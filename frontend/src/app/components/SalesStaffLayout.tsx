@@ -4,18 +4,20 @@ import { PointOfSale } from './PointOfSale';
 import { SalesManagement } from './SalesManagement';
 import { CustomerManagement } from './CustomerManagement';
 import { ReturnManagement } from './ReturnManagement';
-import { ShoppingCart, Users, CreditCard, LogOut, Sparkles, RotateCcw, KeyRound } from 'lucide-react';
+import { ShoppingCart, Users, CreditCard, LogOut, Sparkles, RotateCcw, KeyRound, UserCog } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationCenter } from './NotificationCenter';
 import { useAuth } from '../../lib/auth-context';
 import { BrandLogo } from './BrandLogo';
 import { PortalPasswordResetModal } from './PortalPasswordResetModal';
+import { PortalProfileSettingsModal } from './PortalProfileSettingsModal';
 
 export function SalesStaffLayout() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('pos');
   const { user, logout } = useAuth();
   const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
+  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -76,16 +78,35 @@ export function SalesStaffLayout() {
         <div className="p-3">
           <div className="rounded-2xl p-4 bg-gradient-to-br from-[#FFD60A] to-[#FFB800] text-[#1A1A22] relative overflow-hidden">
             <Sparkles className="absolute -top-2 -right-2 w-16 h-16 opacity-20" />
-            <div className="text-xs opacity-70 mb-1">Welcome back</div>
-            <div className="text-sm leading-tight truncate font-bold">{user?.name || 'Sales Staff'}</div>
-            <div className="mt-3 flex flex-col gap-1.5">
+            <div className="flex items-center gap-2.5 mb-2 relative z-10">
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-[#1A1A22]/30 bg-black/10 flex items-center justify-center shrink-0">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-[#1A1A22]">{(user?.name || 'S').charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] opacity-70 leading-none mb-0.5">Welcome back</div>
+                <div className="text-xs leading-tight truncate font-bold">{user?.name || 'Sales Staff'}</div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-col gap-1.5 relative z-10">
+              <Button
+                type="button"
+                onClick={() => setIsProfileSettingsOpen(true)}
+                className="w-full bg-[#1A1A22]/15 hover:bg-[#1A1A22]/25 text-[#1A1A22] border border-[#1A1A22]/20 rounded-lg h-8 text-xs font-semibold shadow-none transition"
+              >
+                <UserCog className="w-3.5 h-3.5 mr-1.5" />
+                Profile & Settings
+              </Button>
               <Button
                 type="button"
                 onClick={() => setIsPasswordResetOpen(true)}
                 className="w-full bg-[#1A1A22]/15 hover:bg-[#1A1A22]/25 text-[#1A1A22] border border-[#1A1A22]/20 rounded-lg h-8 text-xs font-semibold shadow-none transition"
               >
                 <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-                Reset Password
+                Reset Password (OTP)
               </Button>
               <Button
                 type="button"
@@ -110,12 +131,16 @@ export function SalesStaffLayout() {
             <NotificationCenter />
             <button
               type="button"
-              onClick={() => setIsPasswordResetOpen(true)}
-              title="Click to reset password"
+              onClick={() => setIsProfileSettingsOpen(true)}
+              title="Click to customize profile and settings"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-[#1D1D25] py-1 pl-1 pr-3 hover:border-yellow-400/40 transition group cursor-pointer"
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E5202A] to-[#FFD60A] flex items-center justify-center text-xs font-bold text-white shadow-sm">
-                {(user?.name || 'S').charAt(0).toUpperCase()}
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-gradient-to-br from-[#E5202A] to-[#FFD60A] flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  (user?.name || 'S').charAt(0).toUpperCase()
+                )}
               </div>
               <span className="text-xs font-medium text-white/80 group-hover:text-yellow-300 transition max-w-[100px] truncate">
                 {user?.name?.split(' ')[0] || user?.username || 'Cashier'}
@@ -131,6 +156,10 @@ export function SalesStaffLayout() {
       <PortalPasswordResetModal
         isOpen={isPasswordResetOpen}
         onClose={() => setIsPasswordResetOpen(false)}
+      />
+      <PortalProfileSettingsModal
+        isOpen={isProfileSettingsOpen}
+        onClose={() => setIsProfileSettingsOpen(false)}
       />
     </div>
   );

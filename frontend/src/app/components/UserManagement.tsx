@@ -7,12 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
-import { Plus, Search, Edit, Trash2, Users, Shield, UserCog, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, Shield, UserCog, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../lib/auth-context';
 import { useRoles, useUsers, useUsersMutations } from '../../lib/hooks';
 import { writeAuditLog } from '../../lib/audit';
-import { PortalPasswordResetModal } from './PortalPasswordResetModal';
 
 type AppRole = 'admin' | 'sales' | 'inventory';
 type UserStatus = 'Active' | 'Inactive';
@@ -95,7 +94,6 @@ export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
-  const [resetPasswordTarget, setResetPasswordTarget] = useState<UserRow | null>(null);
   const [formData, setFormData] = useState<UserFormData>(emptyForm);
 
   const roleOptions = useMemo(() => {
@@ -506,16 +504,6 @@ export function UserManagement() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            title="Reset Password via OTP"
-                            className="text-yellow-400 hover:text-yellow-300 hover:bg-red-600 disabled:opacity-40"
-                            onClick={() => setResetPasswordTarget(item)}
-                            disabled={isBusy}
-                          >
-                            <KeyRound className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
                             title={isProtected ? 'Protected account' : item.status === 'Active' ? 'Deactivate user' : 'Delete inactive user'}
                             className="text-yellow-400 hover:text-yellow-300 hover:bg-red-600 disabled:opacity-40"
                             onClick={() => void handleDeleteUser(item)}
@@ -538,18 +526,6 @@ export function UserManagement() {
           </div>
         </CardContent>
       </Card>
-
-      <PortalPasswordResetModal
-        isOpen={Boolean(resetPasswordTarget)}
-        onClose={() => setResetPasswordTarget(null)}
-        targetUser={resetPasswordTarget ? {
-          user_id: resetPasswordTarget.user_id,
-          name: resetPasswordTarget.name,
-          username: resetPasswordTarget.username,
-          email: resetPasswordTarget.email,
-          role_name: resetPasswordTarget.role_name,
-        } : null}
-      />
     </div>
   );
 }

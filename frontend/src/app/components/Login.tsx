@@ -407,7 +407,20 @@ export function Login() {
             </div>
 
             <div>
-              <label className="text-xs text-white/60 mb-1.5 block">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-white/60 block">Password</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setNotice('');
+                    setForgotMode(true);
+                  }}
+                  className="text-xs text-[#FFD60A] hover:text-[#FFE66D] hover:underline transition font-medium cursor-pointer"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                 <input
@@ -450,6 +463,20 @@ export function Login() {
               <LogIn className="w-4 h-4 mr-2" />
               {lockoutRemaining > 0 ? 'Locked (Please Wait)' : 'Sign in'}
             </Button>
+
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setNotice('');
+                  setForgotMode(true);
+                }}
+                className="text-xs text-white/50 hover:text-[#FFD60A] transition"
+              >
+                Need to reset your password? <span className="text-[#FFD60A] underline">Reset with Email OTP</span>
+              </button>
+            </div>
           </form>
           )}
 

@@ -26,6 +26,8 @@ export type AuthUser = {
   role_id: string;
   role_name: string;
   status: string;
+  avatar_url?: string;
+  staff_code?: string;
 };
 
 type AuthContextValue = {
@@ -102,13 +104,29 @@ function readStoredUser(): AuthUser | null {
   try {
     const raw = sessionStorage.getItem(MERYL_USER_STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as AuthUser;
+    const user = JSON.parse(raw) as AuthUser;
+    if (user && !user.avatar_url && typeof window !== "undefined") {
+      user.avatar_url =
+        localStorage.getItem(`meryl_avatar_${user.user_id}`) ||
+        localStorage.getItem(`meryl_avatar_${user.username}`) ||
+        undefined;
+    }
+    return user;
   } catch {
     return null;
   }
 }
 
 function writeStoredUser(authUser: AuthUser) {
+  if (typeof window !== "undefined") {
+    if (authUser.avatar_url) {
+      localStorage.setItem(`meryl_avatar_${authUser.user_id}`, authUser.avatar_url);
+      localStorage.setItem(`meryl_avatar_${authUser.username}`, authUser.avatar_url);
+    } else {
+      localStorage.removeItem(`meryl_avatar_${authUser.user_id}`);
+      localStorage.removeItem(`meryl_avatar_${authUser.username}`);
+    }
+  }
   sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
 }
 
