@@ -769,24 +769,31 @@ def send_otp_email(recipient_email, otp_code, display_name):
 
 def find_active_user_management_account_by_email(email):
     normalized_email = str(email or "").strip().lower()
-    if not normalized_email or not table_exists("user"):
+    if not normalized_email:
         return None
 
-    role_lookup = {
-        str(role.get("role_id")): role
-        for role in fetch_rows("role")
-    } if table_exists("role") else {}
+    if table_exists("user"):
+        role_lookup = {
+            str(role.get("role_id")): role
+            for role in fetch_rows("role")
+        } if table_exists("role") else {}
 
-    for user_row in fetch_rows("user"):
-        if str(user_row.get("email") or "").strip().lower() != normalized_email:
-            continue
-        if str(user_row.get("status") or "active").strip().lower() != "active":
-            return None
-        role = role_lookup.get(str(user_row.get("role_id")))
-        role_name = str((role or {}).get("role_name") or "").strip()
-        if not role_name:
-            return None
-        return user_row
+        for user_row in fetch_rows("user"):
+            if str(user_row.get("email") or "").strip().lower() != normalized_email:
+                continue
+            if str(user_row.get("status") or "active").strip().lower() != "active":
+                return None
+            role = role_lookup.get(str(user_row.get("role_id")))
+            role_name = str((role or {}).get("role_name") or user_row.get("role_name") or "staff").strip()
+            user_row["role_name"] = role_name
+            return user_row
+
+    for account in load_auth_accounts():
+        if str(account.get("email") or "").strip().lower() == normalized_email:
+            if str(account.get("status") or "active").strip().lower() != "active":
+                return None
+            return account
+
     return None
 
 

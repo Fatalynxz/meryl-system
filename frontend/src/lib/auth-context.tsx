@@ -41,7 +41,7 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePasswordAfterRecovery: (newPassword: string) => Promise<void>;
-  verifyPasswordResetOtpAndUpdate: (email: string, otp: string, newPassword: string) => Promise<void>;
+  verifyPasswordResetOtpAndUpdate: (email: string, otp: string, newPassword: string, options?: { keepSession?: boolean }) => Promise<void>;
   requestEmailOtp: (email: string) => Promise<void>;
   completeExternalAuth: (options?: { persist?: boolean; bypassOtpGate?: boolean }) => Promise<AuthUser | null>;
   markGoogleOtpVerified: (email: string) => void;
@@ -414,7 +414,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  const verifyPasswordResetOtpAndUpdate = useCallback(async (email: string, otp: string, newPassword: string) => {
+  const verifyPasswordResetOtpAndUpdate = useCallback(async (
+    email: string,
+    otp: string,
+    newPassword: string,
+    options?: { keepSession?: boolean }
+  ) => {
     const normalizedEmail = email.trim().toLowerCase();
     const cleanOtp = otp.trim();
     const cleanPassword = newPassword.trim();
@@ -427,7 +432,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Password must be at least 8 characters.");
     }
 
-    await supabase.auth.signOut().catch(() => null);
+    if (!options?.keepSession) {
+      await supabase.auth.signOut().catch(() => null);
+    }
 
     const response = await fetch("/api/auth/password-reset/verify", {
       method: "POST",
@@ -444,10 +451,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(String(result?.error || "Unable to reset password right now."));
     }
 
-    sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-    clearGoogleOtpVerifiedEmail();
-    setUser(null);
-    await supabase.auth.signOut().catch(() => null);
+    if (!options?.keepSession) {
+      sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+      clearGoogleOtpVerifiedEmail();
+      setUser(null);
+      await supabase.auth.signOut().catch(() => null);
+    }
   }, []);
 
   const markGoogleOtpVerified = useCallback((email: string) => {

@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ProductManagement } from './ProductManagement';
-import { ClipboardList, Package, LogOut, Sparkles, SlidersHorizontal, Warehouse } from 'lucide-react';
+import { ClipboardList, Package, LogOut, Sparkles, SlidersHorizontal, Warehouse, KeyRound } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationCenter } from './NotificationCenter';
 import { useAuth } from '../../lib/auth-context';
 import { BrandLogo } from './BrandLogo';
 import { InventoryLogPage } from './InventoryLogPage';
+import { PortalPasswordResetModal } from './PortalPasswordResetModal';
 
 export function InventoryStaffLayout() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('product-list');
   const { user, logout } = useAuth();
+  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -78,10 +80,25 @@ export function InventoryStaffLayout() {
           <div className="rounded-2xl p-4 bg-gradient-to-br from-[#FFD60A] to-[#FFB800] text-[#1A1A22] relative overflow-hidden">
             <Sparkles className="absolute -top-2 -right-2 w-16 h-16 opacity-20" />
             <div className="text-xs opacity-70 mb-1">Welcome back</div>
-            <div className="text-sm leading-tight truncate">{user?.name || 'Inventory Staff'}</div>
-            <Button onClick={handleLogout} className="w-full mt-3 bg-[#1A1A22] hover:bg-black text-white rounded-lg h-8 text-xs">
-              <LogOut className="w-3.5 h-3.5 mr-1.5" /> Sign out
-            </Button>
+            <div className="text-sm leading-tight truncate font-bold">{user?.name || 'Inventory Staff'}</div>
+            <div className="mt-3 flex flex-col gap-1.5">
+              <Button
+                type="button"
+                onClick={() => setIsPasswordResetOpen(true)}
+                className="w-full bg-[#1A1A22]/15 hover:bg-[#1A1A22]/25 text-[#1A1A22] border border-[#1A1A22]/20 rounded-lg h-8 text-xs font-semibold shadow-none transition"
+              >
+                <KeyRound className="w-3.5 h-3.5 mr-1.5" />
+                Reset Password
+              </Button>
+              <Button
+                type="button"
+                onClick={handleLogout}
+                className="w-full bg-[#1A1A22] hover:bg-black text-white rounded-lg h-8 text-xs font-semibold transition"
+              >
+                <LogOut className="w-3.5 h-3.5 mr-1.5" />
+                Sign out
+              </Button>
+            </div>
           </div>
         </div>
       </aside>
@@ -94,15 +111,30 @@ export function InventoryStaffLayout() {
           </div>
           <div className="flex items-center gap-3">
             <NotificationCenter />
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E5202A] to-[#FFD60A] flex items-center justify-center text-xs">
-              {(user?.name || 'I').charAt(0).toUpperCase()}
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsPasswordResetOpen(true)}
+              title="Click to reset password"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-[#1D1D25] py-1 pl-1 pr-3 hover:border-yellow-400/40 transition group cursor-pointer"
+            >
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E5202A] to-[#FFD60A] flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                {(user?.name || 'I').charAt(0).toUpperCase()}
+              </div>
+              <span className="text-xs font-medium text-white/80 group-hover:text-yellow-300 transition max-w-[100px] truncate">
+                {user?.name?.split(' ')[0] || user?.username || 'Inventory'}
+              </span>
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto scrollbar-hide p-8 bg-[#0E0E12]">
           {renderContent()}
         </main>
       </div>
+
+      <PortalPasswordResetModal
+        isOpen={isPasswordResetOpen}
+        onClose={() => setIsPasswordResetOpen(false)}
+      />
     </div>
   );
 }
