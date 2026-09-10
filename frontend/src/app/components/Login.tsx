@@ -463,20 +463,6 @@ export function Login() {
               <LogIn className="w-4 h-4 mr-2" />
               {lockoutRemaining > 0 ? 'Locked (Please Wait)' : 'Sign in'}
             </Button>
-
-            <div className="pt-1 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setError('');
-                  setNotice('');
-                  setForgotMode(true);
-                }}
-                className="text-xs text-white/50 hover:text-[#FFD60A] transition"
-              >
-                Need to reset your password? <span className="text-[#FFD60A] underline">Reset with Email OTP</span>
-              </button>
-            </div>
           </form>
           )}
 
