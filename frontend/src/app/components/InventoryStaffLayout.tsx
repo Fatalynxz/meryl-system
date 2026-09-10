@@ -1,20 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ProductManagement } from './ProductManagement';
-import { ClipboardList, Package, LogOut, Sparkles, SlidersHorizontal, Warehouse, KeyRound, UserCog } from 'lucide-react';
+import { ClipboardList, Package, LogOut, Sparkles, SlidersHorizontal, Warehouse, Settings } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationCenter } from './NotificationCenter';
 import { useAuth } from '../../lib/auth-context';
 import { BrandLogo } from './BrandLogo';
 import { InventoryLogPage } from './InventoryLogPage';
-import { PortalPasswordResetModal } from './PortalPasswordResetModal';
 import { PortalProfileSettingsModal } from './PortalProfileSettingsModal';
 
 export function InventoryStaffLayout() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('product-list');
   const { user, logout } = useAuth();
-  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
   const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
 
   const handleLogout = () => {
@@ -27,6 +25,7 @@ export function InventoryStaffLayout() {
     { id: 'product-settings', label: 'Product Settings', icon: SlidersHorizontal },
     { id: 'inventory', label: 'Inventory', icon: Warehouse },
     { id: 'inventory-log', label: 'Inventory Log', icon: ClipboardList },
+    { id: 'profile-settings', label: 'Profile & Settings', icon: Settings },
   ];
 
   const renderContent = () => {
@@ -60,11 +59,17 @@ export function InventoryStaffLayout() {
         <nav className="flex-1 px-3 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeView === item.id;
+            const isActive = item.id === 'profile-settings' ? isProfileSettingsOpen : activeView === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => {
+                  if (item.id === 'profile-settings') {
+                    setIsProfileSettingsOpen(true);
+                  } else {
+                    setActiveView(item.id);
+                  }
+                }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm ${
                   isActive
                     ? 'bg-gradient-to-r from-[#E5202A] to-[#B81820] text-white shadow-lg shadow-red-900/30'
@@ -81,7 +86,12 @@ export function InventoryStaffLayout() {
         <div className="p-3">
           <div className="rounded-2xl p-4 bg-gradient-to-br from-[#FFD60A] to-[#FFB800] text-[#1A1A22] relative overflow-hidden">
             <Sparkles className="absolute -top-2 -right-2 w-16 h-16 opacity-20" />
-            <div className="flex items-center gap-2.5 mb-2 relative z-10">
+            <button
+              type="button"
+              onClick={() => setIsProfileSettingsOpen(true)}
+              title="Click to customize profile and settings"
+              className="w-full flex items-center gap-2.5 mb-2 relative z-10 text-left hover:opacity-85 transition cursor-pointer"
+            >
               <div className="w-8 h-8 rounded-full overflow-hidden border border-[#1A1A22]/30 bg-black/10 flex items-center justify-center shrink-0">
                 {user?.avatar_url ? (
                   <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
@@ -93,24 +103,8 @@ export function InventoryStaffLayout() {
                 <div className="text-[11px] opacity-70 leading-none mb-0.5">Welcome back</div>
                 <div className="text-xs leading-tight truncate font-bold">{user?.name || 'Inventory Staff'}</div>
               </div>
-            </div>
+            </button>
             <div className="mt-3 flex flex-col gap-1.5 relative z-10">
-              <Button
-                type="button"
-                onClick={() => setIsProfileSettingsOpen(true)}
-                className="w-full bg-[#1A1A22]/15 hover:bg-[#1A1A22]/25 text-[#1A1A22] border border-[#1A1A22]/20 rounded-lg h-8 text-xs font-semibold shadow-none transition"
-              >
-                <UserCog className="w-3.5 h-3.5 mr-1.5" />
-                Profile & Settings
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setIsPasswordResetOpen(true)}
-                className="w-full bg-[#1A1A22]/15 hover:bg-[#1A1A22]/25 text-[#1A1A22] border border-[#1A1A22]/20 rounded-lg h-8 text-xs font-semibold shadow-none transition"
-              >
-                <KeyRound className="w-3.5 h-3.5 mr-1.5" />
-                Reset Password (OTP)
-              </Button>
               <Button
                 type="button"
                 onClick={handleLogout}
@@ -156,10 +150,6 @@ export function InventoryStaffLayout() {
         </main>
       </div>
 
-      <PortalPasswordResetModal
-        isOpen={isPasswordResetOpen}
-        onClose={() => setIsPasswordResetOpen(false)}
-      />
       <PortalProfileSettingsModal
         isOpen={isProfileSettingsOpen}
         onClose={() => setIsProfileSettingsOpen(false)}
