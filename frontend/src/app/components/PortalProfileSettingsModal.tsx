@@ -318,7 +318,7 @@ export function PortalProfileSettingsModal({
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#E5202A]/20 to-[#FFD60A]/20 border border-yellow-400/30 text-yellow-400 shadow-inner">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 shadow-inner">
             <User className="h-5 w-5" />
           </div>
           <div>
@@ -332,25 +332,25 @@ export function PortalProfileSettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab("profile")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-lg transition ${
               activeTab === "profile"
-                ? "bg-gradient-to-r from-[#E5202A] to-[#B81820] text-white shadow"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-yellow-400 text-black shadow-md hover:bg-yellow-300"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+            <Sparkles className={`w-3.5 h-3.5 ${activeTab === "profile" ? "text-black" : "text-yellow-400"}`} />
             Profile & Personalization
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("security")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-lg transition ${
               activeTab === "security"
-                ? "bg-gradient-to-r from-[#E5202A] to-[#B81820] text-white shadow"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-yellow-400 text-black shadow-md hover:bg-yellow-300"
+                : "text-zinc-400 hover:text-white hover:bg-white/5"
             }`}
           >
-            <KeyRound className="w-3.5 h-3.5 text-yellow-300" />
+            <KeyRound className={`w-3.5 h-3.5 ${activeTab === "security" ? "text-black" : "text-yellow-400"}`} />
             Reset Password (OTP)
           </button>
         </div>
@@ -395,7 +395,7 @@ export function PortalProfileSettingsModal({
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#E5202A] to-[#FFD60A] flex items-center justify-center text-xl font-bold text-white">
+                      <div className="w-full h-full bg-gradient-to-br from-[#FFD60A] to-[#FFB800] text-[#1A1A22] flex items-center justify-center text-xl font-extrabold shadow-inner">
                         {userInitial}
                       </div>
                     )}
