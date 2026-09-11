@@ -33,44 +33,58 @@ export function AuditLogViewer() {
   const filteredLogs = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return logs.filter((log) => {
+      const action = String(log?.action_type || "").toUpperCase();
+      const entity = String(log?.entity_type || "");
+      const actorName = String(log?.actor_name || "");
+      const actorRole = String(log?.actor_role || "");
+      const entityId = String(log?.entity_id || "");
+
       // Category filter
-      if (selectedFilter === "AUTH" && !log.action_type.startsWith("AUTH_") && !log.action_type.startsWith("TERMINAL_")) {
+      if (selectedFilter === "AUTH" && !action.startsWith("AUTH_") && !action.startsWith("TERMINAL_")) {
         return false;
       }
-      if (selectedFilter === "PRODUCT" && !log.action_type.startsWith("PRODUCT_") && !log.action_type.startsWith("STOCK_") && !log.action_type.startsWith("PRICE_")) {
+      if (selectedFilter === "PRODUCT" && !action.startsWith("PRODUCT_") && !action.startsWith("STOCK_") && !action.startsWith("PRICE_")) {
         return false;
       }
-      if (selectedFilter === "POS" && !log.action_type.startsWith("POS_")) {
+      if (selectedFilter === "POS" && !action.startsWith("POS_")) {
         return false;
       }
 
       // Search term
       if (!q) return true;
+      let metaString = "";
+      try {
+        metaString = typeof log?.metadata === "object" && log?.metadata !== null ? JSON.stringify(log.metadata) : String(log?.metadata || "");
+      } catch {
+        metaString = "";
+      }
+
       return (
-        log.action_type.toLowerCase().includes(q) ||
-        log.entity_type.toLowerCase().includes(q) ||
-        String(log.actor_name ?? "").toLowerCase().includes(q) ||
-        String(log.actor_role ?? "").toLowerCase().includes(q) ||
-        String(log.entity_id ?? "").toLowerCase().includes(q) ||
-        JSON.stringify(log.metadata ?? "").toLowerCase().includes(q)
+        action.toLowerCase().includes(q) ||
+        entity.toLowerCase().includes(q) ||
+        actorName.toLowerCase().includes(q) ||
+        actorRole.toLowerCase().includes(q) ||
+        entityId.toLowerCase().includes(q) ||
+        metaString.toLowerCase().includes(q)
       );
     });
   }, [logs, searchTerm, selectedFilter]);
 
-  const getActionBadge = (action: string) => {
-    if (action.includes("LOCKED") || action.includes("FAILED") || action.includes("DELETED") || action.includes("ARCHIVED")) {
-      return <Badge className="bg-red-950/80 border border-red-500/40 text-red-300 font-semibold">{action}</Badge>;
+  const getActionBadge = (action?: string | null) => {
+    const safeAction = String(action || "SYSTEM_EVENT").toUpperCase();
+    if (safeAction.includes("LOCKED") || safeAction.includes("FAILED") || safeAction.includes("DELETED") || safeAction.includes("ARCHIVED")) {
+      return <Badge className="bg-red-950/80 border border-red-500/40 text-red-300 font-semibold">{safeAction}</Badge>;
     }
-    if (action.includes("LOGIN") || action.includes("UNLOCKED") || action.includes("CREATED")) {
-      return <Badge className="bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 font-semibold">{action}</Badge>;
+    if (safeAction.includes("LOGIN") || safeAction.includes("UNLOCKED") || safeAction.includes("CREATED")) {
+      return <Badge className="bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 font-semibold">{safeAction}</Badge>;
     }
-    if (action.includes("OVERRIDE")) {
-      return <Badge className="bg-purple-950/80 border border-purple-500/40 text-purple-300 font-semibold">{action}</Badge>;
+    if (safeAction.includes("OVERRIDE")) {
+      return <Badge className="bg-purple-950/80 border border-purple-500/40 text-purple-300 font-semibold">{safeAction}</Badge>;
     }
-    if (action.includes("STOCK") || action.includes("PRICE")) {
-      return <Badge className="bg-yellow-950/80 border border-yellow-500/40 text-yellow-300 font-semibold">{action}</Badge>;
+    if (safeAction.includes("STOCK") || safeAction.includes("PRICE")) {
+      return <Badge className="bg-yellow-950/80 border border-yellow-500/40 text-yellow-300 font-semibold">{safeAction}</Badge>;
     }
-    return <Badge className="bg-[#232332] border border-[#35354a] text-zinc-300 font-semibold">{action}</Badge>;
+    return <Badge className="bg-[#232332] border border-[#35354a] text-zinc-300 font-semibold">{safeAction}</Badge>;
   };
 
   const formatTimestamp = (dateStr?: string) => {
@@ -215,24 +229,34 @@ export function AuditLogViewer() {
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-yellow-100 whitespace-nowrap">
-                      <span className="font-semibold text-white">{log.entity_type}</span>
-                      {log.entity_id && (
+                      <span className="font-semibold text-white">{String(log.entity_type || "SYSTEM")}</span>
+                      {log.entity_id != null && (
                         <span className="text-[11px] text-yellow-200/50 block font-mono">
-                          ID: {log.entity_id.length > 18 ? `${log.entity_id.slice(0, 16)}...` : log.entity_id}
+                          ID: {String(log.entity_id).length > 18 ? `${String(log.entity_id).slice(0, 16)}...` : String(log.entity_id)}
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-zinc-300 max-w-xs truncate">
-                      {log.metadata ? (
-                        <span className="font-mono text-[11px] text-yellow-200/90">
-                          {Object.entries(log.metadata)
-                            .filter(([k]) => k !== "user_agent")
-                            .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`)
-                            .join(" • ") || "Normal activity"}
-                        </span>
-                      ) : (
-                        "Standard action recorded."
-                      )}
+                      {(() => {
+                        if (!log.metadata) return "Standard action recorded.";
+                        try {
+                          const metaObj = typeof log.metadata === "string" ? JSON.parse(log.metadata) : log.metadata;
+                          if (metaObj && typeof metaObj === "object" && !Array.isArray(metaObj)) {
+                            const text = Object.entries(metaObj)
+                              .filter(([k]) => k !== "user_agent")
+                              .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+                              .join(" • ");
+                            return (
+                              <span className="font-mono text-[11px] text-yellow-200/90">
+                                {text || "Normal activity"}
+                              </span>
+                            );
+                          }
+                          return <span className="font-mono text-[11px] text-yellow-200/90">{String(log.metadata)}</span>;
+                        } catch {
+                          return <span className="font-mono text-[11px] text-yellow-200/90">{String(log.metadata)}</span>;
+                        }
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))

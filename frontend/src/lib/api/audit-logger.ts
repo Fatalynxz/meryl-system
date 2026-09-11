@@ -138,15 +138,40 @@ export async function fetchAuditLogs(limit: number = 100): Promise<AuditLogEntry
     if (!error && data && data.length > 0) {
       return data.map((row: any) => ({
         ...row,
+        action_type: String(row.action_type || row.action || "SYSTEM_EVENT").toUpperCase(),
+        entity_type: String(row.entity_type || row.entity || "SYSTEM"),
         actor_name: row.metadata?.actor_name || row.actor?.name || row.actor?.username || "Staff",
         actor_role: row.metadata?.actor_role || "Staff",
       }));
+    }
+
+    if (error) {
+      const fallback = await supabase
+        .from("audit_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (!fallback.error && fallback.data && fallback.data.length > 0) {
+        return fallback.data.map((row: any) => ({
+          ...row,
+          action_type: String(row.action_type || row.action || "SYSTEM_EVENT").toUpperCase(),
+          entity_type: String(row.entity_type || row.entity || "SYSTEM"),
+          actor_name: row.metadata?.actor_name || "Staff",
+          actor_role: row.metadata?.actor_role || "Staff",
+        }));
+      }
     }
   } catch {
     // Fall back to local buffer
   }
 
   // Fallback to local storage logs
-  return getLocalAuditLogs().slice(0, limit);
+  const local = getLocalAuditLogs();
+  return (local || []).map((entry: any) => ({
+    ...entry,
+    action_type: String(entry.action_type || entry.action || "SYSTEM_EVENT").toUpperCase(),
+    entity_type: String(entry.entity_type || entry.entity || "SYSTEM"),
+  })).slice(0, limit);
 }
 
