@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Trophy, Medal, Sparkles, Layers, Tag, UserCheck, CreditCard, Grid } from 'lucide-react';
+import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Trophy, Medal, Sparkles, Layers, Tag, UserCheck, CreditCard, Grid, FileSpreadsheet } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
 import { useProducts, useSales } from '../../lib/hooks';
@@ -967,6 +967,110 @@ export function ReportsAnalytics() {
   const avgDaysChange = previousAvgDays ? previousAvgDays - latestAvgDays : 0;
   const selectedRangeLabel = formatDateRange(selectedWindow.start, selectedWindow.now);
 
+  const handleExportCSV = () => {
+    const reportNames: Record<string, string> = {
+      overview: 'Executive Overview Report',
+      sales: 'Sales Report',
+      revenue: 'Revenue Report',
+      inventory: 'Inventory Report',
+    };
+
+    const csvEscape = (val: unknown) => {
+      const str = String(val ?? '').trim();
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const formatRow = (row: unknown[]) => row.map(csvEscape).join(',');
+
+    const lines: string[] = [];
+    const title = reportNames[reportType] ?? 'Meryl Shoes Business Report';
+    const timestamp = new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+
+    // Metadata Header
+    lines.push(formatRow(['MERYL SHOES ENTERPRISE SYSTEM']));
+    lines.push(formatRow([title]));
+    lines.push(formatRow(['Branch', 'Libertad St., Bacolod City Branch']));
+    lines.push(formatRow(['Date Range', selectedRangeLabel]));
+    lines.push(formatRow(['Report Period Preset', timeRange.toUpperCase()]));
+    lines.push(formatRow(['Generated At', timestamp]));
+    lines.push(formatRow(['Prepared By', 'Store Manager']));
+    lines.push('');
+
+    // Section 1: Executive KPI Metrics
+    lines.push(formatRow(['=== EXECUTIVE KEY PERFORMANCE INDICATORS ===']));
+    lines.push(formatRow(['Metric', 'Current Period', 'Previous Period', 'Growth Rate']));
+    lines.push(formatRow(['Total Revenue (PHP)', currentMetrics.current.revenue.toFixed(2), currentMetrics.previous.revenue.toFixed(2), `${revenueChange.toFixed(1)}%`]));
+    lines.push(formatRow(['Units Sold', currentMetrics.current.units, currentMetrics.previous.units, `${unitsChange.toFixed(1)}%`]));
+    lines.push(formatRow(['Completed Transactions', currentMetrics.current.transactions, currentMetrics.previous.transactions, `${percentChange(currentMetrics.current.transactions, currentMetrics.previous.transactions).toFixed(1)}%`]));
+    lines.push(formatRow(['Average Order Value (PHP)', currentMetrics.current.avgOrderValue.toFixed(2), currentMetrics.previous.avgOrderValue.toFixed(2), `${percentChange(currentMetrics.current.avgOrderValue, currentMetrics.previous.avgOrderValue).toFixed(1)}%`]));
+    lines.push('');
+
+    // Section 2: Report-Specific Data
+    if (reportType === 'overview' || reportType === 'sales') {
+      lines.push(formatRow(['=== TOP SELLING BRANDS ===']));
+      lines.push(formatRow(['Rank', 'Brand Name', 'Pairs Sold', 'Gross Revenue (PHP)']));
+      topRankings.brand.byRevenue.forEach((b) => {
+        lines.push(formatRow([`#${b.rank}`, b.name, b.sales, b.revenue.toFixed(2)]));
+      });
+      lines.push('');
+
+      lines.push(formatRow(['=== TOP SELLING SHOE MODELS ===']));
+      lines.push(formatRow(['Rank', 'Shoe Model', 'Pairs Sold', 'Gross Revenue (PHP)']));
+      topRankings.product.byRevenue.forEach((p) => {
+        lines.push(formatRow([`#${p.rank}`, p.name, p.sales, p.revenue.toFixed(2)]));
+      });
+      lines.push('');
+
+      lines.push(formatRow(['=== TOP PRODUCT VARIANTS / COLORWAYS ===']));
+      lines.push(formatRow(['Rank', 'Variant / Color', 'Pairs Sold', 'Gross Revenue (PHP)']));
+      topRankings.variant.byRevenue.forEach((v) => {
+        lines.push(formatRow([`#${v.rank}`, v.name, v.sales, v.revenue.toFixed(2)]));
+      });
+      lines.push('');
+    }
+
+    if (reportType === 'revenue') {
+      lines.push(formatRow(['=== REVENUE BY PRODUCT CATEGORY ===']));
+      lines.push(formatRow(['Category', 'Gross Revenue (PHP)', 'Revenue Share (%)', 'Growth (%)']));
+      revenueByCategory.forEach((cat) => {
+        lines.push(formatRow([cat.category, cat.revenue.toFixed(2), `${cat.percentage}%`, `${cat.growth}%`]));
+      });
+      lines.push('');
+    }
+
+    if (reportType === 'inventory') {
+      lines.push(formatRow(['=== INVENTORY TURNOVER METRICS ===']));
+      lines.push(formatRow(['Period Bucket', 'Units Sold', 'Turnover Rate', 'Average Days to Sell']));
+      inventoryTurnover.forEach((it) => {
+        lines.push(formatRow([it.month, it.units, `${it.turnover.toFixed(2)}x`, it.avgDays || 0]));
+      });
+      lines.push('');
+
+      lines.push(formatRow(['=== INVENTORY AND STOCK STATUS ===']));
+      lines.push(formatRow(['Item ID', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Stock Status']));
+      inventoryStatusRows.forEach((item) => {
+        lines.push(formatRow([item.itemId, item.name, item.size, item.color, item.stock, item.reorder, item.status]));
+      });
+      lines.push('');
+    }
+
+    const csvContent = lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const filename = `${(reportNames[reportType] ?? 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${timeRange}.csv`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.success('CSV report spreadsheet downloaded successfully.');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Controls */}
@@ -1016,8 +1120,16 @@ export function ReportsAnalytics() {
             onClick={handleExportReport}
             className="h-9 bg-yellow-400 text-black hover:bg-yellow-500"
           >
-          <Download className="w-4 h-4 mr-2" />
-          Export PDF
+            <Download className="w-4 h-4 mr-2" />
+            Export PDF
+          </Button>
+          <Button
+            onClick={handleExportCSV}
+            variant="outline"
+            className="h-9 border-yellow-400/40 text-yellow-400 hover:bg-yellow-400/10 hover:text-yellow-300"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Export CSV
           </Button>
         </div>
       </div>
