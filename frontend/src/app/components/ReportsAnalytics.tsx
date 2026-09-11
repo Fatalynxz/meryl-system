@@ -968,107 +968,127 @@ export function ReportsAnalytics() {
   const selectedRangeLabel = formatDateRange(selectedWindow.start, selectedWindow.now);
 
   const handleExportCSV = () => {
-    const reportNames: Record<string, string> = {
-      overview: 'Executive Overview Report',
-      sales: 'Sales Report',
-      revenue: 'Revenue Report',
-      inventory: 'Inventory Report',
-    };
+    try {
+      const reportNames: Record<string, string> = {
+        overview: 'Executive Overview Report',
+        sales: 'Sales Report',
+        revenue: 'Revenue Report',
+        inventory: 'Inventory Report',
+      };
 
-    const csvEscape = (val: unknown) => {
-      const str = String(val ?? '').trim();
-      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-        return `"${str.replace(/"/g, '""')}"`;
+      const csvEscape = (val: unknown) => {
+        if (val === null || val === undefined) return '';
+        const str = String(val).trim();
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const formatRow = (row: unknown[]) => row.map(csvEscape).join(',');
+
+      const lines: string[] = [];
+      const title = reportNames[reportType] ?? 'Meryl Shoes Business Report';
+      const timestamp = new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+
+      // Safe KPI metrics computation
+      const curRev = Number(currentMetrics.current?.revenue ?? 0);
+      const prevRev = Number(currentMetrics.previous?.revenue ?? 0);
+      const curUnits = Number(currentMetrics.current?.units ?? 0);
+      const prevUnits = Number(currentMetrics.previous?.units ?? 0);
+      const curTx = Number(currentMetrics.current?.transactions ?? 0);
+      const prevTx = Number(currentMetrics.previous?.transactions ?? 0);
+      const curAov = curTx > 0 ? curRev / curTx : 0;
+      const prevAov = prevTx > 0 ? prevRev / prevTx : 0;
+
+      // Metadata Header
+      lines.push(formatRow(['MERYL SHOES ENTERPRISE SYSTEM']));
+      lines.push(formatRow([title]));
+      lines.push(formatRow(['Branch', 'Libertad St., Bacolod City Branch']));
+      lines.push(formatRow(['Date Range', selectedRangeLabel]));
+      lines.push(formatRow(['Report Period Preset', String(timeRange).toUpperCase()]));
+      lines.push(formatRow(['Generated At', timestamp]));
+      lines.push(formatRow(['Prepared By', 'Store Manager']));
+      lines.push('');
+
+      // Section 1: Executive KPI Metrics
+      lines.push(formatRow(['=== EXECUTIVE KEY PERFORMANCE INDICATORS ===']));
+      lines.push(formatRow(['Metric', 'Current Period', 'Previous Period', 'Growth Rate']));
+      lines.push(formatRow(['Total Revenue (PHP)', curRev.toFixed(2), prevRev.toFixed(2), `${revenueChange.toFixed(1)}%`]));
+      lines.push(formatRow(['Units Sold', curUnits, prevUnits, `${unitsChange.toFixed(1)}%`]));
+      lines.push(formatRow(['Completed Transactions', curTx, prevTx, `${percentChange(curTx, prevTx).toFixed(1)}%`]));
+      lines.push(formatRow(['Average Order Value (PHP)', curAov.toFixed(2), prevAov.toFixed(2), `${percentChange(curAov, prevAov).toFixed(1)}%`]));
+      lines.push('');
+
+      // Section 2: Report-Specific Data
+      if (reportType === 'overview' || reportType === 'sales') {
+        lines.push(formatRow(['=== TOP SELLING BRANDS ===']));
+        lines.push(formatRow(['Rank', 'Brand Name', 'Pairs Sold', 'Gross Revenue (PHP)']));
+        const brandRankings = topRankings.brand?.byRevenue ?? [];
+        brandRankings.forEach((b: any) => {
+          lines.push(formatRow([`#${b.rank ?? 1}`, b.name ?? 'N/A', b.sales ?? 0, Number(b.revenue ?? 0).toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== TOP SELLING SHOE MODELS ===']));
+        lines.push(formatRow(['Rank', 'Shoe Model', 'Pairs Sold', 'Gross Revenue (PHP)']));
+        const productRankings = topRankings.products?.byRevenue ?? [];
+        productRankings.forEach((p: any) => {
+          lines.push(formatRow([`#${p.rank ?? 1}`, p.name ?? 'N/A', p.sales ?? 0, Number(p.revenue ?? 0).toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== TOP PRODUCT VARIANTS / COLORWAYS ===']));
+        lines.push(formatRow(['Rank', 'Variant / Color', 'Pairs Sold', 'Gross Revenue (PHP)']));
+        const variantRankings = topRankings.variant?.byRevenue ?? [];
+        variantRankings.forEach((v: any) => {
+          lines.push(formatRow([`#${v.rank ?? 1}`, v.name ?? 'N/A', v.sales ?? 0, Number(v.revenue ?? 0).toFixed(2)]));
+        });
+        lines.push('');
       }
-      return str;
-    };
 
-    const formatRow = (row: unknown[]) => row.map(csvEscape).join(',');
+      if (reportType === 'revenue') {
+        lines.push(formatRow(['=== REVENUE BY PRODUCT CATEGORY ===']));
+        lines.push(formatRow(['Category', 'Gross Revenue (PHP)', 'Revenue Share (%)', 'Growth (%)']));
+        (revenueByCategory ?? []).forEach((cat: any) => {
+          lines.push(formatRow([cat.category ?? 'Uncategorized', Number(cat.revenue ?? 0).toFixed(2), `${cat.percentage ?? 0}%`, `${cat.growth ?? 0}%`]));
+        });
+        lines.push('');
+      }
 
-    const lines: string[] = [];
-    const title = reportNames[reportType] ?? 'Meryl Shoes Business Report';
-    const timestamp = new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+      if (reportType === 'inventory') {
+        lines.push(formatRow(['=== INVENTORY TURNOVER METRICS ===']));
+        lines.push(formatRow(['Period Bucket', 'Units Sold', 'Turnover Rate', 'Average Days to Sell']));
+        (inventoryTurnover ?? []).forEach((it: any) => {
+          lines.push(formatRow([it.month ?? 'N/A', it.units ?? 0, `${Number(it.turnover ?? 0).toFixed(2)}x`, it.avgDays || 0]));
+        });
+        lines.push('');
 
-    // Metadata Header
-    lines.push(formatRow(['MERYL SHOES ENTERPRISE SYSTEM']));
-    lines.push(formatRow([title]));
-    lines.push(formatRow(['Branch', 'Libertad St., Bacolod City Branch']));
-    lines.push(formatRow(['Date Range', selectedRangeLabel]));
-    lines.push(formatRow(['Report Period Preset', timeRange.toUpperCase()]));
-    lines.push(formatRow(['Generated At', timestamp]));
-    lines.push(formatRow(['Prepared By', 'Store Manager']));
-    lines.push('');
+        lines.push(formatRow(['=== INVENTORY AND STOCK STATUS ===']));
+        lines.push(formatRow(['Item ID', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Stock Status']));
+        (inventoryStatusRows ?? []).forEach((item: any) => {
+          lines.push(formatRow([item.itemId ?? 'N/A', item.name ?? 'N/A', item.size ?? 'N/A', item.color ?? 'N/A', item.stock ?? 0, item.reorder ?? 0, item.status ?? 'N/A']));
+        });
+        lines.push('');
+      }
 
-    // Section 1: Executive KPI Metrics
-    lines.push(formatRow(['=== EXECUTIVE KEY PERFORMANCE INDICATORS ===']));
-    lines.push(formatRow(['Metric', 'Current Period', 'Previous Period', 'Growth Rate']));
-    lines.push(formatRow(['Total Revenue (PHP)', currentMetrics.current.revenue.toFixed(2), currentMetrics.previous.revenue.toFixed(2), `${revenueChange.toFixed(1)}%`]));
-    lines.push(formatRow(['Units Sold', currentMetrics.current.units, currentMetrics.previous.units, `${unitsChange.toFixed(1)}%`]));
-    lines.push(formatRow(['Completed Transactions', currentMetrics.current.transactions, currentMetrics.previous.transactions, `${percentChange(currentMetrics.current.transactions, currentMetrics.previous.transactions).toFixed(1)}%`]));
-    lines.push(formatRow(['Average Order Value (PHP)', currentMetrics.current.avgOrderValue.toFixed(2), currentMetrics.previous.avgOrderValue.toFixed(2), `${percentChange(currentMetrics.current.avgOrderValue, currentMetrics.previous.avgOrderValue).toFixed(1)}%`]));
-    lines.push('');
-
-    // Section 2: Report-Specific Data
-    if (reportType === 'overview' || reportType === 'sales') {
-      lines.push(formatRow(['=== TOP SELLING BRANDS ===']));
-      lines.push(formatRow(['Rank', 'Brand Name', 'Pairs Sold', 'Gross Revenue (PHP)']));
-      topRankings.brand.byRevenue.forEach((b) => {
-        lines.push(formatRow([`#${b.rank}`, b.name, b.sales, b.revenue.toFixed(2)]));
-      });
-      lines.push('');
-
-      lines.push(formatRow(['=== TOP SELLING SHOE MODELS ===']));
-      lines.push(formatRow(['Rank', 'Shoe Model', 'Pairs Sold', 'Gross Revenue (PHP)']));
-      topRankings.product.byRevenue.forEach((p) => {
-        lines.push(formatRow([`#${p.rank}`, p.name, p.sales, p.revenue.toFixed(2)]));
-      });
-      lines.push('');
-
-      lines.push(formatRow(['=== TOP PRODUCT VARIANTS / COLORWAYS ===']));
-      lines.push(formatRow(['Rank', 'Variant / Color', 'Pairs Sold', 'Gross Revenue (PHP)']));
-      topRankings.variant.byRevenue.forEach((v) => {
-        lines.push(formatRow([`#${v.rank}`, v.name, v.sales, v.revenue.toFixed(2)]));
-      });
-      lines.push('');
+      // Add UTF-8 BOM so Excel opens accented characters and symbols properly
+      const csvContent = '\uFEFF' + lines.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const filename = `${(reportNames[reportType] ?? 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${timeRange}.csv`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('CSV report spreadsheet downloaded successfully.');
+    } catch (err: any) {
+      console.error('Failed to export CSV report:', err);
+      toast.error(`CSV Export failed: ${err?.message ?? 'Unknown error'}`);
     }
-
-    if (reportType === 'revenue') {
-      lines.push(formatRow(['=== REVENUE BY PRODUCT CATEGORY ===']));
-      lines.push(formatRow(['Category', 'Gross Revenue (PHP)', 'Revenue Share (%)', 'Growth (%)']));
-      revenueByCategory.forEach((cat) => {
-        lines.push(formatRow([cat.category, cat.revenue.toFixed(2), `${cat.percentage}%`, `${cat.growth}%`]));
-      });
-      lines.push('');
-    }
-
-    if (reportType === 'inventory') {
-      lines.push(formatRow(['=== INVENTORY TURNOVER METRICS ===']));
-      lines.push(formatRow(['Period Bucket', 'Units Sold', 'Turnover Rate', 'Average Days to Sell']));
-      inventoryTurnover.forEach((it) => {
-        lines.push(formatRow([it.month, it.units, `${it.turnover.toFixed(2)}x`, it.avgDays || 0]));
-      });
-      lines.push('');
-
-      lines.push(formatRow(['=== INVENTORY AND STOCK STATUS ===']));
-      lines.push(formatRow(['Item ID', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Stock Status']));
-      inventoryStatusRows.forEach((item) => {
-        lines.push(formatRow([item.itemId, item.name, item.size, item.color, item.stock, item.reorder, item.status]));
-      });
-      lines.push('');
-    }
-
-    const csvContent = lines.join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const filename = `${(reportNames[reportType] ?? 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${timeRange}.csv`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    toast.success('CSV report spreadsheet downloaded successfully.');
   };
 
   return (
@@ -1117,16 +1137,18 @@ export function ReportsAnalytics() {
             Compare
           </label>
           <Button
+            type="button"
             onClick={handleExportReport}
-            className="h-9 bg-yellow-400 text-black hover:bg-yellow-500"
+            className="h-9 bg-yellow-400 text-black hover:bg-yellow-500 cursor-pointer"
           >
             <Download className="w-4 h-4 mr-2" />
             Export PDF
           </Button>
           <Button
+            type="button"
             onClick={handleExportCSV}
             variant="outline"
-            className="h-9 border-yellow-400/40 text-yellow-400 hover:bg-yellow-400/10 hover:text-yellow-300"
+            className="h-9 border-yellow-400/40 text-yellow-400 hover:bg-yellow-400/10 hover:text-yellow-300 cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Export CSV
