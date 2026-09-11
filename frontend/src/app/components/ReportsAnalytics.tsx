@@ -637,7 +637,7 @@ export function ReportsAnalytics() {
 
     return {
       period: formatDateRange(start, now),
-      store: 'Libertad St., Bacolod City Branch',
+      store: 'Araneta Ave, Bacolod, 6100 Negros Occidental',
       preparedBy: 'Store Manager',
       atv,
       bestBrandName: bestBrand?.[0] ?? 'N/A',
@@ -778,7 +778,7 @@ export function ReportsAnalytics() {
         y -= 22;
         text(reportNames[reportType] ?? 'Meryl Shoes Report', margin, y, 24, true);
         y -= 16;
-        text('Libertad St., Bacolod City Branch', margin, y, 10, false, '0.25 0.25 0.25');
+        text('Araneta Ave, Bacolod, 6100 Negros Occidental', margin, y, 10, false, '0.25 0.25 0.25');
         y -= 18;
       } else {
         text(reportNames[reportType] ?? 'Meryl Shoes Report', margin, y, 10, true, '0.35 0.35 0.35');
@@ -1004,7 +1004,7 @@ export function ReportsAnalytics() {
       // Metadata Header
       lines.push(formatRow(['MERYL SHOES ENTERPRISE SYSTEM']));
       lines.push(formatRow([title]));
-      lines.push(formatRow(['Branch', 'Libertad St., Bacolod City Branch']));
+      lines.push(formatRow(['Branch', 'Araneta Ave, Bacolod, 6100 Negros Occidental']));
       lines.push(formatRow(['Date Range', selectedRangeLabel]));
       lines.push(formatRow(['Report Period Preset', String(timeRange).toUpperCase()]));
       lines.push(formatRow(['Generated At', timestamp]));
