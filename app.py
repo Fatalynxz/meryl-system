@@ -1162,6 +1162,29 @@ def react_assets(filename):
     return response
 
 
+@app.route("/favicon.ico")
+@app.route("/favicon.svg")
+@app.route("/favicon.png")
+@app.route("/favicon-32x32.png")
+@app.route("/favicon-16x16.png")
+@app.route("/favicon-192x192.png")
+@app.route("/apple-touch-icon.png")
+@app.route("/Meryl_Logo_Red.svg")
+def react_root_icons():
+    filename = request.path.lstrip("/")
+    dist_file = REACT_DIST_DIR / filename
+    if dist_file.exists():
+        response = send_from_directory(str(REACT_DIST_DIR), filename)
+        response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+    public_file = Path(__file__).resolve().parent / "frontend" / "public" / filename
+    if public_file.exists():
+        response = send_from_directory(str(public_file.parent), filename)
+        response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+    abort(404)
+
+
 @app.route("/customers")
 @login_required
 @roles_required("admin")
