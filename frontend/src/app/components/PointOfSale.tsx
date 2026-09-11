@@ -926,12 +926,8 @@ export function PointOfSale() {
     });
 
   const handleRemoveFromCart = (id: string) => {
-    const item = cart.find((i) => i.id === id);
-    const desc = item ? `Void line item: ${item.productName} (${item.size})` : "Void item from cart";
-    requestManagerApproval(desc, () => {
-      removeFromCart(id);
-      toast.success("Item removed from cart.");
-    });
+    removeFromCart(id);
+    toast.success("Item removed from cart.");
   };
 
   const updateQuantity = (id: string, newQuantity: number) => {
@@ -1021,19 +1017,6 @@ export function PointOfSale() {
     const currentItem = cart.find((item) => item.id === id);
     if (currentItem && isBogoCartItem(currentItem)) return;
     const cleanDiscount = Math.min(100, Math.max(0, Number(currentItem?.discountInput ?? currentItem?.discount) || 0));
-
-    // If discount > 20% and current discount was <= 20%, require manager approval
-    if (cleanDiscount > 20 && (!currentItem || currentItem.discount <= 20)) {
-      requestManagerApproval(`High Custom Discount: ${cleanDiscount}% on ${currentItem?.productName || "Product"}`, () => {
-        setCart((prev) =>
-          prev.map((item) => {
-            if (item.id !== id || isBogoCartItem(item)) return item;
-            return { ...item, discount: cleanDiscount, discountInput: String(cleanDiscount) };
-          }),
-        );
-      });
-      return;
-    }
 
     setCart((prev) =>
       prev.map((item) => {
@@ -1790,7 +1773,7 @@ function formatReceiptNumber(salesId?: string) {
                               size="sm"
                               variant="ghost"
                               onClick={() => handleRemoveFromCart(item.id)}
-                              title="Void line item"
+                              title="Remove from cart"
                               className="text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg h-8 w-8 p-0"
                             >
                               <Trash2 className="w-4 h-4" />
