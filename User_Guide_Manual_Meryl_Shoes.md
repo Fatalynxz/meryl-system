@@ -221,107 +221,122 @@ Triggered whenever a cashier attempts a restricted managerial action: voiding an
 
 ---
 
-### Section 2.7: Product List – Footwear Product Catalog Management
+### Section 2.7: Product List – Master Footwear Catalog (Search, Category Filters & Active Records)
 #### Screen Description
-The Product List catalog allows administrators to inspect all footwear models enrolled in the system, check stock availability per size run, and filter products across brands and categories.
+The Product List interface serves as the primary master data repository for Meryl Shoes. It enables store administrators to inspect all registered footwear styles across colorways and sizes, monitor total enrolled records, toggle archived/discontinued models, and rapidly filter inventory through dynamic keyword searches, category dropdowns, and quick-select category filter pills.
 
 #### Screenshot Callout Labels
-* **Box 1 [Search & Category Filter Bar]**: "Dynamic filters to search by shoe model name, brand (Nike, Adidas, Puma, etc.), and footwear category."
-* **Box 2 [Stock Status Badges]**: "Color-coded visual badges indicating 'In Stock' (Green), 'Low Stock' (Amber), or 'Out of Stock' (Red)."
-* **Box 3 [Product Thumbnail Cards]**: "Cards displaying footwear style photos, model name, SKU prefix, and retail price."
-* **Box 4 [Size Availability Matrix]**: "Dropdown/grid showing individual physical inventory counts across EU sizes 36 to 46."
-* **Box 5 [Inspect Product Button]**: "Opens the Inventory Variant Details modal to check safety levels and expiration dates."
+* **Box 1 [Product List / Master Data Header & Live Records Counter]**: "Header showing the active module title and a yellow pill badge displaying total enrolled records (e.g., '879 records')."
+* **Box 2 [Show / Hide Archived Products Toggle]**: "Bordered toggle button that switches between displaying only active catalog styles or revealing soft-deleted/archived items."
+* **Box 3 [+ Add Product Action Button]**: "Prominent golden button with plus icon that triggers the Add Product modal for master shoe enrollment."
+* **Box 4 [Catalog Master Search Bar & Clear Button]**: "Search input with yellow magnifying glass icon and instant clear button (X) accepting SKU codes, shoe names, brands, categories, or colors."
+* **Box 5 [Category Dropdown Filter]**: "Dropdown selector with filter icon showing all registered footwear categories alongside live variant counts per category."
+* **Box 6 [Quick-Select Category Filter Pills]**: "Horizontal row of interactive pills (All, Basketball Shoes, Boots, Casual Shoes, Formal Shoes, Sandals, Sports Shoes) for fast 1-click catalog filtering."
+* **Box 7 [Master Data Catalog Table]**: "Comprehensive table displaying Image thumbnails, SKU identifiers, Product titles, Brands, Categories, Colors, Target Departments, EU Sizes, Unit Prices (PHP), and Row Action controls."
+* **Box 8 [Edit Variant Action Icon]**: "Yellow square edit pencil button on each product row that opens the Edit Product modal for attribute updates or deletion."
 
 #### STEPS
 1. Click **Product List** in the left navigation sidebar.
-2. Use the search input to locate specific footwear models by name or style code.
-3. Select a category tab (e.g., *Running*, *Casual*, *Basketball*) to filter the view.
-4. Click on any product card to expand its **Size Run Breakdown** and inspect physical quantities in the stockroom.
-5. Click **Inspect** to review complete SKU metadata and safety stock thresholds.
+2. Review the live catalog records badge at the top right to verify total registered styles (e.g., `879 records`).
+3. To filter by footwear style, click any of the **Quick-Select Category Pills** (e.g., *Basketball Shoes (2)*, *Casual Shoes*, or *All*), or select a category from the **Category Dropdown**.
+4. Use the **Catalog Master Search Bar** to instantly find specific models by typing the SKU barcode, product name (e.g., *Street Runner*), brand (e.g., *Venus*, *Nike*), or color. Click the **X** button to quickly clear your search query.
+5. Click **Show Archived** if you need to inspect or restore previously discontinued products.
+6. To enroll a brand-new shoe model into the catalog, click the golden **+ Add Product** button.
+7. To edit an existing footwear item, click the yellow **Edit** icon in the **Actions** column of the desired row.
 
 ---
 
-### Section 2.8: Inventory Variant Details & Stock Condition Modal
+### Section 2.8: Product List – Add Product Modal (Master Shoe Variant Enrollment)
 #### Screen Description
-Opens when clicking on any product card or the Details button in the catalog table. Displays an in-depth stock breakdown for individual size variants.
+Triggered by clicking the "+ Add Product" button on the Product List page. This modal allows administrators to enroll new footwear styles and variants into the master database by specifying commercial style titles, manufacturer brands, category taxonomies, EU sizing, colorways, target departments, unit costs, and high-resolution shoe imagery.
 
 #### Screenshot Callout Labels
-* **Box 1 [Product Header Bar]**: "Product thumbnail, shoe model name, brand badge, and category tag."
-* **Box 2 [SKU & Pricing Pills]**: "Displays unique SKU barcode identifier, cost price, and retail SRP."
-* **Box 3 [Stock Health Breakdown]**: "Pills displaying Physical On Hand, Reserved Units, Available Stock, and Safety Reorder Point (ROP)."
-* **Box 4 [Stock Condition Status Badge]**: "Color-coded badge indicating 'Normal Stock', 'Low Stock Triggered', or 'Stockout Alert'."
-* **Box 5 [Manufacturing & Batch Dates]**: "Displays manufacturing batch date and expiration/warranty limits."
+* **Box 1 [Modal Header & Dismiss Control]**: "Modal title 'Add Product' with quick-exit close icon (X) at the upper right."
+* **Box 2 [Product Name & Brand Mandatory Inputs]**: "Required text fields for the commercial footwear style title (e.g., 'Street Runner') and manufacturer brand (e.g., 'Venus', 'Nike')."
+* **Box 3 [Category Classification Dropdown]**: "Mandatory selector to assign the shoe style to an established category (Running Shoes, Casual Shoes, Basketball Shoes, Sandals, etc.)."
+* **Box 4 [Size & Colorway Specifications]**: "Input fields to designate the specific EU shoe size (e.g., '42', '10', '43') and visual colorway (e.g., 'White', 'Black', 'Green')."
+* **Box 5 [Department Demographic Selector]**: "Dropdown menu to assign customer demographic targeting: Men, Women, Kids, Unisex, or N/A."
+* **Box 6 [Unit Price Currency Input]**: "Numeric field to set the base supplier cost / unit price for the shoe variant in Philippine Pesos (PHP)."
+* **Box 7 [Product Image Upload & URL Panel]**: "Interactive media panel with image preview placeholder, 'Upload Image' button for local device files, and text field to paste direct web image URLs."
+* **Box 8 [Save Product Submission Button]**: "Golden action button that validates required fields, commits the new footwear variant into Supabase, and updates the catalog."
 
 #### STEPS
-1. Navigate to **Product List** in the admin sidebar.
-2. Search for the shoe model or filter by category.
-3. Click on the product row or the **Inspect** eye icon.
-4. Review the modal details to check available inventory counts across all sizes.
-5. Click anywhere outside the modal or press `Esc` to close.
+1. On the Product List page, click the golden **+ Add Product** button at the top right.
+2. In the modal, enter the **Product Name \*** (e.g., *Air Force Classic*) and the manufacturer **Brand \*** (e.g., *Meryl*).
+3. Open the **Category \*** dropdown and select the appropriate category (e.g., *Casual Shoes*).
+4. Enter the shoe **Size** (e.g., *42*) and **Color** (e.g., *White*).
+5. Select the target **Department** (e.g., *Men* or *Kids*) from the dropdown.
+6. Enter the base **Unit Price** in Philippine Pesos (e.g., *1500*).
+7. For the **Product Image (Optional)**, either click **Upload Image** to select a photo from your local computer, or paste a high-resolution image web URL directly into the text box.
+8. Click **Save Product**. The modal closes, a confirmation notification appears, and the new footwear variant appears in the catalog table.
 
 ---
 
-### Section 2.9: Product Settings – Add New Master Product Modal
+### Section 2.9: Product List – Edit Product Modal (Variant Attributes, Update Scope & Archiving)
 #### Screen Description
-The Product Settings interface is the administrative master tool used to register brand-new footwear models, configure barcode formats, and establish pricing benchmarks.
+Triggered by clicking the yellow Edit icon on any row in the Product List table. Allows administrators to modify footwear specifications, update product imagery, select an update scope across sibling variants, and safely delete or archive discontinued shoe models without corrupting past sales records.
 
 #### Screenshot Callout Labels
-* **Box 1 [Brand & Product Name Inputs]**: "Text inputs for brand (Nike, Adidas, Puma, etc.) and commercial style model name."
-* **Box 2 [Category Dropdown]**: "Select footwear category: Running, Basketball, Casual, Sandals, Formal, Training."
-* **Box 3 [Color & Gender Selectors]**: "Colorway description (e.g., White/Black) and target demographic (Men, Women, Unisex, Kids)."
-* **Box 4 [Supplier Cost (COGS) & Retail SRP]**: "Input purchase cost and retail price; system displays live profit margin percentage."
-* **Box 5 [EU Size Matrix Multi-Select Checkboxes]**: "Interactive checkboxes for EU sizes 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46."
-* **Box 6 [Product Photo Upload / URL Field]**: "Upload shoe imagery or paste high-resolution product image URL."
-* **Box 7 [Save Product Button]**: "Creates the master product record and automatically generates unique SKU variants for all checked sizes."
+* **Box 1 [Edit Product Header]**: "Modal title 'Edit Product' with quick-exit close icon (X)."
+* **Box 2 [Pre-Populated Attribute Inputs]**: "Editable fields pre-filled with the selected variant's Product Name, Brand, Category, Size, Color, Department, and Unit Price."
+* **Box 3 [Product Image Manager]**: "Image preview container displaying the current shoe photo with options to upload a replacement photo or paste a new URL."
+* **Box 4 [UPDATE SCOPE Selector]**: "Three interactive selector pills allowing administrators to govern how edits propagate: 'This variant only', 'Selected variants', or 'All variants of base'."
+* **Box 5 [Delete / Archive Product Action Button]**: "Red text button on the left that deactivates discontinued shoes to Inactive status while safeguarding historical sales transactions (switches to 'Restore Product' if already inactive)."
+* **Box 6 [Update Product Confirmation Button]**: "Golden action button on the right that commits all edited attributes to Supabase and updates the catalog table."
 
 #### STEPS
-1. Navigate to **Product Settings** in the sidebar.
-2. Click **Add Product** at the top right.
-3. Fill in the **Brand**, **Model Name**, and select the **Category**.
-4. Enter the **Unit Cost (₱)** and **Selling Price (₱)**.
-5. Check all EU sizes included in the supplier shipment.
-6. Upload a product photo or enter an image URL.
-7. Click **Save Product**. The system generates size variants, assigns unique barcode SKUs, and displays a green confirmation prompt.
+1. Locate the footwear item to modify in the **Product List** table and click the yellow **Edit** icon in the **Actions** column.
+2. In the **Edit Product** modal, review and modify the attributes:
+   - Edit the **Product Name**, **Brand**, or **Category**.
+   - Adjust the **Size**, **Color**, **Department**, or **Unit Price**.
+   - Update or replace the **Product Image** by uploading a new file or pasting an updated image URL.
+3. Under **UPDATE SCOPE**, select how the modifications should be applied:
+   - **This variant only**: Modifies only the currently selected size and color SKU.
+   - **Selected variants**: Opens checkboxes to choose specific sibling variants within the shoe model family.
+   - **All variants of base**: Propagates commercial attributes (Name, Brand, Category, Unit Price, Image) across all sizes and colors of this footwear style simultaneously.
+4. If the footwear model has been discontinued or retired from sales, click the red **Delete / Archive Product** button on the bottom left. The system flags the item as inactive and hides it from POS registers.
+5. To commit the edits, click the golden **Update Product** button. The system updates the records in real time and displays a success toast notification.
 
 ---
 
-### Section 2.10: Product Settings – Configure Product Parameters Modal (Stock-In, Markup % & POS Visibility)
+### Section 2.10: Product Settings – Footwear Parameters & Stock Health Dashboard
 #### Screen Description
-Opens when clicking Configure Parameters on any product in the settings matrix. Used to add bulk delivery stock, adjust retail markup, and toggle POS display visibility.
+The Product Settings dashboard provides high-level inventory health metrics across all catalog variants and enables store managers to configure stock-in intake, retail markup rates, and automated Reorder Points (ROP).
 
 #### Screenshot Callout Labels
-* **Box 1 [Product Specs Header]**: "Thumbnail, Model Title, Category, Colorway, and Unit Cost summary."
-* **Box 2 [Inventory Stocking Panel]**: "Shows Current On-Hand units; input field for 'Add Stock Quantity' to increment physical inventory upon delivery."
-* **Box 3 [ROP & Safety Stock Fields]**: "Configures the Reorder Point threshold and maximum warehouse shelf capacity."
-* **Box 4 [Markup & Pricing Calculator]**: "Input markup percentage (%) to auto-calculate SRP, or edit SRP directly to see profit margins."
-* **Box 5 [POS Availability Toggle]**: "Switch to make the product visible on POS registers or hide out-of-season styles."
-* **Box 6 [Save Parameters Button]**: "Commits new stock levels, logs a delivery audit entry, and updates prices."
+* **Box 1 [Inventory KPI Metrics Bar]**: "Four summary stat cards displaying Total Variants, POS Available in-stock count, Low Stock Warnings, and Out of Stock counts."
+* **Box 2 [Stock Health Status Filter Dropdown]**: "Dropdown selector to filter by inventory status: 'All Stock Statuses', 'In-Stock & Sellable', 'Low Stock (≤ Reorder)', 'Out of Stock', or 'Inactive Items'."
+* **Box 3 [Category Filter Dropdown]**: "Filters the settings matrix by footwear classification."
+* **Box 4 [Variant Inventory Configuration Table]**: "Table listing SKU, Product Name, Brand, Unit Cost, SRP, On-Hand Stock, ROP, and the Configure action icon."
+* **Box 5 [Configure Parameters Action Button]**: "Gear icon on each variant row that launches the Configure Product Parameters modal."
+
+#### STEPS
+1. Click **Product Settings** in the left navigation sidebar.
+2. Review the four top KPI cards to monitor stock health (Total Variants, POS Available, Low Stock, Out of Stock).
+3. Filter the table using the **Stock Status** dropdown to isolate low-stock or out-of-stock shoes.
+4. Click the gear **Configure** button on any variant to adjust its inventory parameters.
+
+---
+
+### Section 2.11: Product Settings – Configure Product Parameters Modal (Stock-In, Markup % & POS Visibility)
+#### Screen Description
+Opens when clicking Configure Parameters (gear icon) on any product in the Product Settings matrix. Used to record delivery stock-ins, adjust retail markup percentages, recalculate SRP selling prices, establish safety reorder thresholds, and set expiration or manufacturing batch dates.
+
+#### Screenshot Callout Labels
+* **Box 1 [Product Specifications Summary]**: "Displays thumbnail, style name, SKU barcode, category, colorway, and current unit cost."
+* **Box 2 [Stock-In Intake & Current On-Hand Panel]**: "Shows Current On-Hand units with an 'Add Stock Quantity' field that automatically projects new available shelf stock."
+* **Box 3 [Markup % & Live SRP Calculator]**: "Input markup percentage to automatically calculate SRP, displaying the exact gross profit margin in Pesos (₱)."
+* **Box 4 [Reorder Point (ROP) & Safety Stock Input]**: "Configures the minimum quantity threshold that triggers automated low-stock restocking alerts."
+* **Box 5 [Batch Dates & Active Status Toggle]**: "Input fields for manufacturing batch date and expiration/warranty date, plus an Active/Inactive status selector."
+* **Box 6 [Save Parameters Confirmation Button]**: "Commits the new stock quantity, updates retail prices across all connected POS terminals, and logs an inventory movement audit entry."
 
 #### STEPS
 1. In the Product Settings table, click the **Gear/Configure** icon on the desired shoe style.
-2. To add incoming shipment stock, enter the number of pairs received into the **Add Stock Quantity** field.
-3. Adjust the **Markup %** or **Reorder Point (ROP)** if needed.
-4. Ensure the **POS Availability** toggle is enabled (green).
-5. Click **Save Parameters**. The stock count is incremented immediately and logged in the inventory audit ledger.
-
----
-
-### Section 2.11: Product Settings – Edit Product & Archive Confirmation Modal
-#### Screen Description
-Opens when clicking Edit on an existing footwear model to update details, or clicking Archive/Delete Product to safely deactivate discontinued footwear without corrupting historical sales records.
-
-#### Screenshot Callout Labels
-* **Box 1 [Edit Scope Selector]**: "Choose whether modifications apply to 'All Sizes in Style' or 'Selected Variants Only'."
-* **Box 2 [Attribute Modification Fields]**: "Editable fields for Product Name, Category, SRP Price, and Brand."
-* **Box 3 [Archive / Restore Product Button]**: "Red button that deactivates discontinued shoes from active registers while preserving past sales data."
-* **Box 4 [Update Product Button]**: "Saves modified details across selected variants."
-
-#### STEPS
-1. Click **Edit** on any product row.
-2. Select the edit scope: choose **All Sizes** for general price changes, or specific variants for single-size adjustments.
-3. Modify the desired fields (e.g., updating SRP from ₱3,500 to ₱3,299).
-4. If the shoe is discontinued, click **Archive Product** to hide it from registers.
-5. Click **Update Product** to commit changes.
+2. To intake incoming deliveries, enter the number of pairs received into the **Add Stock Quantity** field (e.g., `24`).
+3. To adjust pricing, input a new **Markup %** (e.g., `35%`); the system instantly calculates and displays the new retail SRP and margin.
+4. Set the **Reorder Level (ROP)** (e.g., `10 pairs`) to define when the system should raise low-stock warnings.
+5. Verify the **Status** is set to `Active` so the shoe is sellable on POS cash registers.
+6. Click **Save Parameters**. The physical count increments immediately and a delivery intake audit entry is logged.
 
 ---
 
