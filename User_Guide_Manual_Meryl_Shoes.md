@@ -1045,3 +1045,4 @@ Allows inventory custodians to update their account credentials and log out of t
 1. Click **Profile & Settings** to update your account password if required.
 2. At the end of your shift, click the red **Logout** button.
 3. Confirm that the browser redirects to `/login` to ensure the warehouse terminal is secure.
+

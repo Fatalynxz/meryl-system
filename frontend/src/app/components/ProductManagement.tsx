@@ -225,6 +225,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
   const queryClient = useQueryClient();
   const [internalActiveTab, setInternalActiveTab] = useState<ProductTab>(view ?? "inventory");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<UiProduct | null>(null);
   const [deleteTargetProductId, setDeleteTargetProductId] = useState<string>("");
@@ -305,12 +306,52 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.product_id, product])), [products]);
 
-  const filteredProducts = useMemo(() => {
-    const q = searchTerm.toLowerCase();
+  const baseProducts = useMemo(() => {
     const sourceRaw = activeTab === "inventory" ? products.filter((product) => product.hasInventory) : products;
-    const source = activeTab === "list" && !showArchived ? sourceRaw.filter((product) => !product.isArchived) : sourceRaw;
-    return source.filter(
-      (product) =>
+    return activeTab === "list" && !showArchived ? sourceRaw.filter((product) => !product.isArchived) : sourceRaw;
+  }, [activeTab, products, showArchived]);
+
+  const availableCategories = useMemo(() => {
+    const countMap = new Map<string, number>();
+    for (const p of baseProducts) {
+      const cat = (p.category || "Uncategorized").trim();
+      const key = cat.toLowerCase();
+      countMap.set(key, (countMap.get(key) ?? 0) + 1);
+    }
+
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const c of categories) {
+      const name = String(c.category_name ?? "").trim();
+      if (name) {
+        const key = name.toLowerCase();
+        map.set(key, {
+          id: String(c.category_id ?? name),
+          name,
+          count: countMap.get(key) ?? 0,
+        });
+      }
+    }
+
+    for (const p of baseProducts) {
+      const name = (p.category || "Uncategorized").trim();
+      const key = name.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: p.category_id || name,
+          name,
+          count: countMap.get(key) ?? 0,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [baseProducts, categories]);
+
+  const filteredProducts = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    return baseProducts.filter((product) => {
+      const matchesSearch =
+        !q ||
         product.name.toLowerCase().includes(q) ||
         product.brand.toLowerCase().includes(q) ||
         product.category.toLowerCase().includes(q) ||
@@ -318,9 +359,16 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
         product.color.toLowerCase().includes(q) ||
         product.gender.toLowerCase().includes(q) ||
         product.size.toLowerCase().includes(q) ||
-        variantLabel(product).toLowerCase().includes(q),
-    );
-  }, [activeTab, products, searchTerm, showArchived]);
+        variantLabel(product).toLowerCase().includes(q);
+
+      const matchesCategory =
+        selectedCategory === "all" ||
+        product.category_id === selectedCategory ||
+        product.category.toLowerCase() === selectedCategory.toLowerCase();
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [baseProducts, searchTerm, selectedCategory]);
 
   const selectedSettingsProduct = productMap.get(stockForm.product_id);
   const editableVariantGroup = useMemo(() => {
@@ -813,16 +861,135 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="mb-4 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400" />
-              <Input
-                placeholder={activeTab === "inventory" ? "Search by SKU, product, brand, category, or variant..." : "Search by SKU, product, brand, or category..."}
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="pl-10 bg-[#12121A] border-[#24242F] text-white placeholder:text-zinc-500 focus-visible:ring-yellow-400/40"
-              />
+          <CardContent className="space-y-4">
+            {/* Search and Category Filter Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400" />
+                <Input
+                  placeholder={activeTab === "inventory" ? "Search by SKU, product, brand, category, or variant..." : "Search by SKU, product, brand, or category..."}
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="pl-10 pr-9 bg-[#12121A] border-[#24242F] text-white placeholder:text-zinc-500 focus-visible:ring-yellow-400/40"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter Dropdown */}
+              <div className="w-full sm:w-60 shrink-0">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="h-10 bg-[#12121A] border-[#24242F] text-white focus:ring-yellow-400/40">
+                    <div className="flex items-center gap-2 truncate">
+                      <Filter className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <span className="truncate">
+                        {selectedCategory === "all"
+                          ? "All Categories"
+                          : availableCategories.find(
+                              (c) =>
+                                c.id === selectedCategory ||
+                                c.name.toLowerCase() === selectedCategory.toLowerCase()
+                            )?.name ?? selectedCategory}
+                      </span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#15161d] border-[#2a2c36] text-white max-h-72">
+                    <SelectItem value="all">
+                      All Categories ({baseProducts.length})
+                    </SelectItem>
+                    {availableCategories.map((cat) => (
+                      <SelectItem key={cat.id || cat.name} value={cat.name}>
+                        {cat.name} ({cat.count})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {/* Quick-filter Category Pills */}
+            {availableCategories.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-thin scrollbar-thumb-zinc-800">
+                <span className="text-zinc-500 font-medium shrink-0 mr-1 text-[11px] uppercase tracking-wider">
+                  Category:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory("all")}
+                  className={`px-3 py-1 rounded-full border transition-all shrink-0 font-medium ${
+                    selectedCategory === "all"
+                      ? "bg-yellow-400 text-black border-yellow-400 font-bold shadow-sm"
+                      : "bg-[#181824] border-[#24242F] text-zinc-300 hover:border-yellow-400/40 hover:text-white"
+                  }`}
+                >
+                  All ({baseProducts.length})
+                </button>
+                {availableCategories.map((cat) => {
+                  const isSelected =
+                    selectedCategory.toLowerCase() === cat.name.toLowerCase() ||
+                    selectedCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id || cat.name}
+                      type="button"
+                      onClick={() => setSelectedCategory(isSelected ? "all" : cat.name)}
+                      className={`px-3 py-1 rounded-full border transition-all shrink-0 font-medium ${
+                        isSelected
+                          ? "bg-yellow-400 text-black border-yellow-400 font-bold shadow-sm"
+                          : "bg-[#181824] border-[#24242F] text-zinc-300 hover:border-yellow-400/40 hover:text-white"
+                      }`}
+                    >
+                      {cat.name} <span className="opacity-70 text-[10px]">({cat.count})</span>
+                    </button>
+                  );
+                })}
+                {(selectedCategory !== "all" || searchTerm) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory("all");
+                      setSearchTerm("");
+                    }}
+                    className="text-xs text-yellow-400/80 hover:text-yellow-300 underline underline-offset-2 shrink-0 ml-2"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Active Filter Info Notice */}
+            {(selectedCategory !== "all" || searchTerm) && (
+              <div className="flex items-center justify-between text-xs text-zinc-400 px-1 pt-1">
+                <span>
+                  Showing <strong className="text-yellow-400">{filteredProducts.length}</strong> matching items
+                  {selectedCategory !== "all" && (
+                    <> in category <strong className="text-white">"{selectedCategory}"</strong></>
+                  )}
+                  {searchTerm && (
+                    <> matching <strong className="text-white">"{searchTerm}"</strong></>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory("all");
+                    setSearchTerm("");
+                  }}
+                  className="text-yellow-400 hover:underline cursor-pointer"
+                >
+                  Reset all
+                </button>
+              </div>
+            )}
+
             {activeTab === "list" ? (
               <ProductListTable products={filteredProducts} onEdit={openEditProduct} />
             ) : (
