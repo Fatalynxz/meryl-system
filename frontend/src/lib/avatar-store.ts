@@ -333,3 +333,4 @@ export async function removeStoredAvatar(identifiers: AvatarIdentifiers): Promis
     );
   }
 }
+

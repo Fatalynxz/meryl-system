@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
-import { ArrowLeft, KeyRound, LogIn, Mail, User, Lock, ShieldCheck, Eye, EyeOff, CheckCircle2, ShieldAlert, Clock } from 'lucide-react';
+import { ArrowLeft, KeyRound, LogIn, Mail, User, Lock, ShieldCheck, Eye, EyeOff, CheckCircle2, ShieldAlert, Clock, RotateCcw, AlertTriangle } from 'lucide-react';
 import { checkLockoutStatus, clearFailedAttempts, getPostLoginPath, recordFailedAttempt, useAuth } from '../../lib/auth-context';
 import { logAuditEvent } from '../../lib/api/audit-logger';
 import { supabase } from '../../lib/supabase';
@@ -34,6 +34,23 @@ export function Login() {
     return time > Date.now() ? time : 0;
   });
   const [resetCooldownRemaining, setResetCooldownRemaining] = useState<number>(0);
+
+  // OTP 10-minute expiration timer (persisted across refreshes)
+  const [otpExpiresUntil, setOtpExpiresUntil] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = sessionStorage.getItem('meryl_otp_expires_until');
+    if (!stored) return 0;
+    const time = parseInt(stored, 10);
+    return time > Date.now() ? time : 0;
+  });
+  const [otpExpiresRemaining, setOtpExpiresRemaining] = useState<number>(0);
+
+  // Helper to format remaining seconds as MM:SS
+  const formatTimer = (totalSeconds: number) => {
+    const mins = Math.floor(Math.max(0, totalSeconds) / 60);
+    const secs = Math.max(0, totalSeconds) % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Check lockout status whenever username changes
   useEffect(() => {
@@ -87,6 +104,27 @@ export function Login() {
     const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
   }, [resetCooldownUntil]);
+
+  // Live ticking countdown for OTP 10-minute expiration
+  useEffect(() => {
+    if (otpExpiresUntil <= 0) {
+      setOtpExpiresRemaining(0);
+      return;
+    }
+
+    const updateOtpTimer = () => {
+      const remaining = Math.max(0, Math.ceil((otpExpiresUntil - Date.now()) / 1000));
+      setOtpExpiresRemaining(remaining);
+      if (remaining <= 0) {
+        setOtpExpiresUntil(0);
+        sessionStorage.removeItem('meryl_otp_expires_until');
+      }
+    };
+
+    updateOtpTimer();
+    const timer = setInterval(updateOtpTimer, 1000);
+    return () => clearInterval(timer);
+  }, [otpExpiresUntil]);
 
   useEffect(() => {
     const resetExternalSubmitting = () => {
@@ -195,10 +233,23 @@ export function Login() {
       setResetOtp(res?.dev_otp || '');
       setResetPassword('');
       setResetConfirmPassword('');
+
+      // Dynamic 10-minute (600s) OTP expiry timer
+      const expiresTime = Date.now() + 10 * 60 * 1000;
+      setOtpExpiresUntil(expiresTime);
+      setOtpExpiresRemaining(600);
+      sessionStorage.setItem('meryl_otp_expires_until', String(expiresTime));
+
+      // 60-second rate limit cooldown for resending OTP
+      const cooldownTime = Date.now() + 60 * 1000;
+      setResetCooldownUntil(cooldownTime);
+      setResetCooldownRemaining(60);
+      sessionStorage.setItem('meryl_reset_cooldown_until', String(cooldownTime));
+
       if (res?.dev_otp) {
-        setNotice(`OTP: ${res.dev_otp} (Testing mode: OTP provided here).`);
+        setNotice(`OTP: ${res.dev_otp} (Testing mode: OTP provided here). Valid for 10 minutes.`);
       } else {
-        setNotice('Password reset email sent via Supabase Auth! Click the link in your email to reset, or enter your code below.');
+        setNotice('Verification code sent to your email! Please check your inbox and enter the 6 to 8-digit code below.');
       }
     } catch (resetError) {
       const message = resetError instanceof Error ? resetError.message : 'Unable to send password reset request right now.';
@@ -226,22 +277,43 @@ export function Login() {
   const handleVerifyResetOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+
+    const cleanOtp = resetOtp.trim().replace(/\D/g, '');
+    if (!cleanOtp || cleanOtp.length < 6 || cleanOtp.length > 8) {
+      setError('Please enter the 6 to 8-digit OTP code sent to your email.');
+      return;
+    }
+
+    if (otpExpiresUntil > 0 && otpExpiresRemaining <= 0) {
+      setError('This OTP code has expired. Please click "Resend OTP" to request a fresh code.');
+      return;
+    }
+
+    if (resetPassword.trim().length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (resetPassword !== resetConfirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
     setNotice('');
 
     try {
-      if (resetPassword.trim().length < 8) {
-        setError('Password must be at least 8 characters.');
-        return;
-      }
-      if (resetPassword !== resetConfirmPassword) {
-        setError('Passwords do not match.');
-        return;
-      }
+      await verifyPasswordResetOtpAndUpdate(resetEmail, cleanOtp, resetPassword);
+      setNotice('Password updated successfully! You can now sign in with your new password.');
 
-      await verifyPasswordResetOtpAndUpdate(resetEmail, resetOtp, resetPassword);
-      setNotice('Password updated successfully. You can now sign in with your new password.');
+      // Clear timers and storage
+      setOtpExpiresUntil(0);
+      setOtpExpiresRemaining(0);
+      sessionStorage.removeItem('meryl_otp_expires_until');
+      setResetCooldownUntil(0);
+      setResetCooldownRemaining(0);
+      sessionStorage.removeItem('meryl_reset_cooldown_until');
+
       window.setTimeout(() => {
         setForgotMode(false);
         setResetStep('email');
@@ -332,19 +404,49 @@ export function Login() {
             {resetStep === 'otp' && (
               <>
                 <div>
-                  <label className="text-xs text-white/60 mb-1.5 block">Email OTP code</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-white/60 block">Email OTP code (6 to 8 digits)</label>
+                    {otpExpiresUntil > 0 && (
+                      otpExpiresRemaining > 0 ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono border transition-colors ${
+                          otpExpiresRemaining <= 60
+                            ? 'bg-amber-500/20 border-amber-400/50 text-amber-300 animate-pulse'
+                            : 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300'
+                        }`}>
+                          <Clock className="w-3 h-3" />
+                          Expires in {formatTimer(otpExpiresRemaining)}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono bg-red-500/20 border border-red-500/40 text-red-300 font-semibold animate-pulse">
+                          <AlertTriangle className="w-3 h-3" />
+                          Expired (00:00)
+                        </span>
+                      )
+                    )}
+                  </div>
                   <div className="relative">
                     <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                     <input
                       type="text"
                       inputMode="numeric"
-                      placeholder="Enter OTP code"
+                      maxLength={8}
+                      placeholder="Enter 6 to 8-digit OTP code"
                       value={resetOtp}
-                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
                       required
-                      className="w-full pl-10 pr-3 py-2.5 bg-[#1D1D25] border border-white/5 rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#FFD60A]/40 focus:ring-2 focus:ring-[#FFD60A]/20 transition"
+                      className={`w-full pl-10 pr-3 py-2.5 bg-[#1D1D25] border rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 transition tracking-wider font-mono ${
+                        otpExpiresUntil > 0 && otpExpiresRemaining <= 0
+                          ? 'border-red-500/60 focus:border-red-500 focus:ring-red-500/20'
+                          : 'border-white/5 focus:border-[#FFD60A]/40 focus:ring-[#FFD60A]/20'
+                      }`}
                     />
                   </div>
+                  {otpExpiresUntil > 0 && otpExpiresRemaining <= 0 && (
+                    <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                      OTP code has expired. Please click <strong>Resend OTP</strong> below to get a fresh code.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -384,7 +486,7 @@ export function Login() {
                 <Clock className="w-5 h-5 text-red-400 shrink-0 mt-0.5 animate-pulse" />
                 <div className="min-w-0">
                   <p className="text-xs text-red-200">
-                    For security purposes, you can only request this after{' '}
+                    For security purposes, you can only request a new code after{' '}
                     <span className="font-mono font-bold text-yellow-400 text-sm">
                       {resetCooldownRemaining} second{resetCooldownRemaining === 1 ? '' : 's'}
                     </span>
@@ -410,8 +512,17 @@ export function Login() {
 
             <Button
               type="submit"
-              disabled={submitting || (resetStep === 'email' && resetCooldownRemaining > 0)}
-              className="w-full h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] shadow-lg shadow-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              disabled={
+                submitting ||
+                (resetStep === 'email' && resetCooldownRemaining > 0) ||
+                (resetStep === 'otp' && (
+                  (otpExpiresUntil > 0 && otpExpiresRemaining <= 0) ||
+                  resetOtp.length < 6 ||
+                  resetPassword.length < 8 ||
+                  !resetConfirmPassword
+                ))
+              }
+              className="w-full h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] shadow-lg shadow-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
             >
               {resetStep === 'email' ? (
                 resetCooldownRemaining > 0 ? <Clock className="w-4 h-4 mr-2" /> : <Mail className="w-4 h-4 mr-2" />
@@ -432,8 +543,17 @@ export function Login() {
                 onClick={handleForgotPassword}
                 className="h-11 w-full rounded-xl border border-white/10 bg-[#1D1D25] text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {resetCooldownRemaining > 0 ? <Clock className="w-4 h-4 mr-2" /> : <Mail className="w-4 h-4 mr-2" />}
-                {resetCooldownRemaining > 0 ? `Resend OTP in ${resetCooldownRemaining}s` : 'Resend OTP'}
+                {resetCooldownRemaining > 0 ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2 text-yellow-400 animate-pulse" />
+                    <span>Resend OTP in {resetCooldownRemaining}s</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4 mr-2 text-yellow-400" />
+                    <span>Resend OTP</span>
+                  </>
+                )}
               </Button>
             )}
 

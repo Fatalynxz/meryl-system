@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   RefreshCw,
   X,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { logAuditEvent } from "../../lib/api/audit-logger";
@@ -41,7 +43,14 @@ export function PortalPasswordResetModal({
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresRemaining, setOtpExpiresRemaining] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const formatTimer = (totalSeconds: number) => {
+    const mins = Math.floor(Math.max(0, totalSeconds) / 60);
+    const secs = Math.max(0, totalSeconds) % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // Initialize or reset state when modal opens
   useEffect(() => {
@@ -55,6 +64,7 @@ export function PortalPasswordResetModal({
       setIsSending(false);
       setIsVerifying(false);
       setResendCooldown(0);
+      setOtpExpiresRemaining(0);
       setErrorMessage("");
     }
   }, [isOpen, effectiveUser]);
@@ -67,6 +77,15 @@ export function PortalPasswordResetModal({
     }, 1000);
     return () => window.clearInterval(timer);
   }, [resendCooldown]);
+
+  // Handle OTP 10-minute expiration timer
+  useEffect(() => {
+    if (otpExpiresRemaining <= 0) return;
+    const timer = window.setInterval(() => {
+      setOtpExpiresRemaining((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [otpExpiresRemaining]);
 
   if (!isOpen) return null;
 
@@ -85,7 +104,8 @@ export function PortalPasswordResetModal({
       await requestPasswordReset(cleanEmail);
       setStep("verify");
       setResendCooldown(60);
-      toast.success("One-Time Password (OTP) sent to your email!");
+      setOtpExpiresRemaining(600);
+      toast.success("Verification OTP code sent to your email!");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send OTP. Please check your email.";
       setErrorMessage(msg);
@@ -101,8 +121,13 @@ export function PortalPasswordResetModal({
     const cleanPassword = newPassword.trim();
     const cleanConfirm = confirmPassword.trim();
 
-    if (!cleanOtp || cleanOtp.length !== 6) {
-      setErrorMessage("Please enter the complete 6-digit OTP code.");
+    if (!cleanOtp || cleanOtp.length < 6 || cleanOtp.length > 8) {
+      setErrorMessage("Please enter the complete 6 to 8-digit OTP code.");
+      return;
+    }
+
+    if (otpExpiresRemaining <= 0) {
+      setErrorMessage("This OTP code has expired. Please click Resend OTP to request a fresh code.");
       return;
     }
 
@@ -224,7 +249,7 @@ export function PortalPasswordResetModal({
                 className="h-11 rounded-xl border-[#2f3142] bg-[#1c1c28] text-sm text-yellow-100 placeholder:text-zinc-500 focus-visible:ring-yellow-400/50"
               />
               <p className="text-[11px] text-zinc-400">
-                A 6-digit verification code will be sent to this email address to verify your identity.
+                A 6 to 8-digit verification code will be sent to this email address to verify your identity.
               </p>
             </div>
 
@@ -277,25 +302,50 @@ export function PortalPasswordResetModal({
 
             {/* OTP Code Input */}
             <div className="space-y-1.5 text-left">
-              <label className="text-xs font-semibold text-yellow-200/90 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-yellow-400" />
-                6-Digit Verification OTP
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-yellow-200/90 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-yellow-400" />
+                  Verification OTP (6 to 8 Digits)
+                </label>
+                {otpExpiresRemaining > 0 ? (
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full border ${
+                    otpExpiresRemaining <= 60
+                      ? "bg-amber-500/20 border-amber-400/40 text-amber-300 animate-pulse"
+                      : "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
+                  }`}>
+                    <Clock className="w-3 h-3" />
+                    Expires in {formatTimer(otpExpiresRemaining)}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 animate-pulse">
+                    <AlertTriangle className="w-3 h-3" />
+                    Expired (00:00)
+                  </span>
+                )}
+              </div>
               <Input
                 type="text"
                 autoFocus
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={6}
-                placeholder="123456"
+                maxLength={8}
+                placeholder="12345678"
                 value={otp}
                 onChange={(e) => {
-                  const cleaned = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  const cleaned = e.target.value.replace(/\D/g, "").slice(0, 8);
                   setOtp(cleaned);
                   if (errorMessage) setErrorMessage("");
                 }}
-                className="h-11 rounded-xl border-[#2f3142] bg-[#1c1c28] text-center text-lg tracking-[0.35em] font-mono text-yellow-300 placeholder:text-zinc-600 focus-visible:ring-yellow-400/50"
+                className={`h-11 rounded-xl bg-[#1c1c28] text-center text-lg tracking-[0.35em] font-mono text-yellow-300 placeholder:text-zinc-600 focus-visible:ring-yellow-400/50 ${
+                  otpExpiresRemaining <= 0 ? "border-red-500/60" : "border-[#2f3142]"
+                }`}
               />
+              {otpExpiresRemaining <= 0 && (
+                <p className="text-xs text-red-400 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  OTP code has expired. Please click <strong>Resend OTP</strong> to request a new code.
+                </p>
+              )}
             </div>
 
             {/* New Password */}
@@ -344,7 +394,7 @@ export function PortalPasswordResetModal({
             <div className="flex flex-col gap-2 pt-2">
               <Button
                 type="submit"
-                disabled={isVerifying || otp.length !== 6 || newPassword.length < 8 || !confirmPassword}
+                disabled={isVerifying || otp.length < 6 || otp.length > 8 || newPassword.length < 8 || !confirmPassword || otpExpiresRemaining <= 0}
                 className="w-full h-11 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-bold shadow-md transition"
               >
                 {isVerifying ? (
@@ -374,9 +424,19 @@ export function PortalPasswordResetModal({
                   type="button"
                   disabled={resendCooldown > 0 || isSending}
                   onClick={handleSendOtp}
-                  className="text-yellow-400 hover:underline disabled:opacity-40 disabled:no-underline transition font-medium"
+                  className="text-yellow-400 hover:underline disabled:opacity-40 disabled:no-underline transition font-medium inline-flex items-center gap-1"
                 >
-                  {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
+                  {resendCooldown > 0 ? (
+                    <>
+                      <Clock className="w-3 h-3 text-yellow-400 animate-pulse" />
+                      Resend OTP in {resendCooldown}s
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="w-3 h-3 text-yellow-400" />
+                      Resend OTP
+                    </>
+                  )}
                 </button>
               </div>
             </div>

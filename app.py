@@ -2204,7 +2204,7 @@ def api_password_reset_request():
             "error": "Your account is not authorized to reset a password. Please contact the administrator.",
         }, 403
 
-    otp_code = f"{random.SystemRandom().randint(0, 999999):06d}"
+    otp_code = f"{random.SystemRandom().randint(10000000, 99999999)}"
     expires_at = datetime.utcnow() + timedelta(minutes=10)
 
     try:
