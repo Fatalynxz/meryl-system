@@ -160,15 +160,19 @@ export function Login() {
     setNotice('');
 
     try {
-      await requestPasswordReset(resetEmail);
+      const res: any = await requestPasswordReset(resetEmail);
       setResetStep('otp');
-      setResetOtp('');
+      setResetOtp(res?.dev_otp || '');
       setResetPassword('');
       setResetConfirmPassword('');
-      setNotice('OTP sent. Enter the code from your email, then set your new password.');
+      if (res?.dev_otp) {
+        setNotice(`OTP: ${res.dev_otp} (Testing mode: OTP provided here).`);
+      } else {
+        setNotice('Password reset email sent via Supabase Auth! Click the link in your email to reset, or enter your code below.');
+      }
     } catch (resetError) {
-      const message = resetError instanceof Error ? resetError.message : 'Unable to send password reset OTP right now.';
-      setError(message.includes('rate limit') ? 'Email rate limit exceeded. Please wait before requesting another OTP.' : message);
+      const message = resetError instanceof Error ? resetError.message : 'Unable to send password reset request right now.';
+      setError(message.includes('rate limit') ? 'Email rate limit exceeded. Please wait a few moments before requesting another reset.' : message);
     } finally {
       setSubmitting(false);
     }

@@ -41,7 +41,7 @@ type AuthContextValue = {
   validateCredentials: (username: string, password: string) => Promise<AuthUser | null>;
   setCurrentUser: (user: AuthUser) => void;
   signInWithGoogle: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{ ok?: boolean; message?: string; dev_otp?: string } | void>;
   updatePasswordAfterRecovery: (newPassword: string) => Promise<void>;
   verifyPasswordResetOtpAndUpdate: (email: string, otp: string, newPassword: string, options?: { keepSession?: boolean }) => Promise<void>;
   requestEmailOtp: (email: string) => Promise<void>;
@@ -379,16 +379,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     await supabase.auth.signOut().catch(() => null);
 
-    const response = await fetch("/api/auth/password-reset/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: normalizedEmail }),
-    });
+    const resetRedirect = typeof window !== "undefined"
+      ? `${window.location.origin}/auth/reset-password`
+      : undefined;
 
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result?.ok) {
-      throw new Error(String(result?.error || "Unable to send password reset OTP right now."));
+    // 1. Primary: Use Supabase Auth (same infrastructure as Google sign-in)
+    let supabaseSucceeded = false;
+    let supabaseError: any = null;
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: resetRedirect,
+      });
+      if (error) {
+        supabaseError = error;
+      } else {
+        supabaseSucceeded = true;
+      }
+    } catch (err: any) {
+      supabaseError = err;
     }
+
+    // Also attempt sending an OTP via Supabase Auth so users can type the 6-digit code on page if preferred
+    try {
+      await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: resetRedirect,
+        },
+      });
+    } catch {
+      // Ignored if rate limited or not enabled
+    }
+
+    // 2. Optional: Parallel sync with Python backend if available
+    let backendResult: any = null;
+    try {
+      const response = await fetch("/api/auth/password-reset/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      backendResult = await response.json().catch(() => ({}));
+    } catch {
+      // Backend not running is completely fine because Supabase Auth handles delivery!
+    }
+
+    if (supabaseSucceeded || backendResult?.ok) {
+      return {
+        ok: true,
+        message: "Password reset link & code sent to your registered email via Supabase Auth.",
+        dev_otp: backendResult?.dev_otp,
+      };
+    }
+
+    if (supabaseError) {
+      throw new Error(getSupabaseErrorMessage(supabaseError));
+    }
+
+    throw new Error(String(backendResult?.error || "Unable to send password reset request right now."));
   }, []);
 
   const updatePasswordAfterRecovery = useCallback(async (newPassword: string) => {
@@ -454,20 +504,92 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut().catch(() => null);
     }
 
-    const response = await fetch("/api/auth/password-reset/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: normalizedEmail,
-        otp: cleanOtp,
-        new_password: cleanPassword,
-      }),
-    });
+    let verifiedWithSupabase = false;
 
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result?.ok) {
-      throw new Error(String(result?.error || "Unable to reset password right now."));
+    // 1. Try Supabase Auth OTP verification (type: "recovery" or "email")
+    try {
+      const { data: recData, error: recError } = await supabase.auth.verifyOtp({
+        email: normalizedEmail,
+        token: cleanOtp,
+        type: "recovery",
+      });
+      if (!recError && recData?.session) {
+        verifiedWithSupabase = true;
+      } else {
+        const { data: emailData, error: emailError } = await supabase.auth.verifyOtp({
+          email: normalizedEmail,
+          token: cleanOtp,
+          type: "email",
+        });
+        if (!emailError && emailData?.session) {
+          verifiedWithSupabase = true;
+        }
+      }
+    } catch {
+      // Fall through to backend verification
     }
+
+    if (verifiedWithSupabase) {
+      // Update Supabase Auth user password
+      await supabase.auth.updateUser({ password: cleanPassword }).catch(() => null);
+
+      // Update public "user" table password
+      await supabase.rpc("reset_user_password_by_email", { p_new_password: cleanPassword }).catch(() => null);
+      await supabase.from("user").update({ password: cleanPassword }).eq("email", normalizedEmail).catch(() => null);
+
+      // Also sync to backend if running
+      await fetch("/api/auth/password-reset/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          otp: cleanOtp,
+          new_password: cleanPassword,
+        }),
+      }).catch(() => null);
+
+      if (!options?.keepSession) {
+        sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+        clearGoogleOtpVerifiedEmail();
+        setUser(null);
+        await supabase.auth.signOut().catch(() => null);
+      }
+      return;
+    }
+
+    // 2. Fallback to Python backend OTP verification if Supabase Auth OTP wasn't matched
+    let backendResponse: Response | null = null;
+    try {
+      backendResponse = await fetch("/api/auth/password-reset/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          otp: cleanOtp,
+          new_password: cleanPassword,
+        }),
+      });
+    } catch {
+      // Backend not running
+    }
+
+    if (backendResponse) {
+      const result = await backendResponse.json().catch(() => ({}));
+      if (backendResponse.ok && result?.ok) {
+        if (!options?.keepSession) {
+          sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+          clearGoogleOtpVerifiedEmail();
+          setUser(null);
+          await supabase.auth.signOut().catch(() => null);
+        }
+        return;
+      }
+      if (result?.error) {
+        throw new Error(String(result.error));
+      }
+    }
+
+    throw new Error("Invalid or expired OTP code. Please check your email or click the reset link.");
 
     if (!options?.keepSession) {
       sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);

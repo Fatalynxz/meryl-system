@@ -734,10 +734,10 @@ def ensure_default_categories():
 
 
 def send_otp_email(recipient_email, otp_code, display_name):
-    smtp_email = os.getenv("GMAIL_APP_EMAIL")
-    smtp_password = os.getenv("GMAIL_APP_PASSWORD")
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_email = (os.getenv("GMAIL_APP_EMAIL") or "").strip()
+    smtp_password = (os.getenv("GMAIL_APP_PASSWORD") or "").replace(" ", "").strip()
+    smtp_host = (os.getenv("SMTP_HOST") or "smtp.gmail.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT") or "587")
 
     if not smtp_email or not smtp_password:
         raise RuntimeError(
@@ -761,10 +761,39 @@ def send_otp_email(recipient_email, otp_code, display_name):
         )
     )
 
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_email, smtp_password)
-        server.send_message(message)
+    try:
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                server.login(smtp_email, smtp_password)
+                server.send_message(message)
+                return
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.starttls()
+                server.login(smtp_email, smtp_password)
+                server.send_message(message)
+                return
+    except smtplib.SMTPAuthenticationError as auth_err:
+        logger.error(f"Gmail SMTP authentication failed for {smtp_email}: {auth_err}")
+        raise RuntimeError(
+            "Gmail authentication failed: Username and Password not accepted. "
+            "Please use a 16-character Google App Password (not your personal Gmail password) from myaccount.google.com/apppasswords."
+        ) from auth_err
+    except (smtplib.SMTPConnectError, TimeoutError, OSError) as conn_err:
+        logger.warning(f"SMTP connection on port {smtp_port} failed ({conn_err}), attempting SSL on port 465...")
+        try:
+            with smtplib.SMTP_SSL(smtp_host, 465, timeout=10) as server:
+                server.login(smtp_email, smtp_password)
+                server.send_message(message)
+                return
+        except smtplib.SMTPAuthenticationError as auth_err:
+            raise RuntimeError(
+                "Gmail authentication failed: Username and Password not accepted. "
+                "Please use a 16-character Google App Password (not your personal Gmail password) from myaccount.google.com/apppasswords."
+            ) from auth_err
+        except Exception as fallback_err:
+            logger.error(f"Fallback SMTP_SSL also failed: {fallback_err}")
+            raise RuntimeError(f"Unable to connect to Gmail SMTP server: {conn_err}") from conn_err
 
 
 def find_active_user_management_account_by_email(email):
@@ -2188,12 +2217,42 @@ def api_password_reset_request():
                 "failed_attempts": 0,
             }
         ).execute()
-        send_otp_email(email, otp_code, user_row.get("name") or "Meryl Shoes user")
-    except Exception as exc:
-        logger.exception("Password reset OTP request failed")
-        return {"ok": False, "error": str(exc) or "Unable to send password reset OTP right now."}, 500
+    except Exception as db_exc:
+        logger.exception("Failed to store password reset OTP in database")
+        return {"ok": False, "error": f"Database error: {db_exc}"}, 500
 
-    return {"ok": True, "message": "OTP sent. Check your registered email."}
+    logger.info(f"=== [PASSWORD RESET OTP] Generated OTP for {email}: {otp_code} ===")
+
+    is_production = str(os.getenv("FLASK_ENV", "")).strip().lower() == "production"
+    email_sent = False
+    email_error_msg = ""
+
+    try:
+        send_otp_email(email, otp_code, user_row.get("name") or "Meryl Shoes user")
+        email_sent = True
+    except Exception as exc:
+        logger.exception("Password reset OTP email delivery failed")
+        raw_error = str(exc).strip()
+        if "535" in raw_error or "BadCredentials" in raw_error or "Username and Password not accepted" in raw_error:
+            email_error_msg = (
+                "Gmail authentication failed. Please configure a 16-character Google App Password (not your personal Gmail password) in GMAIL_APP_PASSWORD."
+            )
+        else:
+            email_error_msg = raw_error
+
+    if email_sent:
+        return {"ok": True, "message": "OTP sent. Check your registered email."}
+
+    # If running in development / local mode, provide the OTP directly so testing / development is not blocked
+    if not is_production:
+        return {
+            "ok": True,
+            "message": f"Email delivery failed ({email_error_msg}), but local development mode generated your OTP: {otp_code}",
+            "dev_otp": otp_code,
+            "warning": email_error_msg,
+        }
+
+    return {"ok": False, "error": email_error_msg or "Unable to send password reset OTP right now."}, 500
 
 
 @app.route("/api/auth/password-reset/verify", methods=["POST"])

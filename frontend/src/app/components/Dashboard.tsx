@@ -339,7 +339,7 @@ export function Dashboard() {
                 <XAxis
                   dataKey="day"
                   stroke="#ffffff40"
-                  fontSize={11}
+                  tick={{ fill: "#cbd5e1", fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
                   interval={0}
@@ -348,11 +348,15 @@ export function Dashboard() {
                 <Tooltip
                   formatter={(value) => [formatPeso(Number(value)), "Revenue"]}
                   contentStyle={{
-                    background: "#0E0E12",
-                    border: "1px solid #ffffff20",
+                    background: "#16161C",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: 12,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+                    padding: "10px 14px",
                     color: "#fff",
                   }}
+                  labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                  itemStyle={{ color: "#FFD60A", fontSize: 12, fontWeight: 500 }}
                 />
                 <Area type="monotone" dataKey="value" stroke="#FFD60A" strokeWidth={2.5} fill="url(#revFill)" />
               </AreaChart>
@@ -363,22 +367,28 @@ export function Dashboard() {
         <div className="rounded-2xl p-6 bg-[#16161C] border border-white/5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-white">Categories</h3>
-              <p className="text-xs text-white/40 mt-0.5">Inventory mix</p>
+              <h3 className="text-white font-semibold">Categories</h3>
+              <p className="text-xs text-white/50 mt-0.5">Inventory mix</p>
             </div>
           </div>
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={categoryData}>
-                <XAxis dataKey="name" stroke="#ffffff80" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="#ffffff60"
+                  tick={{ fill: "#cbd5e1", fontSize: 10, fontWeight: 500 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis
                   stroke="#ffffff55"
-                  fontSize={10}
+                  tick={{ fill: "#94a3b8", fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
                   domain={[0, 100]}
                   tickFormatter={(value) => `${value}%`}
-                  width={30}
+                  width={34}
                 />
                 <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                   {categoryData.map((entry, i) => (
@@ -390,12 +400,23 @@ export function Dashboard() {
                     formatter={(value: number) => `${Number(value)}%`}
                     fill="#FFFFFF"
                     fontSize={11}
+                    fontWeight={600}
+                    offset={6}
                   />
                 </Bar>
                 <Tooltip
                   formatter={(value: number) => [`${Number(value)}%`, "Percentage"]}
-                  cursor={{ fill: "#ffffff05" }}
-                  contentStyle={{ background: "#0E0E12", border: "1px solid #ffffff20", borderRadius: 12, color: "#fff" }}
+                  cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
+                  contentStyle={{
+                    background: "#16161C",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    borderRadius: 12,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+                    padding: "10px 14px",
+                    color: "#fff",
+                  }}
+                  labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                  itemStyle={{ color: "#FFFFFF", fontSize: 12, fontWeight: 500 }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -405,9 +426,9 @@ export function Dashboard() {
               <div key={c.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${i % 2 === 0 ? "bg-[#E5202A]" : "bg-[#FFD60A]"}`} />
-                  <span className="text-white/70">{c.name}</span>
+                  <span className="text-white/90 font-medium">{c.name}</span>
                 </div>
-                <span className="text-white">{c.value}%</span>
+                <span className="text-white font-semibold">{c.value}%</span>
               </div>
             ))}
           </div>

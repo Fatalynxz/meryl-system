@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useAuth } from "../../lib/auth-context";
 import { useInventory, useProducts, useReturns, useSales } from "../../lib/hooks";
 import { supabase } from "../../lib/supabase";
+import { saveReceiptProof, getAllReceiptProofs, StoredReceiptProof } from "../../lib/receipt-proof-store";
 
 type ReturnDetail = {
   return_detail_id: string;
@@ -283,6 +284,28 @@ export function ReturnManagement() {
   }>({ state: "idle" });
   const [showManualSaleList, setShowManualSaleList] = useState(false);
   const [printExchangeSlip, setPrintExchangeSlip] = useState<ReturnRow | null>(null);
+  const [storedReceiptsMap, setStoredReceiptsMap] = useState<Map<string, StoredReceiptProof>>(new Map());
+
+  useEffect(() => {
+    getAllReceiptProofs().then((map) => {
+      setStoredReceiptsMap(map);
+    });
+
+    const handleSaved = (event: any) => {
+      const proof = event.detail as StoredReceiptProof;
+      if (proof) {
+        setStoredReceiptsMap((prev) => {
+          const next = new Map(prev);
+          if (proof.returnId) next.set(proof.returnId, proof);
+          if (proof.salesId) next.set(`sale_${proof.salesId}`, proof);
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener("receipt-proof-saved", handleSaved);
+    return () => window.removeEventListener("receipt-proof-saved", handleSaved);
+  }, []);
 
   const sales = (salesQuery.data as any[]) ?? [];
   const productRows = (productsQuery.data as any[]) ?? [];
@@ -765,6 +788,13 @@ export function ReturnManagement() {
         return sum + extractPesoAmount(String(detail?.reason ?? ""));
       }, 0);
       const rowAdditionalPayment = Number(row.additional_payment ?? row.total_replacement_payments ?? 0);
+      const localProof =
+        storedReceiptsMap.get(String(row.return_id ?? "")) ||
+        storedReceiptsMap.get(`sale_${String(row.sales_id ?? "")}`) ||
+        storedReceiptsMap.get(`sale_${String(row.original_sales_id ?? "")}`) ||
+        storedReceiptsMap.get(String(row.sales_id ?? ""));
+      const rawVerifiedAt = row.receipt_verified_at || localProof?.verifiedAt;
+      const formattedVerifiedAt = rawVerifiedAt ? formatDate(rawVerifiedAt) : "-";
       return {
         return_id: String(row.return_id ?? ""),
         display_return_id: returnDisplayMap.get(String(row.return_id ?? "")) ?? "EXC-000",
@@ -781,10 +811,10 @@ export function ReturnManagement() {
         processedBy: processedUser?.name ?? processedUser?.username ?? "Staff",
         staffCode: String(processedUser?.staff_code ?? processedUser?.staffCode ?? "N/A"),
         salesStatus: normalizeSaleStatus(sale?.sales_status ?? sale?.status),
-        receiptProofName: String(row.receipt_proof_name ?? ""),
+        receiptProofName: String(row.receipt_proof_name || localProof?.name || ""),
         receiptProofPath: String(row.receipt_proof_path ?? ""),
-        receiptProofUrl: String(row.receipt_proof_url ?? ""),
-        receiptVerifiedAt: formatDate(row.receipt_verified_at),
+        receiptProofUrl: String(row.receipt_proof_url || localProof?.url || ""),
+        receiptVerifiedAt: formattedVerifiedAt !== "N/A" ? formattedVerifiedAt : "-",
         returnDetails: details.map((detail: any) => {
           const product = Array.isArray(detail.product) ? detail.product[0] : detail.product;
           const replacementJoin = Array.isArray(detail.replacement_product) ? detail.replacement_product[0] : detail.replacement_product;
@@ -825,7 +855,7 @@ export function ReturnManagement() {
         }),
       };
     });
-  }, [productMap, returnRows, salesDisplayMap]);
+  }, [productMap, returnRows, salesDisplayMap, storedReceiptsMap]);
 
   const visibleReturns = useMemo(
     () => (isAdmin ? displayReturns : displayReturns.filter((row) => row.user_id === String(user?.user_id ?? ""))),
@@ -936,6 +966,13 @@ export function ReturnManagement() {
     if (!receiptProofFile) throw new Error("Upload a printed receipt photo before finalizing the replacement.");
     const extension = receiptProofFile.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "jpg";
     const proofPath = `${returnId}/${Date.now()}-${buildClientId()}.${extension}`;
+    let proofResult = {
+      receiptProofName: receiptProofFile.name,
+      receiptProofPath: `local/${receiptProofFile.name}`,
+      receiptProofUrl: receiptProofPreview || "",
+      receiptVerifiedAt: new Date().toISOString(),
+    };
+
     try {
       const { error } = await supabase.storage
         .from(RECEIPT_PROOF_BUCKET)
@@ -946,7 +983,7 @@ export function ReturnManagement() {
         });
       if (!error) {
         const { data } = supabase.storage.from(RECEIPT_PROOF_BUCKET).getPublicUrl(proofPath);
-        return {
+        proofResult = {
           receiptProofName: receiptProofFile.name,
           receiptProofPath: proofPath,
           receiptProofUrl: data?.publicUrl || receiptProofPreview || "",
@@ -957,13 +994,87 @@ export function ReturnManagement() {
       // Storage upload failed or bucket missing, fall through to safe fallback
     }
 
-    // Resilient Fallback: If bucket is missing or network/storage fails, preserve receipt data without crashing
-    return {
-      receiptProofName: receiptProofFile.name,
-      receiptProofPath: `local/${receiptProofFile.name}`,
-      receiptProofUrl: receiptProofPreview || "",
-      receiptVerifiedAt: new Date().toISOString(),
-    };
+    // Persist receipt proof in client-side persistent IndexedDB store
+    await saveReceiptProof({
+      returnId,
+      salesId: selectedSale?.sales_id,
+      name: proofResult.receiptProofName,
+      url: proofResult.receiptProofUrl,
+      verifiedAt: proofResult.receiptVerifiedAt,
+    });
+
+    setStoredReceiptsMap((prev) => {
+      const next = new Map(prev);
+      if (returnId) next.set(returnId, proofResult);
+      if (selectedSale?.sales_id) next.set(`sale_${selectedSale.sales_id}`, proofResult);
+      return next;
+    });
+
+    return proofResult;
+  };
+
+  const handleDirectReceiptProofUpload = async (returnId: string, salesId: string, file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (PNG, JPG, etc.).");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Receipt image must be 10MB or smaller.");
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = String(reader.result ?? "");
+        const verifiedAt = new Date().toISOString();
+        const proofObj = {
+          returnId,
+          salesId,
+          name: file.name,
+          url: dataUrl,
+          verifiedAt,
+        };
+
+        // 1. Save to local persistent IndexedDB + localStorage store
+        await saveReceiptProof(proofObj);
+
+        // 2. Try Supabase storage & DB update in background (if supported)
+        try {
+          const extension = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "jpg";
+          const proofPath = `${returnId}/${Date.now()}.${extension}`;
+          const { error: storageError } = await supabase.storage
+            .from(RECEIPT_PROOF_BUCKET)
+            .upload(proofPath, file, { upsert: true });
+          if (!storageError) {
+            const { data } = supabase.storage.from(RECEIPT_PROOF_BUCKET).getPublicUrl(proofPath);
+            if (data?.publicUrl) {
+              await supabase.from("returns").update({
+                receipt_proof_url: data.publicUrl,
+                receipt_proof_name: file.name,
+                receipt_proof_path: proofPath,
+                receipt_verified_at: verifiedAt,
+              }).eq("return_id", returnId);
+            }
+          }
+        } catch {
+          // Supabase column/bucket may not exist, safe to ignore
+        }
+
+        // 3. Update local state
+        setStoredReceiptsMap((prev) => {
+          const next = new Map(prev);
+          if (returnId) next.set(returnId, proofObj);
+          if (salesId) next.set(`sale_${salesId}`, proofObj);
+          return next;
+        });
+
+        toast.success("Receipt proof attached and saved successfully!");
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save receipt proof.");
+    }
   };
 
   const handleAddReturn = async () => {
@@ -2073,34 +2184,85 @@ export function ReturnManagement() {
                               </div>
                             </div>
 
-                            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                              <p className="mb-3 text-xs uppercase tracking-wide text-zinc-400">Receipt Proof</p>
-                              {returnItem.receiptProofUrl ? (
-                                <div className="grid gap-3 md:grid-cols-[180px_1fr] md:items-center">
-                                  <a href={returnItem.receiptProofUrl} target="_blank" rel="noreferrer">
-                                    <img
-                                      src={returnItem.receiptProofUrl}
-                                      alt="Uploaded receipt proof"
-                                      className="h-32 w-full rounded-md border border-zinc-800 object-cover md:w-44"
-                                    />
-                                  </a>
-                                  <div className="min-w-0">
-                                    <p className="truncate text-zinc-100">{returnItem.receiptProofName || "Receipt photo"}</p>
-                                    <p className="mt-1 text-sm text-zinc-400">Verified: {returnItem.receiptVerifiedAt}</p>
-                                    <a
-                                      href={returnItem.receiptProofUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="mt-2 inline-flex text-sm font-semibold text-yellow-300 hover:text-yellow-200"
-                                    >
-                                      Open receipt proof
-                                    </a>
+                            {(() => {
+                              const activeProof =
+                                storedReceiptsMap.get(returnItem.return_id) ||
+                                storedReceiptsMap.get(`sale_${returnItem.sales_id}`) ||
+                                storedReceiptsMap.get(returnItem.sales_id);
+                              const activeReceiptUrl = returnItem.receiptProofUrl || activeProof?.url || "";
+                              const activeReceiptName = returnItem.receiptProofName || activeProof?.name || "Receipt photo";
+                              const activeVerifiedAt =
+                                (returnItem.receiptVerifiedAt && returnItem.receiptVerifiedAt !== "-")
+                                  ? returnItem.receiptVerifiedAt
+                                  : (activeProof?.verifiedAt ? formatDate(activeProof.verifiedAt) : "-");
+
+                              return (
+                                <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+                                  <div className="mb-3 flex items-center justify-between">
+                                    <p className="text-xs uppercase tracking-wide text-zinc-400">Receipt Proof</p>
+                                    {activeReceiptUrl && (
+                                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-800/80 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors cursor-pointer">
+                                        <Upload className="h-3.5 w-3.5" />
+                                        Replace Photo
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleDirectReceiptProofUpload(returnItem.return_id, returnItem.sales_id, file);
+                                          }}
+                                        />
+                                      </label>
+                                    )}
                                   </div>
+                                  {activeReceiptUrl ? (
+                                    <div className="grid gap-3 md:grid-cols-[180px_1fr] md:items-center">
+                                      <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border border-zinc-800 hover:border-yellow-400/60 transition-colors">
+                                        <img
+                                          src={activeReceiptUrl}
+                                          alt="Uploaded receipt proof"
+                                          className="h-32 w-full object-cover md:w-44 transition-transform duration-200 hover:scale-105"
+                                        />
+                                      </a>
+                                      <div className="min-w-0">
+                                        <p className="truncate font-medium text-zinc-100">{activeReceiptName}</p>
+                                        <p className="mt-1 text-sm text-zinc-400">Verified: {activeVerifiedAt}</p>
+                                        <a
+                                          href={activeReceiptUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-yellow-400 hover:text-yellow-300"
+                                        >
+                                          Open full size
+                                        </a>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-md border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-center">
+                                      <FileImage className="mx-auto h-8 w-8 text-amber-400/80 mb-2" />
+                                      <p className="text-sm font-medium text-amber-300">No receipt proof currently attached</p>
+                                      <p className="mt-1 text-xs text-zinc-400 max-w-md mx-auto">
+                                        You can upload the customer's printed physical receipt photo now to attach proof to this replacement record.
+                                      </p>
+                                      <label className="mt-3 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-yellow-400 px-4 py-2 text-xs font-bold text-zinc-950 hover:bg-yellow-300 transition-colors shadow-sm cursor-pointer">
+                                        <Upload className="h-4 w-4" />
+                                        Upload Receipt Proof Now
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleDirectReceiptProofUpload(returnItem.return_id, returnItem.sales_id, file);
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  )}
                                 </div>
-                              ) : (
-                                <p className="text-sm text-zinc-400">No receipt proof uploaded for this replacement.</p>
-                              )}
-                            </div>
+                              );
+                            })()}
 
                             <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
                               <p className="mb-3 text-xs uppercase tracking-wide text-zinc-400">Replacement Items</p>

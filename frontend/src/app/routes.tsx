@@ -120,6 +120,15 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/reset-password',
+    errorElement: <RouteErrorFallback />,
+    element: (
+      <RouteLoader>
+        <ResetPassword />
+      </RouteLoader>
+    ),
+  },
+  {
     path: '/sales',
     errorElement: <RouteErrorFallback />,
     element: (
