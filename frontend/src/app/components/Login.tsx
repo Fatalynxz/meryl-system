@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
-import { ArrowLeft, KeyRound, LogIn, Mail, User, Lock, ShieldCheck, Eye, EyeOff, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, KeyRound, LogIn, Mail, User, Lock, ShieldCheck, Eye, EyeOff, CheckCircle2, ShieldAlert, Clock } from 'lucide-react';
 import { checkLockoutStatus, clearFailedAttempts, getPostLoginPath, recordFailedAttempt, useAuth } from '../../lib/auth-context';
 import { logAuditEvent } from '../../lib/api/audit-logger';
 import { supabase } from '../../lib/supabase';
@@ -26,6 +26,14 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [resetCooldownUntil, setResetCooldownUntil] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = sessionStorage.getItem('meryl_reset_cooldown_until');
+    if (!stored) return 0;
+    const time = parseInt(stored, 10);
+    return time > Date.now() ? time : 0;
+  });
+  const [resetCooldownRemaining, setResetCooldownRemaining] = useState<number>(0);
 
   // Check lockout status whenever username changes
   useEffect(() => {
@@ -57,6 +65,28 @@ export function Login() {
 
     return () => clearInterval(timer);
   }, [lockoutRemaining > 0, username]);
+
+  // Live ticking countdown for reset password rate limit / security cooldown
+  useEffect(() => {
+    if (resetCooldownUntil <= 0) {
+      setResetCooldownRemaining(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.ceil((resetCooldownUntil - Date.now()) / 1000));
+      setResetCooldownRemaining(remaining);
+      if (remaining <= 0) {
+        setResetCooldownUntil(0);
+        sessionStorage.removeItem('meryl_reset_cooldown_until');
+        setNotice('Cooldown finished. You can now request a new reset OTP.');
+      }
+    };
+
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
+    return () => clearInterval(timer);
+  }, [resetCooldownUntil]);
 
   useEffect(() => {
     const resetExternalSubmitting = () => {
@@ -154,7 +184,7 @@ export function Login() {
 
   const handleForgotPassword = async (e?: React.FormEvent | React.MouseEvent) => {
     e?.preventDefault();
-    if (submitting) return;
+    if (submitting || resetCooldownRemaining > 0) return;
     setSubmitting(true);
     setError('');
     setNotice('');
@@ -172,6 +202,21 @@ export function Login() {
       }
     } catch (resetError) {
       const message = resetError instanceof Error ? resetError.message : 'Unable to send password reset request right now.';
+
+      // Parse seconds from Supabase rate limit error (e.g. "For security purposes, you can only request this after 133 seconds.")
+      const secondsMatch = message.match(/(\d+)\s*seconds?/i);
+      if (secondsMatch && secondsMatch[1]) {
+        const secs = parseInt(secondsMatch[1], 10);
+        if (secs > 0) {
+          const until = Date.now() + secs * 1000;
+          setResetCooldownUntil(until);
+          setResetCooldownRemaining(secs);
+          sessionStorage.setItem('meryl_reset_cooldown_until', String(until));
+          setError('');
+          return;
+        }
+      }
+
       setError(message.includes('rate limit') ? 'Email rate limit exceeded. Please wait a few moments before requesting another reset.' : message);
     } finally {
       setSubmitting(false);
@@ -334,11 +379,28 @@ export function Login() {
               </>
             )}
 
-            {error && (
+            {resetCooldownRemaining > 0 ? (
+              <div className="rounded-xl px-4 py-3 bg-red-950/70 border border-red-500/40 text-sm text-red-200 flex items-start gap-2.5 animate-in fade-in">
+                <Clock className="w-5 h-5 text-red-400 shrink-0 mt-0.5 animate-pulse" />
+                <div className="min-w-0">
+                  <p className="text-xs text-red-200">
+                    For security purposes, you can only request this after{' '}
+                    <span className="font-mono font-bold text-yellow-400 text-sm">
+                      {resetCooldownRemaining} second{resetCooldownRemaining === 1 ? '' : 's'}
+                    </span>
+                    {resetCooldownRemaining >= 60 && (
+                      <span className="text-zinc-400 ml-1">
+                        ({Math.floor(resetCooldownRemaining / 60)}:{(resetCooldownRemaining % 60).toString().padStart(2, '0')})
+                      </span>
+                    )}.
+                  </p>
+                </div>
+              </div>
+            ) : error ? (
               <div className="rounded-xl px-3 py-2.5 bg-[#E5202A]/15 border border-[#E5202A]/30 text-sm text-[#FF6B72]">
                 {error}
               </div>
-            )}
+            ) : null}
 
             {notice && (
               <div className="rounded-xl px-3 py-2.5 bg-emerald-500/10 border border-emerald-400/25 text-sm text-emerald-200">
@@ -348,22 +410,30 @@ export function Login() {
 
             <Button
               type="submit"
-              disabled={submitting}
-              className="w-full h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] shadow-lg shadow-yellow-900/20"
+              disabled={submitting || (resetStep === 'email' && resetCooldownRemaining > 0)}
+              className="w-full h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] shadow-lg shadow-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {resetStep === 'email' ? <Mail className="w-4 h-4 mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-              {resetStep === 'email' ? 'Send Reset OTP' : 'Verify OTP and Reset Password'}
+              {resetStep === 'email' ? (
+                resetCooldownRemaining > 0 ? <Clock className="w-4 h-4 mr-2" /> : <Mail className="w-4 h-4 mr-2" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 mr-2" />
+              )}
+              {resetStep === 'email'
+                ? resetCooldownRemaining > 0
+                  ? `Wait ${resetCooldownRemaining}s to Resend`
+                  : 'Send Reset OTP'
+                : 'Verify OTP and Reset Password'}
             </Button>
 
             {resetStep === 'otp' && (
               <Button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || resetCooldownRemaining > 0}
                 onClick={handleForgotPassword}
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#1D1D25] text-white hover:bg-white/10"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#1D1D25] text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                <Mail className="w-4 h-4 mr-2" />
-                Resend OTP
+                {resetCooldownRemaining > 0 ? <Clock className="w-4 h-4 mr-2" /> : <Mail className="w-4 h-4 mr-2" />}
+                {resetCooldownRemaining > 0 ? `Resend OTP in ${resetCooldownRemaining}s` : 'Resend OTP'}
               </Button>
             )}
 
