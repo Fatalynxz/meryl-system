@@ -9,6 +9,11 @@ import {
 } from "react";
 import { supabase } from "./supabase";
 import { logAuditEvent } from "./api/audit-logger";
+import {
+  getStoredAvatarSync,
+  getStoredAvatarAsync,
+  saveStoredAvatar,
+} from "./avatar-store";
 
 export const MERYL_USER_STORAGE_KEY = "meryl_user";
 export const MERYL_TERMINAL_LOCKED_KEY = "meryl_terminal_locked";
@@ -43,7 +48,12 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ ok?: boolean; message?: string; dev_otp?: string } | void>;
   updatePasswordAfterRecovery: (newPassword: string) => Promise<void>;
-  verifyPasswordResetOtpAndUpdate: (email: string, otp: string, newPassword: string, options?: { keepSession?: boolean }) => Promise<void>;
+  verifyPasswordResetOtpAndUpdate: (
+    email: string,
+    otp: string,
+    newPassword: string,
+    options?: { keepSession?: boolean }
+  ) => Promise<void>;
   requestEmailOtp: (email: string) => Promise<void>;
   completeExternalAuth: (options?: { persist?: boolean; bypassOtpGate?: boolean }) => Promise<AuthUser | null>;
   markGoogleOtpVerified: (email: string) => void;
@@ -102,14 +112,20 @@ export function checkLockoutStatus(username: string): { isLocked: boolean; remai
 
 function readStoredUser(): AuthUser | null {
   try {
-    const raw = sessionStorage.getItem(MERYL_USER_STORAGE_KEY);
+    const raw =
+      (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(MERYL_USER_STORAGE_KEY) : null) ||
+      (typeof localStorage !== "undefined" ? localStorage.getItem(MERYL_USER_STORAGE_KEY) : null);
     if (!raw) return null;
     const user = JSON.parse(raw) as AuthUser;
-    if (user && !user.avatar_url && typeof window !== "undefined") {
-      user.avatar_url =
-        localStorage.getItem(`meryl_avatar_${user.user_id}`) ||
-        localStorage.getItem(`meryl_avatar_${user.username}`) ||
-        undefined;
+    if (user && typeof window !== "undefined") {
+      const persistedAvatar = getStoredAvatarSync({
+        userId: user.user_id,
+        username: user.username,
+        email: user.email,
+      });
+      if (persistedAvatar) {
+        user.avatar_url = persistedAvatar;
+      }
     }
     return user;
   } catch {
@@ -120,14 +136,32 @@ function readStoredUser(): AuthUser | null {
 function writeStoredUser(authUser: AuthUser) {
   if (typeof window !== "undefined") {
     if (authUser.avatar_url) {
-      localStorage.setItem(`meryl_avatar_${authUser.user_id}`, authUser.avatar_url);
-      localStorage.setItem(`meryl_avatar_${authUser.username}`, authUser.avatar_url);
+      saveStoredAvatar(
+        {
+          userId: authUser.user_id,
+          username: authUser.username,
+          email: authUser.email,
+        },
+        authUser.avatar_url
+      );
     } else {
-      localStorage.removeItem(`meryl_avatar_${authUser.user_id}`);
-      localStorage.removeItem(`meryl_avatar_${authUser.username}`);
+      // NEVER delete avatar on login or user write! Backfill from persistent avatar store instead.
+      const existing = getStoredAvatarSync({
+        userId: authUser.user_id,
+        username: authUser.username,
+        email: authUser.email,
+      });
+      if (existing) {
+        authUser.avatar_url = existing;
+      }
     }
+    try {
+      sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
+    } catch {}
+    try {
+      localStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
+    } catch {}
   }
-  sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
 }
 
 function getVerifiedGoogleOtpEmail() {
@@ -234,6 +268,11 @@ async function findAppUserByEmail(email: string): Promise<AuthUser | null> {
     role_id: row.role_id,
     role_name: String((roleRows?.[0] as { role_name?: string } | undefined)?.role_name ?? ""),
     status: row.status ?? "active",
+    avatar_url: getStoredAvatarSync({
+      userId: row.user_id,
+      username: row.username,
+      email: row.email ?? normalizedEmail,
+    }),
   };
 
   return isAuthorizedAppUser(authUser) ? authUser : null;
@@ -303,14 +342,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     async function bootstrapAuth() {
-      // One-time cleanup for old persistent login behavior.
-      localStorage.removeItem(MERYL_USER_STORAGE_KEY);
       const storedUser = readStoredUser();
       if (storedUser && !isAuthorizedAppUser(storedUser)) {
         sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+        localStorage.removeItem(MERYL_USER_STORAGE_KEY);
         clearGoogleOtpVerifiedEmail();
       } else if (storedUser && mounted) {
         setUser(storedUser);
+        getStoredAvatarAsync({
+          userId: storedUser.user_id,
+          username: storedUser.username,
+          email: storedUser.email,
+        }).then((asyncAvatar) => {
+          if (asyncAvatar && mounted) {
+            setUser((prev) => (prev ? { ...prev, avatar_url: asyncAvatar } : prev));
+          }
+        });
       }
 
       try {
@@ -332,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user?.email) {
         completeExternalAuth().catch(() => {
           sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+          localStorage.removeItem(MERYL_USER_STORAGE_KEY);
           setUser(null);
         });
       }
@@ -342,6 +390,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, [completeExternalAuth]);
+
+  // Synchronize avatar updates across components or tabs in real-time
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleAvatarUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { avatarUrl, userId, username } = customEvent.detail || {};
+
+      setUser((prev) => {
+        if (!prev) return prev;
+        const matchesUser =
+          !userId ||
+          String(prev.user_id) === String(userId) ||
+          prev.username?.toLowerCase() === String(username || "").toLowerCase();
+
+        if (matchesUser) {
+          const nextUser = {
+            ...prev,
+            avatar_url: avatarUrl || undefined,
+          };
+          try {
+            sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(nextUser));
+            localStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(nextUser));
+          } catch {}
+          return nextUser;
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("meryl-avatar-updated", handleAvatarUpdated);
+    return () => window.removeEventListener("meryl-avatar-updated", handleAvatarUpdated);
+  }, []);
 
   const signInWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -620,7 +702,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (payload.error === "inactive" || String(payload.status ?? "").toLowerCase() === "inactive") {
           throw new Error("This account is inactive. Please contact the administrator.");
         }
-        return data as AuthUser;
+        const authUser = { ...(data as AuthUser) };
+        authUser.avatar_url = getStoredAvatarSync({
+          userId: authUser.user_id,
+          username: authUser.username,
+          email: authUser.email,
+        });
+        return authUser;
       }
     } catch (rpcErr: any) {
       if (rpcErr?.message && rpcErr.message.toLowerCase().includes("inactive")) {
@@ -690,6 +778,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role_name: roleName,
         status: "Active",
         email: row.email || null,
+        avatar_url: getStoredAvatarSync({
+          userId: row.user_id,
+          username: row.username || cleanUsername,
+          email: row.email || null,
+        }),
       };
     } catch {
       return null;
@@ -822,7 +915,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
     sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+    localStorage.removeItem(MERYL_USER_STORAGE_KEY);
     sessionStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);
+    localStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);
     setIsLocked(false);
     clearGoogleOtpVerifiedEmail();
     supabase.auth.signOut();

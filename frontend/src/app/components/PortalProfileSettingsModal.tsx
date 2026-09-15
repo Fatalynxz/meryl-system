@@ -25,6 +25,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logAuditEvent } from "../../lib/api/audit-logger";
+import {
+  getStoredAvatarSync,
+  getStoredAvatarAsync,
+  saveStoredAvatar,
+  removeStoredAvatar,
+} from "../../lib/avatar-store";
 
 interface PortalProfileSettingsModalProps {
   isOpen: boolean;
@@ -69,11 +75,34 @@ export function PortalProfileSettingsModal({
       setActiveTab(defaultTab);
       setName(currentUser?.name || "");
       setEmail(currentUser?.email || "");
-      setAvatarUrl(currentUser?.avatar_url || "");
-      setUrlInput(currentUser?.avatar_url || "");
+
+      const currentAvatar =
+        currentUser?.avatar_url ||
+        getStoredAvatarSync({
+          userId: currentUser?.user_id,
+          username: currentUser?.username,
+          email: currentUser?.email,
+        }) ||
+        "";
+
+      setAvatarUrl(currentAvatar);
+      setUrlInput(currentAvatar);
       setShowUrlInput(false);
       setProfileError("");
       setProfileNotice("");
+
+      if (!currentAvatar && currentUser) {
+        getStoredAvatarAsync({
+          userId: currentUser.user_id,
+          username: currentUser.username,
+          email: currentUser.email,
+        }).then((asyncAvatar) => {
+          if (asyncAvatar) {
+            setAvatarUrl(asyncAvatar);
+            setUrlInput(asyncAvatar);
+          }
+        });
+      }
 
       setSecurityStep("request");
       setResetEmail(currentUser?.email || "");
@@ -96,8 +125,45 @@ export function PortalProfileSettingsModal({
 
   if (!isOpen) return null;
 
+  // Resize uploaded image to keep it lightweight (max 512x512, jpeg)
+  const resizeImageToDataUrl = (file: File, maxDimension = 512, quality = 0.88): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawResult = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(rawResult);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = () => resolve(rawResult);
+        img.src = rawResult;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle Photo File Upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -106,20 +172,18 @@ export function PortalProfileSettingsModal({
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image size exceeds 2MB limit. Please choose a smaller image.");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size exceeds 5MB limit. Please choose a smaller image.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
+    const dataUrl = await resizeImageToDataUrl(file);
+    if (dataUrl) {
       setAvatarUrl(dataUrl);
       setUrlInput("");
       setShowUrlInput(false);
       toast.success("Profile photo uploaded! Click Save Changes to apply.");
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleApplyUrl = () => {
@@ -188,7 +252,25 @@ export function PortalProfileSettingsModal({
         throw new Error(dbError.message || "Failed to update profile in database.");
       }
 
-      // 3. Update auth context with new profile info and avatar
+      // 3. Save or remove from persistent avatar store (IndexedDB + localStorage)
+      if (!avatarUrl && currentUser) {
+        await removeStoredAvatar({
+          userId: currentUser.user_id,
+          username: currentUser.username,
+          email: currentUser.email || undefined,
+        });
+      } else if (avatarUrl && currentUser) {
+        await saveStoredAvatar(
+          {
+            userId: currentUser.user_id,
+            username: currentUser.username,
+            email: currentUser.email || undefined,
+          },
+          avatarUrl
+        );
+      }
+
+      // 4. Update auth context with new profile info and avatar
       const updatedUser = {
         ...currentUser,
         name: trimmedName,
