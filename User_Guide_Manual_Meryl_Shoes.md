@@ -370,11 +370,12 @@ Opens when clicking the Eye icon (`View details`) on any footwear variant in the
 
 #### Screenshot Callout Labels
 * **Box 1 [Variant Header Summary Card]**: "Displays shoe thumbnail photo, Brand, Model Name, Category, and detailed variant classification (Color, Size, Department)."
-* **Box 2 [SKU & Identification Pills]**: "Displays the unique SKU barcode reference and complete product title."
-* **Box 3 [Inventory Stock Breakdown (On Hand, Held, Available)]**: "Itemizes total physical units on shelf ('On Hand'), stock reserved for pending orders or transfers ('Held'), and units available for immediate POS purchase ('Available')."
-* **Box 4 [Reorder Threshold (ROP) & Retail Price (SRP)]**: "Displays the safety reorder alert point and current selling retail price formatted in Philippine Pesos (₱)."
-* **Box 5 [Stock Condition & Status Indicators]**: "Live automated condition evaluation badge (e.g., 'Brand New / In Stock', 'Low Stock', 'Out of Stock', 'Expired') alongside the Active sellable status."
-* **Box 6 [Manufacturer & Expiration Batch Dates]**: "Shows the recorded manufacturing batch date and warranty/expiration shelf-life date (`YYYY-MM-DD`)."
+* **Box 2 [SKU & Identification Code]**: "Displays the unique SKU barcode reference and complete product title."
+* **Box 3 [Stock Metrics, Pricing & Batch Quality Grid]**: "Two-column specifications grid itemizing complete variant inventory metrics:
+  - **Stock Distribution**: Physical count on warehouse shelves (**On Hand**), stock reserved for pending orders or transfers (**Held**), and sellable units ready for POS checkouts (**Available**).
+  - **Threshold & Pricing**: Minimum safety threshold triggering automated alerts (**Reorder**) and retail selling price formatted in Philippine Pesos (**Price**).
+  - **Condition & Status**: Live automated health check indicator (**Condition**, e.g., *Brand New / In Stock*, *Low Stock*, *Out of Stock*, *Expired*) and sellable operational status (**Status**: *Active*).
+  - **Batch Tracking Dates**: Recorded production batch date (**Manufacturer Date**) and warranty/shelf-life expiration date (**Expiration Date**)."
 
 #### STEPS
 1. On the **Sellable Inventory** table, click the **Eye icon** (`View details`) in the **Actions** column for the desired shoe variant.
