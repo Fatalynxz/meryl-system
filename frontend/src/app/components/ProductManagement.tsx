@@ -136,7 +136,11 @@ function stockCondition(stock: number, reorder: number, expired = false) {
 }
 
 function formatMoney(value: number) {
-  return `PHP ${Number(value || 0).toLocaleString()}`;
+  const num = Number(value || 0);
+  return `PHP ${num.toLocaleString(undefined, {
+    minimumFractionDigits: num % 1 !== 0 ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function ProductThumbnail({
