@@ -1560,7 +1560,7 @@ function ProductSettingsPage({
                         </span>
                       </div>
                       <p className="text-xs text-yellow-200/70">
-                        Color: {activeProduct.color} &nbsp;|&nbsp; Size: {activeProduct.size} &nbsp;|&nbsp; Gender: {activeProduct.gender}
+                        Color: {activeProduct.color} &nbsp;|&nbsp; Size: {activeProduct.size} &nbsp;|&nbsp; Department: {activeProduct.gender}
                       </p>
                     </div>
                   </div>
@@ -1724,6 +1724,39 @@ function ProductSettingsPage({
                       <span className="text-lg font-black text-yellow-300">
                         {formatMoney(computedSrp)}
                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DATES & BATCH TRACKING */}
+                <div className="rounded-xl border border-[#272738] bg-[#161622] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calendar className="w-4 h-4 text-yellow-400" />
+                    <span className="text-xs font-bold text-white">Batch & Quality Dates</span>
+                    <span className="text-xs text-yellow-200/60">(Optional)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-yellow-200/80 font-medium">
+                        Manufactured Date
+                      </Label>
+                      <Input
+                        type="date"
+                        value={stockForm.manufacturer_date || ""}
+                        onChange={(e) => setStockForm({ ...stockForm, manufacturer_date: e.target.value })}
+                        className="h-10 bg-[#1f1f2e] border-[#303044] text-yellow-100 text-xs rounded-lg [color-scheme:dark]"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-yellow-200/80 font-medium">
+                        Expiration Date
+                      </Label>
+                      <Input
+                        type="date"
+                        value={stockForm.expiration_date || ""}
+                        onChange={(e) => setStockForm({ ...stockForm, expiration_date: e.target.value })}
+                        className="h-10 bg-[#1f1f2e] border-[#303044] text-yellow-100 text-xs rounded-lg [color-scheme:dark]"
+                      />
                     </div>
                   </div>
                 </div>
