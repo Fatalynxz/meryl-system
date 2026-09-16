@@ -58,10 +58,10 @@ type ProductFormData = {
 
 type StockFormData = {
   product_id: string;
-  stock_in: number;
-  reserved_quantity: number;
+  stock_in: number | string;
+  reserved_quantity: number | string;
   markup_rate: number;
-  reorder_level: number;
+  reorder_level: number | string;
   status: InventoryStatus;
   manufacturer_date: string;
   expiration_date: string;
@@ -89,7 +89,7 @@ const defaultStockForm: StockFormData = {
   expiration_date: "",
 };
 
-const MARKUP_RATE_OPTIONS = [0.1, 0.2, 0.3, 0.5, 0.75, 0.9, 1];
+const MARKUP_RATE_OPTIONS = [0.1, 0.2, 0.3, 0.35, 0.5, 0.75, 0.9, 1.0];
 
 function buildClientId(prefix = "id") {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -1587,8 +1587,17 @@ function ProductSettingsPage({
                         <Input
                           type="number"
                           min="0"
-                          value={stockForm.stock_in || ""}
-                          onChange={(e) => setStockForm({ ...stockForm, stock_in: Number(e.target.value) || 0 })}
+                          value={stockForm.stock_in === "" ? "" : stockForm.stock_in}
+                          onFocus={(e) => {
+                            if (e.target.value === "0") e.target.select();
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setStockForm({
+                              ...stockForm,
+                              stock_in: val === "" ? "" : Math.max(0, parseInt(val, 10) || 0),
+                            });
+                          }}
                           placeholder="0"
                           className="h-10 bg-[#1f1f2e] border-[#303044] text-yellow-100 font-semibold focus-visible:ring-yellow-400/50 rounded-lg text-sm"
                         />
@@ -1602,8 +1611,17 @@ function ProductSettingsPage({
                           <Input
                             type="number"
                             min="0"
-                            value={stockForm.reserved_quantity}
-                            onChange={(e) => setStockForm({ ...stockForm, reserved_quantity: Number(e.target.value) || 0 })}
+                            value={stockForm.reserved_quantity === "" ? "" : stockForm.reserved_quantity}
+                            onFocus={(e) => {
+                              if (e.target.value === "0") e.target.select();
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setStockForm({
+                                ...stockForm,
+                                reserved_quantity: val === "" ? "" : Math.max(0, parseInt(val, 10) || 0),
+                              });
+                            }}
                             placeholder="0"
                             className="h-10 bg-[#1f1f2e] border-[#303044] text-yellow-100 text-sm rounded-lg"
                           />
@@ -1615,8 +1633,17 @@ function ProductSettingsPage({
                           <Input
                             type="number"
                             min="0"
-                            value={stockForm.reorder_level}
-                            onChange={(e) => setStockForm({ ...stockForm, reorder_level: Number(e.target.value) || 0 })}
+                            value={stockForm.reorder_level === "" ? "" : stockForm.reorder_level}
+                            onFocus={(e) => {
+                              if (e.target.value === "0") e.target.select();
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setStockForm({
+                                ...stockForm,
+                                reorder_level: val === "" ? "" : Math.max(0, parseInt(val, 10) || 0),
+                              });
+                            }}
                             placeholder="5"
                             className="h-10 bg-[#1f1f2e] border-[#303044] text-yellow-100 text-sm rounded-lg"
                           />
@@ -1645,17 +1672,17 @@ function ProductSettingsPage({
                         <Label className="text-xs text-yellow-200/80 font-medium">Markup Preset</Label>
                         <div className="grid grid-cols-4 gap-2">
                           {[
-                            { label: "20%", rate: 1.20 },
-                            { label: "35%", rate: 1.35 },
-                            { label: "50%", rate: 1.50 },
-                            { label: "90%", rate: 1.90 },
+                            { label: "20%", rate: 0.20 },
+                            { label: "35%", rate: 0.35 },
+                            { label: "50%", rate: 0.50 },
+                            { label: "90%", rate: 0.90 },
                           ].map((item) => (
                             <button
                               key={item.rate}
                               type="button"
                               onClick={() => setStockForm({ ...stockForm, markup_rate: item.rate })}
                               className={`h-9 rounded-lg text-xs font-semibold border transition-all ${
-                                stockForm.markup_rate === item.rate
+                                Math.abs(stockForm.markup_rate - item.rate) < 0.001
                                   ? "bg-yellow-400 text-red-950 border-yellow-400 font-bold"
                                   : "bg-[#1f1f2e] border-[#303044] text-yellow-200/80 hover:bg-[#28283c] hover:text-white"
                               }`}
@@ -1678,7 +1705,7 @@ function ProductSettingsPage({
                           <SelectContent className="bg-[#181824] border-[#2e2e42] text-yellow-100 text-xs">
                             {MARKUP_RATE_OPTIONS.map((rate) => (
                               <SelectItem key={rate} value={String(rate)}>
-                                {rate.toFixed(2)}x Multiplier (+{Math.round((rate - 1) * 100)}% margin)
+                                {rate.toFixed(2)}x Multiplier (+{Math.round(rate * 100)}% margin)
                               </SelectItem>
                             ))}
                           </SelectContent>
