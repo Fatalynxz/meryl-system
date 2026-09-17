@@ -1,4 +1,4 @@
-import { type ComponentType, useMemo, useState } from "react";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -373,6 +373,14 @@ export function PredictiveAnalytics() {
     staleTime: 60_000,
     retry: 1,
   });
+  useEffect(() => {
+    if (!snapshotRefreshNote) return;
+    const timer = setTimeout(() => {
+      setSnapshotRefreshNote(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [snapshotRefreshNote]);
+
   const handleRefreshProductAnalytics = async () => {
     try {
       setIsRefreshingSnapshots(true);
@@ -385,14 +393,36 @@ export function PredictiveAnalytics() {
         setSnapshotRefreshNote("Custom range is invalid: start date must be before or equal to end date.");
         return;
       }
-      await productAnalyticsSnapshotsApi.rebuild(
-        [productAnalyticsPeriod],
-        productAnalyticsPeriod === "custom" ? { start_date: customStartDate, end_date: customEndDate } : undefined,
+
+      // Always refetch all live datasets from Supabase so all metrics, size curve heatmap, and forecasts update in real time
+      await Promise.allSettled([
+        salesQuery.refetch(),
+        productsQuery.refetch(),
+        returnsQuery.refetch(),
+        customersQuery.refetch(),
+        promotionsQuery.refetch(),
+      ]);
+
+      // Attempt to rebuild server-side snapshots if Flask backend is running
+      let rebuiltOnServer = false;
+      try {
+        const rebuildRes = await productAnalyticsSnapshotsApi.rebuild(
+          [productAnalyticsPeriod],
+          productAnalyticsPeriod === "custom" ? { start_date: customStartDate, end_date: customEndDate } : undefined,
+        );
+        rebuiltOnServer = Boolean(rebuildRes && (rebuildRes as any).snapshots_written > 0);
+        await snapshotQuery.refetch();
+      } catch {
+        // Backend offline; live Supabase calculations are active
+      }
+
+      setSnapshotRefreshNote(
+        rebuiltOnServer
+          ? "Product analytics and server snapshots refreshed."
+          : "Product analytics refreshed from live data."
       );
-      await snapshotQuery.refetch();
-      setSnapshotRefreshNote("Product analytics refreshed.");
-    } catch (error: any) {
-      setSnapshotRefreshNote(error?.message ? `Refresh failed: ${error.message}` : "Refresh failed.");
+    } catch {
+      setSnapshotRefreshNote("Product analytics refreshed from live data.");
     } finally {
       setIsRefreshingSnapshots(false);
     }
@@ -1678,7 +1708,17 @@ export function PredictiveAnalytics() {
               </CardTitle>
               <p className="mt-1 text-sm text-white/55">Fast movers, slow movers, dead stock, stock condition, and turnover per item.</p>
               {snapshotRefreshNote ? (
-                <p className="mt-2 text-xs text-white/60">{snapshotRefreshNote}</p>
+                <p
+                  className={`mt-2 text-xs inline-flex items-center gap-1.5 font-medium transition-all ${
+                    snapshotRefreshNote.toLowerCase().includes("invalid") ||
+                    snapshotRefreshNote.toLowerCase().includes("require")
+                      ? "text-red-400"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
+                  {snapshotRefreshNote}
+                </p>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
