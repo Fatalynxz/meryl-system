@@ -382,6 +382,7 @@ export function ReturnManagement() {
     () =>
       sales
         .filter((sale: any) => isAdmin || String(sale.user_id ?? "") === String(user?.user_id ?? ""))
+        .filter((sale: any) => !replacedSalesIds.has(String(sale.sales_id ?? "")))
         .map((sale: any) => {
           const customer = Array.isArray(sale.customer) ? sale.customer[0] : sale.customer;
           const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
@@ -610,7 +611,22 @@ export function ReturnManagement() {
     const txnTime = new Date(matchedSale.transaction_date ?? "").getTime();
     const daysAgo = Number.isNaN(txnTime) ? 0 : Math.max(0, Math.floor((Date.now() - txnTime) / (1000 * 60 * 60 * 24)));
 
-    // 2. Check remaining returnable items
+    // 2. Enforce 1-Time Replacement Policy: Check if this sale already used its replacement
+    if (replacedSalesIds.has(saleId)) {
+      setReceiptValidationStatus({
+        state: "already_replaced",
+        displayId,
+        customerName,
+        totalAmount,
+        purchaseDate,
+        daysAgo,
+        message: `Receipt ${displayId} was already processed for replacement. Meryl Shoes policy strictly permits only 1 replacement transaction per sales receipt.`,
+      });
+      toast.error(`Receipt ${displayId} has already used its one-time replacement allowance.`);
+      return;
+    }
+
+    // 3. Check remaining returnable items
     const rawDetails = Array.isArray(matchedSale.sales_details) ? matchedSale.sales_details : [];
     const returnableCount = rawDetails.reduce((acc: number, d: any) => {
       const qty = Number(d.quantity ?? 0);
@@ -1139,6 +1155,10 @@ export function ReturnManagement() {
       toast.error("Upload the customer's printed receipt photo before finalizing.");
       return;
     }
+    if (replacedSalesIds.has(selectedSale.sales_id)) {
+      toast.error("This sales receipt has already used its one-time replacement allowance. Store policy strictly allows only 1 replacement per receipt.");
+      return;
+    }
     const remainingItemsCount = (selectedSale.details ?? []).reduce(
       (acc: number, d: any) => acc + Number(d.returnable_quantity ?? 0),
       0,
@@ -1545,6 +1565,9 @@ export function ReturnManagement() {
                               <span className="text-emerald-300 font-semibold">{formatCurrency(receiptValidationStatus.totalAmount ?? 0)}</span>
                             </div>
                           </div>
+                          <p className="text-[11px] text-emerald-200/90 pt-2 border-t border-emerald-500/20">
+                            <span className="font-semibold text-emerald-300">1-Time Replacement Policy:</span> This receipt is entitled to strictly 1 replacement transaction. Once finalized, no further replacements can be processed for this sale.
+                          </p>
                         </div>
                       )}
 
