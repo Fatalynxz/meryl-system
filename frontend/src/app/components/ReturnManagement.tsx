@@ -382,7 +382,6 @@ export function ReturnManagement() {
     () =>
       sales
         .filter((sale: any) => isAdmin || String(sale.user_id ?? "") === String(user?.user_id ?? ""))
-        .filter((sale: any) => !replacedSalesIds.has(String(sale.sales_id ?? "")))
         .map((sale: any) => {
           const customer = Array.isArray(sale.customer) ? sale.customer[0] : sale.customer;
           const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
@@ -611,22 +610,7 @@ export function ReturnManagement() {
     const txnTime = new Date(matchedSale.transaction_date ?? "").getTime();
     const daysAgo = Number.isNaN(txnTime) ? 0 : Math.max(0, Math.floor((Date.now() - txnTime) / (1000 * 60 * 60 * 24)));
 
-    // 2. Check if already replaced
-    if (replacedSalesIds.has(saleId)) {
-      setReceiptValidationStatus({
-        state: "already_replaced",
-        displayId,
-        customerName,
-        totalAmount,
-        purchaseDate,
-        daysAgo,
-        message: `Receipt ${displayId} was already processed for replacement.`,
-      });
-      toast.error(`Receipt ${displayId} has already been replaced.`);
-      return;
-    }
-
-    // 3. Check remaining returnable items
+    // 2. Check remaining returnable items
     const rawDetails = Array.isArray(matchedSale.sales_details) ? matchedSale.sales_details : [];
     const returnableCount = rawDetails.reduce((acc: number, d: any) => {
       const qty = Number(d.quantity ?? 0);
@@ -643,7 +627,7 @@ export function ReturnManagement() {
         purchaseDate,
         daysAgo,
         returnableCount: 0,
-        message: `All items on Receipt ${receiptDisplay} have already been fully returned or replaced.`,
+        message: `All items on Receipt ${receiptDisplay} have already been fully replaced or returned.`,
       });
       toast.error(`No returnable items remaining on Receipt ${receiptDisplay}.`);
       return;
@@ -1155,8 +1139,12 @@ export function ReturnManagement() {
       toast.error("Upload the customer's printed receipt photo before finalizing.");
       return;
     }
-    if (replacedSalesIds.has(selectedSale.sales_id)) {
-      toast.error("This sales transaction already has a recorded replacement. Only one replacement is allowed per sale.");
+    const remainingItemsCount = (selectedSale.details ?? []).reduce(
+      (acc: number, d: any) => acc + Number(d.returnable_quantity ?? 0),
+      0,
+    );
+    if (remainingItemsCount <= 0) {
+      toast.error("All items on this receipt have already been replaced or returned.");
       return;
     }
 
