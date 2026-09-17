@@ -459,24 +459,28 @@ The Sales Management module (`/sales`) serves as the master sales transaction le
 
 ---
 
-### Section 2.17: Itemized Order Details & Transaction Audit Modal
+### Section 2.17: Sale Details & Transaction Settlement Audit Modal
 #### Screen Description
-Triggered by clicking the blue Eye icon on any transaction row in the Sales Register. Provides an in-depth operational breakdown of the selected sale, displaying itemized footwear models, size variants, individual line totals, promotional discounts, customer profile details, and payment verification.
+Opens when clicking the golden View Details icon (eye icon) on any transaction row in the Sales Records register. It provides an itemized breakdown of the completed transaction, displaying customer status, cashier identification with staff code, transaction date, payment tender method, purchased footwear styles with brand/size/colorway badges and applied discounts, followed by a comprehensive financial settlement and replacement audit summary.
 
 #### Screenshot Callout Labels
-* **Box 1 [Order Audit Header & Metadata]**: "Displays the Official Receipt Number, transaction timestamp, terminal station ID, and processing cashier username."
-* **Box 2 [Customer Information Panel]**: "Summary card displaying registered customer name, contact phone number, loyalty tier, or tagged as 'Walk-In Customer'."
-* **Box 3 [Itemized Footwear Products Table]**: "Data table listing shoe thumbnail photo, model title, colorway, EU size variant, unit price, purchased quantity, and line subtotal (₱)."
-* **Box 4 [Financial Settlement & Tax Summary]**: "Complete payment calculation: Gross Subtotal, Promo / BOGO Deductions, VAT, Net Total Paid, Tender Method, Cash Received, and Change Due."
-* **Box 5 [Receipt Reprint & Close Actions]**: "Footer buttons: Yellow 'Reprint Receipt' button to dispatch a duplicate thermal print job, and 'Close' button to return to the sales ledger."
+* **Box 1 [Modal Header & Order Status Badge]**: "Displays the transaction identifier (e.g., 'Sale Details • SALES-055'), a green status badge ('COMPLETED'), and a quick-close (X) button."
+* **Box 2 [Transaction Metadata Summary Card]**: "Four-column card detailing Customer type ('Walk-in Customer'), Cashier name and staff badge code ('Administrator ADM-001'), Transaction Date ('2026-09-17'), and Payment Method ('CASH')."
+* **Box 3 [Purchased Items Register & Variant Badges]**: "Header indicating total pair count (e.g., 'PURCHASED ITEMS (2 PAIRS)') with an item card displaying shoe title ('Dunk Low Retro'), brand tag ('Nike'), size badge ('Size 42'), and colorway badge ('Black/White')."
+* **Box 4 [Quantity Breakdown & Promotional Discount]**: "Shows unit pricing computation ('Qty: 2 pairs × PHP 2,295.00'), green discount badge ('Discount: 15% (-PHP 688.50)'), original strikethrough price ('PHP 4,590.00'), and final net item total ('PHP 3,901.50')."
+* **Box 5 [Payment & Settlement Financial Summary]**: "Itemizes Gross Subtotal ('PHP 4,590.00'), Total Discount in green ('-PHP 688.50'), and large bold Total Net Amount ('PHP 3,901.50')."
+* **Box 6 [Settlement Metadata & Replacement Tracker]**: "Footer strip showing Payment Mode ('CASH'), Replacements status ('0 items'), and Last Activity date ('2026-09-17')."
 
 #### STEPS
-1. In the Sales table, click the blue **Eye icon (👁️)** on the transaction row you wish to inspect.
-2. The **Order Details** modal opens with the complete transaction metadata **(Box 1)**.
-3. Check the **Customer Information Panel (Box 2)** to verify buyer registration or walk-in status.
-4. Review the **Itemized Products Table (Box 3)** to confirm shoe models, sizes (e.g., Size 42), quantities, and individual prices.
-5. In the **Financial Settlement Summary (Box 4)**, verify applied promotional discounts, net paid amount, cash tendered, and exact change released.
-6. Click **Reprint Receipt (Box 5)** if a duplicate receipt is required, or click **Close** to exit.
+1. In the left navigation sidebar, click **Sales** to open the **Sales Records** register.
+2. Locate the target transaction using the search bar, date range pickers, or cashier dropdown filter.
+3. In the **Actions** column of the transaction row, click the golden **View (eye icon)**.
+4. The **Sale Details** modal opens centered on screen.
+5. Review the **Transaction Metadata** card to verify customer identity, cashier credentials (`ADM-001`), transaction date, and payment method.
+6. Inspect the **PURCHASED ITEMS** card to review shoe model, brand, EU size, colorway, unit cost, and applied promotional discounts.
+7. Verify the financial figures in the **PAYMENT & SETTLEMENT** card (Gross Subtotal, Total Discount, and Total Net Amount).
+8. Check the replacement tracker line at the bottom to verify if any warranty returns or size exchanges were associated with this sale.
+9. Click the **[X]** button at the top right of the modal to close the view and return to the sales ledger.
 
 ---
 
