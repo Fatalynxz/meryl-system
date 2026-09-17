@@ -100,34 +100,36 @@ function QuantityStepper({
   max = 999,
   disabled = false,
   onChange,
+  className = "",
 }: {
   value: number;
   min?: number;
   max?: number;
   disabled?: boolean;
   onChange: (value: number) => void;
+  className?: string;
 }) {
   const clamp = (nextValue: number) => Math.min(Math.max(min, Math.floor(Number(nextValue) || min)), max);
 
   return (
-    <div className="mx-auto flex w-[116px] items-center justify-center rounded-xl border border-yellow-400/25 bg-[#1D1D25] p-1">
+    <div className={`inline-flex items-center justify-center rounded-xl border border-yellow-400/30 bg-[#1D1D25] p-1 ${className}`}>
       <Button
         type="button"
         size="icon"
         variant="ghost"
         disabled={disabled || value <= min}
         onClick={() => onChange(clamp(value - 1))}
-        className="h-7 w-7 rounded-lg text-yellow-300 hover:bg-yellow-400 hover:text-[#171219] disabled:cursor-not-allowed disabled:opacity-40"
+        className="h-7 w-7 rounded-lg text-yellow-300 hover:bg-yellow-400 hover:text-[#171219] disabled:cursor-not-allowed disabled:opacity-40 p-0 flex items-center justify-center shrink-0"
       >
         <Minus className="h-3.5 w-3.5" />
       </Button>
-      <Input
+      <input
         type="text"
         inputMode="numeric"
         value={String(value)}
         disabled={disabled}
         onChange={(event) => onChange(clamp(Number(event.target.value.replace(/\D/g, ""))))}
-        className="h-7 w-12 border-0 bg-transparent p-0 text-center text-yellow-100 shadow-none focus-visible:ring-0 disabled:opacity-50"
+        className="h-7 w-10 border-0 bg-transparent p-0 text-center text-sm font-bold text-yellow-100 outline-none focus:outline-none focus:ring-0 disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none leading-none flex items-center justify-center"
       />
       <Button
         type="button"
@@ -135,7 +137,7 @@ function QuantityStepper({
         variant="ghost"
         disabled={disabled || value >= max}
         onClick={() => onChange(clamp(value + 1))}
-        className="h-7 w-7 rounded-lg text-yellow-300 hover:bg-yellow-400 hover:text-[#171219] disabled:cursor-not-allowed disabled:opacity-40"
+        className="h-7 w-7 rounded-lg text-yellow-300 hover:bg-yellow-400 hover:text-[#171219] disabled:cursor-not-allowed disabled:opacity-40 p-0 flex items-center justify-center shrink-0"
       >
         <Plus className="h-3.5 w-3.5" />
       </Button>
@@ -434,7 +436,9 @@ export function ReturnManagement() {
   const selectedOriginalItem =
     selectedReturnedItems[0] ??
     selectedSale?.details.find((detail) => detail.product_id === formData.returned_product_id);
-  const replacementProduct = productMap.get(formData.replacement_product_id);
+  const replacementProduct =
+    productMap.get(formData.replacement_product_id) ??
+    (selectedOriginalItem ? productMap.get(selectedOriginalItem.product_id) : undefined);
   const requiresReplacement = formData.return_action === "Replacement" || formData.return_action === "Adjustment";
   const maxReturnQty = Math.max(
     1,
@@ -450,8 +454,9 @@ export function ReturnManagement() {
   const replacementTotal =
     selectedReturnedItemsWithQty.length > 0
       ? selectedReturnedItemsWithQty.reduce((sum, item) => {
-          const sameProduct = productMap.get(item.product_id);
-          return sum + Number(sameProduct?.price ?? item.price ?? 0) * Number(item.selectedQty ?? 1);
+          const chosenId = formData.replacement_product_id || item.product_id;
+          const repItem = productMap.get(chosenId) ?? productMap.get(item.product_id);
+          return sum + Number(repItem?.price ?? item.price ?? 0) * Number(item.selectedQty ?? 1);
         }, 0)
       : Number(replacementProduct?.price ?? 0) * quantity;
   const priceDifference = replacementTotal - originalTotal;
@@ -461,14 +466,36 @@ export function ReturnManagement() {
   const hasReturnedSelected = selectedReturnedItems.length > 0;
   const hasReplacementSelected =
     selectedReturnedItemsWithQty.length > 0 &&
-    selectedReturnedItemsWithQty.every((item) => Boolean(productMap.get(item.product_id)));
-  const eligibleReplacementProducts = useMemo(
-    () => {
-      const selectedProductIds = new Set(selectedReturnedItemsWithQty.map((item) => item.product_id));
-      return products.filter((product) => selectedProductIds.has(product.product_id));
-    },
-    [products, selectedReturnedItemsWithQty],
-  );
+    (Boolean(formData.replacement_product_id)
+      ? Boolean(productMap.get(formData.replacement_product_id))
+      : selectedReturnedItemsWithQty.every((item) => Boolean(productMap.get(item.product_id))));
+
+  const isSameProductModel = (productIdA: string, productIdB: string) => {
+    if (!productIdA || !productIdB) return false;
+    if (productIdA === productIdB) return true;
+    const prodA = productMap.get(productIdA);
+    const prodB = productMap.get(productIdB);
+    if (!prodA || !prodB) return false;
+    return normalizeProductName(prodA.name) === normalizeProductName(prodB.name);
+  };
+
+  const eligibleReplacementProducts = useMemo(() => {
+    if (selectedReturnedItemsWithQty.length === 0) return [];
+    const returnedNames = new Set(
+      selectedReturnedItemsWithQty
+        .map((item) => {
+          const prod = productMap.get(item.product_id);
+          return normalizeProductName(prod?.name || item.productName || "");
+        })
+        .filter(Boolean),
+    );
+    const selectedProductIds = new Set(selectedReturnedItemsWithQty.map((item) => item.product_id));
+
+    return products.filter((product) => {
+      const prodName = normalizeProductName(product.name);
+      return selectedProductIds.has(product.product_id) || (Boolean(prodName) && returnedNames.has(prodName));
+    });
+  }, [products, productMap, selectedReturnedItemsWithQty]);
 
   const filteredSaleOptions = useMemo(() => {
     const term = salePickerSearch.trim().toLowerCase();
@@ -674,8 +701,9 @@ export function ReturnManagement() {
   };
 
   const selectReplacementProduct = (productId: string) => {
-    if (!selectedReturnedItems.some((item) => item.product_id === productId)) {
-      toast.error("Replacement must be the same product as the returned item.");
+    const isEligible = selectedReturnedItems.some((item) => isSameProductModel(item.product_id, productId));
+    if (!isEligible) {
+      toast.error("Replacement must be the same shoe model / variant.");
       return;
     }
     setFormData((current) => ({ ...current, replacement_product_id: productId }));
@@ -700,34 +728,38 @@ export function ReturnManagement() {
       return;
     }
     const stockNeededByProduct = selectedReturnedItemsWithQty.reduce((map, item) => {
-      const productId = String(item.product_id ?? "");
-      map.set(productId, (map.get(productId) ?? 0) + Number(item.selectedQty ?? 1));
+      const chosenId = String(formData.replacement_product_id || item.product_id);
+      map.set(chosenId, (map.get(chosenId) ?? 0) + Number(item.selectedQty ?? 1));
       return map;
     }, new Map<string, number>());
     for (const [productId, stockNeeded] of stockNeededByProduct) {
-      const sameProduct = productMap.get(productId);
-      if (!sameProduct || sameProduct.stock < stockNeeded) {
-        toast.error(`Only ${sameProduct?.stock ?? 0} replacement unit(s) available for ${sameProduct?.name ?? "this product"}, but ${stockNeeded} needed`);
+      const targetProduct = productMap.get(productId);
+      if (!targetProduct || targetProduct.stock < stockNeeded) {
+        toast.error(`Only ${targetProduct?.stock ?? 0} replacement unit(s) available for ${targetProduct?.name ?? "this product"}, but ${stockNeeded} needed`);
         return;
       }
     }
 
     setReplacementLines((prev) => {
       const additions = selectedReturnedItemsWithQty.map((item) => {
-        const sameProduct = productMap.get(item.product_id)!;
+        const chosenId = formData.replacement_product_id || item.product_id;
+        const replacementItem = productMap.get(chosenId) || productMap.get(item.product_id)!;
         const lineQty = Number(item.selectedQty ?? 1);
         const originalLineTotal = Number(item.price ?? 0) * lineQty;
-        const replacementLineTotal = Number(sameProduct.price ?? 0) * lineQty;
+        const replacementLineTotal = Number(replacementItem.price ?? 0) * lineQty;
+        const origProduct = productMap.get(item.product_id);
+        const origLabel = `${item.productName}${origProduct?.size ? ` (Size ${origProduct.size})` : ""}`;
+        const repLabel = `${replacementItem.name}${replacementItem.size ? ` (Size ${replacementItem.size})` : ""}`;
         return {
           line_id: buildClientId(),
           sales_detail_id: item.sales_detail_id,
           returned_product_id: item.product_id,
-          returned_product_name: item.productName,
-          replacement_product_id: sameProduct.product_id,
-          replacement_product_name: sameProduct.name,
+          returned_product_name: origLabel,
+          replacement_product_id: replacementItem.product_id,
+          replacement_product_name: repLabel,
           quantity: lineQty,
           returned_price_unit: Number(item.price ?? 0),
-          replacement_price_unit: Number(sameProduct.price ?? 0),
+          replacement_price_unit: Number(replacementItem.price ?? 0),
           price_difference: replacementLineTotal - originalLineTotal,
           inventory_action: effectiveInventoryAction,
         };
@@ -1087,20 +1119,24 @@ export function ReturnManagement() {
     let lines = [...replacementLines];
     if (lines.length === 0 && selectedReturnedItemsWithQty.length > 0 && hasReplacementSelected) {
       lines = selectedReturnedItemsWithQty.map((item) => {
-        const sameProduct = productMap.get(item.product_id)!;
+        const chosenId = formData.replacement_product_id || item.product_id;
+        const replacementItem = productMap.get(chosenId) || productMap.get(item.product_id)!;
         const lineQty = Number(item.selectedQty ?? 1);
         const originalLineTotal = Number(item.price ?? 0) * lineQty;
-        const replacementLineTotal = Number(sameProduct.price ?? 0) * lineQty;
+        const replacementLineTotal = Number(replacementItem.price ?? 0) * lineQty;
+        const origProduct = productMap.get(item.product_id);
+        const origLabel = `${item.productName}${origProduct?.size ? ` (Size ${origProduct.size})` : ""}`;
+        const repLabel = `${replacementItem.name}${replacementItem.size ? ` (Size ${replacementItem.size})` : ""}`;
         return {
           line_id: buildClientId(),
           sales_detail_id: item.sales_detail_id,
           returned_product_id: item.product_id,
-          returned_product_name: item.productName,
-          replacement_product_id: sameProduct.product_id,
-          replacement_product_name: sameProduct.name,
+          returned_product_name: origLabel,
+          replacement_product_id: replacementItem.product_id,
+          replacement_product_name: repLabel,
           quantity: lineQty,
           returned_price_unit: Number(item.price ?? 0),
-          replacement_price_unit: Number(sameProduct.price ?? 0),
+          replacement_price_unit: Number(replacementItem.price ?? 0),
           price_difference: replacementLineTotal - originalLineTotal,
           inventory_action: effectiveInventoryAction,
         };
@@ -1131,8 +1167,8 @@ export function ReturnManagement() {
       const replacementStockUsed = new Map<string, number>();
 
       for (const line of lines) {
-        if (line.replacement_product_id !== line.returned_product_id) {
-          throw new Error("Replacement must use the same product as the returned item.");
+        if (!isSameProductModel(line.replacement_product_id, line.returned_product_id)) {
+          throw new Error("Replacement must use the same shoe model / variant.");
         }
         const saleDetail = saleDetailById.get(line.sales_detail_id);
         if (!saleDetail) {
@@ -1417,25 +1453,27 @@ export function ReturnManagement() {
                       <p className="text-sm font-semibold text-zinc-100">Current Selection</p>
                       <Badge className="bg-yellow-400 text-red-900">{replacementLines.length} line(s) added</Badge>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-                      <div className={`rounded-lg border p-2 ${hasSaleSelected ? "border-emerald-600 bg-emerald-900/20" : "border-zinc-700 bg-zinc-950"}`}>
-                        <p className="text-[11px] text-zinc-400">1. Sale</p>
-                        <p className="text-sm text-zinc-100">{selectedSale?.display_sales_id ?? "Not selected"}</p>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                      <div className={`rounded-lg border p-2.5 ${hasSaleSelected ? "border-emerald-600 bg-emerald-900/20" : "border-zinc-700 bg-zinc-950"}`}>
+                        <p className="text-[11px] text-zinc-400 font-medium">1. Sale / Receipt</p>
+                        <p className="text-sm font-semibold text-zinc-100 truncate">{selectedSale?.display_sales_id ?? "Not selected"}</p>
                       </div>
-                      <div className={`rounded-lg border p-2 ${hasReturnedSelected ? "border-emerald-600 bg-emerald-900/20" : "border-zinc-700 bg-zinc-950"}`}>
-                        <p className="text-[11px] text-zinc-400">2. Replaced Item</p>
-                        <p className="text-sm text-zinc-100">{selectedOriginalItem?.productName ?? "Not selected"}</p>
-                      </div>
-                      <div className={`rounded-lg border p-2 ${hasReplacementSelected ? "border-emerald-600 bg-emerald-900/20" : "border-zinc-700 bg-zinc-950"}`}>
-                        <p className="text-[11px] text-zinc-400">3. Replacement</p>
-                        <p className="text-sm text-zinc-100">
-                          {hasReplacementSelected ? "Same product only" : "Not selected"}
+                      <div className={`rounded-lg border p-2.5 ${hasReturnedSelected ? "border-emerald-600 bg-emerald-900/20" : "border-zinc-700 bg-zinc-950"}`}>
+                        <p className="text-[11px] text-zinc-400 font-medium">2. Replaced Item</p>
+                        <p className="text-sm font-semibold text-zinc-100 truncate">
+                          {selectedOriginalItem
+                            ? `${selectedOriginalItem.productName}${productMap.get(selectedOriginalItem.product_id)?.size ? ` (Size ${productMap.get(selectedOriginalItem.product_id)?.size})` : ""}`
+                            : "Not selected"}
                         </p>
                       </div>
-                      <div className="rounded-lg border border-zinc-700 bg-zinc-950 p-2">
-                        <p className="text-[11px] text-zinc-400">4. Difference</p>
-                        <p className={`text-sm ${priceDifference > 0 ? "text-orange-300" : priceDifference < 0 ? "text-cyan-300" : "text-zinc-100"}`}>
-                          {formatCurrency(priceDifference)}
+                      <div className={`rounded-lg border p-2.5 ${hasReplacementSelected ? "border-emerald-600 bg-emerald-900/20" : "border-zinc-700 bg-zinc-950"}`}>
+                        <p className="text-[11px] text-zinc-400 font-medium">3. Replacement Variant</p>
+                        <p className="text-sm font-semibold text-zinc-100 truncate">
+                          {replacementProduct
+                            ? `${replacementProduct.name} (${replacementProduct.size ? `Size ${replacementProduct.size}` : ""}${replacementProduct.color ? ` / ${replacementProduct.color}` : ""})`
+                            : hasReplacementSelected
+                              ? "Same Product (1:1)"
+                              : "Not selected"}
                         </p>
                       </div>
                     </div>
@@ -1724,69 +1762,37 @@ export function ReturnManagement() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-yellow-300">Mode of Payment</Label>
-                      <Select
-                        value={formData.mode_of_payment}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, mode_of_payment: value as ExchangeForm["mode_of_payment"] })
-                        }
-                        disabled={customerPays <= 0 && totalAdditionalPayment <= 0}
-                      >
-                        <SelectTrigger className="bg-red-600 border-red-800 text-yellow-200">
-                          <SelectValue placeholder={customerPays > 0 || totalAdditionalPayment > 0 ? "Select mode of payment" : "Not needed for this replacement"} />
-                        </SelectTrigger>
-                        <SelectContent className="bg-red-700 border-red-800 text-yellow-200">
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="gcash">GCash</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {customerPays <= 0 && totalAdditionalPayment <= 0 && <p className="text-xs text-yellow-300">No payment required unless replacement value is higher.</p>}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-yellow-300">Replaced Item Inventory Action *</Label>
-                      <Select
-                        value={effectiveInventoryAction}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, inventory_action: value as ExchangeForm["inventory_action"] })
-                        }
-                        disabled={isUnsellableReason}
-                      >
-                        <SelectTrigger className="bg-red-600 border-red-800 text-yellow-200">
-                          <SelectValue placeholder="Select inventory action" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-red-700 border-red-800 text-yellow-200">
-                          <SelectItem value="Defective / Not Sellable">Defective / Not Sellable</SelectItem>
-                          <SelectItem value="Return to Stock">Back to Stock</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {isUnsellableReason && (
-                        <p className="text-xs text-yellow-300">
-                          Damaged or defective items cannot be returned to sellable stock.
+                  <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <Label className="text-yellow-300 font-semibold text-sm">Replaced Item Inventory Action *</Label>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Specify where the customer&apos;s returned shoe will be routed in inventory.
                         </p>
-                      )}
+                      </div>
+                      <div className="sm:w-72">
+                        <Select
+                          value={effectiveInventoryAction}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, inventory_action: value as ExchangeForm["inventory_action"] })
+                          }
+                          disabled={isUnsellableReason}
+                        >
+                          <SelectTrigger className="bg-red-600 border-red-800 text-yellow-200 font-medium">
+                            <SelectValue placeholder="Select inventory action" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-red-700 border-red-800 text-yellow-200">
+                            <SelectItem value="Defective / Not Sellable">Defective / Not Sellable</SelectItem>
+                            <SelectItem value="Return to Stock">Back to Stock (Restock)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-xl border border-red-800 p-3">
-                    <div>
-                      <p className="text-xs text-yellow-300">Selected Sale</p>
-                      <p className="text-sm text-yellow-200">{selectedSale?.display_sales_id ?? "Not selected"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-yellow-300">Replaced Item</p>
-                      <p className="text-sm text-yellow-200">
-                        {selectedReturnedItems.length
-                          ? `${selectedReturnedItems.length} item(s) selected`
-                          : "Not selected"}
+                    {isUnsellableReason && (
+                      <p className="text-xs text-yellow-300 pt-1">
+                        Damaged or defective items cannot be returned to sellable stock.
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-yellow-300">Replacement Item</p>
-                      <p className="text-sm text-yellow-200">{replacementProduct?.name ?? "Not selected"}</p>
-                    </div>
+                    )}
                   </div>
 
                   <div className={`space-y-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 ${!hasSaleSelected ? "opacity-50" : ""}`}>
@@ -1864,21 +1870,29 @@ export function ReturnManagement() {
                   {requiresReplacement && (
                     <div className={`space-y-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 ${!hasReturnedSelected ? "opacity-50" : ""}`}>
                       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                        <Label className="text-yellow-300">Step 3: Same Product Replacement</Label>
+                        <div>
+                          <Label className="text-yellow-300 font-semibold text-sm">Step 3: Same Product Replacement</Label>
+                          <p className="text-xs text-zinc-400 mt-0.5">
+                            Exchange for the identical pair or a different size/color variant of the same shoe model.
+                          </p>
+                        </div>
                         <Dialog open={isReplacementPickerOpen} onOpenChange={setIsReplacementPickerOpen}>
                           <DialogTrigger asChild>
                             <Button
                               type="button"
                               disabled={!hasReturnedSelected}
-                              className="bg-yellow-400 text-red-900 hover:bg-yellow-500 disabled:opacity-50"
+                              className="bg-yellow-400 text-red-900 hover:bg-yellow-500 disabled:opacity-50 font-bold text-xs h-9"
                             >
-                              View Same Product Options
+                              Choose Size / Variant
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 !w-[92vw] !max-w-[980px] max-h-[84vh] overflow-hidden p-0">
-                            <div className="border-b border-zinc-800 p-4">
+                            <div className="border-b border-zinc-800 p-4 bg-zinc-900">
                               <DialogHeader>
-                                <DialogTitle className="text-yellow-300">Same Product Replacement Options</DialogTitle>
+                                <DialogTitle className="text-yellow-300 flex items-center gap-2">
+                                  <ArrowRightLeft className="w-5 h-5" />
+                                  Same Product Size &amp; Variant Options
+                                </DialogTitle>
                               </DialogHeader>
                             </div>
                             <div className="max-h-[66vh] overflow-y-auto p-4 space-y-3">
@@ -1887,43 +1901,50 @@ export function ReturnManagement() {
                                 <Input
                                   value={replacementSearch}
                                   onChange={(event) => setReplacementSearch(event.target.value)}
-                                  placeholder="Search same product by SKU, name, brand..."
-                                  className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-yellow-300/50"
+                                  placeholder="Search by size, color, brand..."
+                                  className="pl-10 bg-[#1D1D25] border-zinc-700 text-white placeholder:text-zinc-500 text-xs"
                                 />
                               </div>
                               <div className="border border-zinc-800 rounded-xl overflow-y-auto overflow-x-auto max-h-[48vh]">
                                 <Table className="w-full text-sm">
                                   <TableHeader>
                                     <TableRow className="bg-zinc-900 hover:bg-zinc-900 border-zinc-800">
-                                      <TableHead className="text-yellow-300 text-center">Product</TableHead>
+                                      <TableHead className="text-yellow-300 text-center">Product Model</TableHead>
                                       <TableHead className="text-yellow-300 text-center">Brand</TableHead>
-                                      <TableHead className="text-yellow-300 text-center">Variant</TableHead>
-                                      <TableHead className="text-yellow-300 text-center">Price</TableHead>
-                                      <TableHead className="text-yellow-300 text-center">Stock</TableHead>
+                                      <TableHead className="text-yellow-300 text-center">Size</TableHead>
+                                      <TableHead className="text-yellow-300 text-center">Color</TableHead>
+                                      <TableHead className="text-yellow-300 text-center">Stock Available</TableHead>
                                       <TableHead className="text-yellow-300 text-center">Action</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {filteredReplacementProducts.map((product) => (
-                                      <TableRow key={product.product_id} className={`border-zinc-800 transition-colors hover:bg-zinc-900 ${formData.replacement_product_id === product.product_id ? "bg-yellow-400/10" : ""}`}>
-                                        <TableCell className="truncate text-yellow-200 text-center" title={product.name}>{product.name}</TableCell>
-                                        <TableCell className="truncate text-yellow-200 text-center" title={product.brand}>{product.brand}</TableCell>
-                                        <TableCell className="truncate text-yellow-200 text-center" title={`${product.color} / ${product.size}`}>{product.color} / {product.size}</TableCell>
-                                        <TableCell className="truncate text-yellow-300 text-center">{formatCurrency(product.price)}</TableCell>
-                                        <TableCell className="text-center">
-                                          <Badge className="rounded-full bg-yellow-400 text-red-900">{product.stock} units</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                          <Button
-                                            size="sm"
-                                            onClick={() => selectReplacementProduct(product.product_id)}
-                                            className="h-8 rounded-full bg-yellow-400 px-4 text-red-900 hover:bg-yellow-500"
-                                          >
-                                            {formData.replacement_product_id === product.product_id ? "Selected" : "Select"}
-                                          </Button>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
+                                    {filteredReplacementProducts.map((product) => {
+                                      const isCurrentChoice = formData.replacement_product_id === product.product_id;
+                                      const isIdentical = selectedOriginalItem?.product_id === product.product_id;
+                                      return (
+                                        <TableRow key={product.product_id} className={`border-zinc-800 transition-colors hover:bg-zinc-900 ${isCurrentChoice ? "bg-yellow-400/10" : ""}`}>
+                                          <TableCell className="truncate text-zinc-100 text-center font-medium" title={product.name}>{product.name}</TableCell>
+                                          <TableCell className="truncate text-zinc-300 text-center" title={product.brand}>{product.brand}</TableCell>
+                                          <TableCell className="truncate text-yellow-300 text-center font-semibold">{product.size}</TableCell>
+                                          <TableCell className="truncate text-zinc-300 text-center">{product.color}</TableCell>
+                                          <TableCell className="text-center">
+                                            <Badge className={`rounded-full ${product.stock > 0 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-red-500/20 text-red-300 border-red-500/30"}`}>
+                                              {product.stock} units in stock
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <Button
+                                              size="sm"
+                                              disabled={product.stock <= 0}
+                                              onClick={() => selectReplacementProduct(product.product_id)}
+                                              className="h-8 rounded-full bg-yellow-400 px-4 text-red-900 hover:bg-yellow-500 font-bold text-xs disabled:opacity-40"
+                                            >
+                                              {isCurrentChoice ? "Selected" : isIdentical ? "Select (Same Size)" : "Select"}
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
                                   </TableBody>
                                 </Table>
                               </div>
@@ -1931,28 +1952,50 @@ export function ReturnManagement() {
                           </DialogContent>
                         </Dialog>
                       </div>
-                      {!hasReturnedSelected && <p className="text-xs text-zinc-300">Select the replaced product first.</p>}
-                      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-                        <p className="text-xs text-yellow-300">Replacement Rule</p>
-                        <p className="text-sm text-yellow-200">
-                          {hasReplacementSelected
-                            ? "Replacement will use the same product variant as each returned item."
-                            : "Select the replaced product first."}
-                        </p>
-                      </div>
+                      {!hasReturnedSelected ? (
+                        <p className="text-xs text-zinc-400">Select the replaced product in Step 2 first.</p>
+                      ) : (
+                        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="space-y-1">
+                            <span className="text-[11px] text-zinc-400 uppercase tracking-wide font-semibold block">Selected Replacement Unit</span>
+                            <p className="text-sm font-bold text-zinc-100">
+                              {replacementProduct
+                                ? `${replacementProduct.name} — Size ${replacementProduct.size} (${replacementProduct.color})`
+                                : "Same Product (Identical Variant)"}
+                            </p>
+                            <p className="text-xs text-zinc-400">
+                              Available Stock:{" "}
+                              <span className="text-yellow-300 font-semibold">
+                                {replacementProduct ? `${replacementProduct.stock} unit(s)` : "Available"}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {replacementProduct && selectedOriginalItem && replacementProduct.product_id === selectedOriginalItem.product_id ? (
+                              <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
+                                Identical Replacement (Defect Swap)
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">
+                                Size / Variant Exchange (Even 1:1)
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   <div className="space-y-2 rounded-xl border border-red-800 p-3">
-                    <Label className="text-yellow-300">Replacement List ({replacementLines.length})</Label>
+                    <Label className="text-yellow-300">Replacement Queue ({replacementLines.length})</Label>
                     <div className="border border-red-800 rounded-lg overflow-x-auto">
                       <Table className="w-full text-sm">
                         <TableHeader>
                           <TableRow className="bg-red-800 hover:bg-red-800 border-red-900">
-                            <TableHead className="text-yellow-300 text-center">Replaced</TableHead>
-                            <TableHead className="text-yellow-300 text-center">Replacement</TableHead>
+                            <TableHead className="text-yellow-300 text-center">Original Item</TableHead>
+                            <TableHead className="text-yellow-300 text-center">Replacement Item / Size</TableHead>
                             <TableHead className="text-yellow-300 text-center">Qty</TableHead>
-                            <TableHead className="text-yellow-300 text-center">Difference</TableHead>
+                            <TableHead className="text-yellow-300 text-center">Policy</TableHead>
                             <TableHead className="text-yellow-300 text-center">Action</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1967,7 +2010,11 @@ export function ReturnManagement() {
                                 <TableCell className="text-yellow-200 text-center">{line.returned_product_name}</TableCell>
                                 <TableCell className="text-yellow-200 text-center">{line.replacement_product_name}</TableCell>
                                 <TableCell className="text-yellow-200 text-center">{line.quantity}</TableCell>
-                                <TableCell className="text-yellow-300 text-center">{formatCurrency(line.price_difference)}</TableCell>
+                                <TableCell className="text-center">
+                                  <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
+                                    1:1 Even Exchange
+                                  </Badge>
+                                </TableCell>
                                 <TableCell className="text-center">
                                   <Button
                                     type="button"
@@ -1987,32 +2034,28 @@ export function ReturnManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-yellow-300">Step 4: Quantity</Label>
-                      <QuantityStepper
-                        value={quantity}
-                        max={maxReturnQty}
-                        onChange={(nextQty) => setFormData({ ...formData, quantity: nextQty })}
-                      />
-                      {selectedReturnedItems.length > 1 && (
-                        <p className="text-xs text-yellow-300">Tip: Set exact qty per selected item in Step 2 (Replace Qty column).</p>
-                      )}
+                  <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <Label className="text-yellow-300 font-semibold text-sm">Step 4: Quantity</Label>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Specify units to exchange (max {maxReturnQty} unit{maxReturnQty > 1 ? "s" : ""})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <QuantityStepper
+                          value={quantity}
+                          max={maxReturnQty}
+                          onChange={(nextQty) => setFormData({ ...formData, quantity: nextQty })}
+                        />
+                        <span className="text-xs text-yellow-300 font-semibold whitespace-nowrap bg-yellow-400/15 border border-yellow-400/30 px-2.5 py-1 rounded-lg">
+                          {quantity} unit{quantity > 1 ? "s" : ""} (1:1 Even Exchange)
+                        </span>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-yellow-300">Original Value</Label>
-                      <Input value={formatCurrency(originalTotal)} readOnly className="bg-red-600 border-red-800 text-yellow-200" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-yellow-300">Replacement Value</Label>
-                      <Input value={formatCurrency(replacementTotal)} readOnly className="bg-red-600 border-red-800 text-yellow-200" />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-                    <p className="text-zinc-200 text-sm">
-                      Added payment total: {formatCurrency(totalAdditionalPayment)} | Replacement-only policy (no store credit/refund)
-                    </p>
+                    {selectedReturnedItems.length > 1 && (
+                      <p className="text-xs text-yellow-300 pt-1">Tip: Set exact qty per selected item in Step 2 (Replace Qty column).</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

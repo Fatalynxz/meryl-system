@@ -589,28 +589,31 @@ The Replacement Management module allows administrators to inspect defective foo
 
 ---
 
-### Section 2.23: 5-Step Item Replacement Verification Wizard Modal
+### Section 2.23: Process Item Replacement Modal (1:1 Same-Product Exchange)
 #### Screen Description
-Opens when clicking the golden Process Replacement button. A structured 5-step wizard ensuring strict compliance with store warranty policies before issuing exchange footwear.
+Opens when clicking the golden **Process Replacement** button in the Replacement module. Provides a structured 1:1 same-product exchange workflow adhering strictly to Meryl Shoes' store warranty policy (even exchange for sizing or defective replacement with ₱0.00 price difference, no refunds or store credit).
 
 #### Screenshot Callout Labels
-* **Box 1 [Progress Stepper Bar]**: "Visual indicator displaying the active step: 1. Validate Sale &rarr; 2. Return Item &rarr; 3. Defect &rarr; 4. Replacement &rarr; 5. Settlement."
-* **Box 2 [Step 1: Receipt Number Validation Bar & 7-Day Policy Badge]**: "Input to scan or type the original receipt # (e.g., SALES-001); displays green 'Valid Warranty' badge or red 'Warranty Expired' alert (>7 days)."
-* **Box 3 [Receipt Proof & Document Upload]**: "Button to upload photo evidence of the customer's original paper receipt or transaction slip."
-* **Box 4 [Step 2: Purchased Items Selection Grid]**: "Displays all shoe styles and sizes from the verified receipt; click to select the specific defective pair being returned."
-* **Box 5 [Step 3: Defect Reason Dropdown & Photo Upload]**: "Select defect category (Sole Detachment, Broken Stitching, Sizing Discrepancy, Upper Tear) and upload defect photos."
-* **Box 6 [Step 4: Replacement Shoe & Size Selector]**: "Choose the replacement footwear style and size variant from available in-stock inventory."
-* **Box 7 [Step 5: Price Difference & Financial Settlement]**: "Automatically computes financial balance: ₱0.00 for exact size exchange, additional cash due if upgrading to a higher-priced model, or credit voucher."
-* **Box 8 [Submit Replacement Claim Button]**: "Submits ticket to admin approval queue, updates inventory reservations, and generates an official replacement voucher."
+* **Box 1 [Current Selection Summary Bar]**: "Three-column status card itemizing: 1. Sale / Receipt #, 2. Replaced Item (with original size), and 3. Replacement Variant (with new size/color)."
+* **Box 2 [Step 1: Receipt Number Validation & 7-Day Window]**: "Input to scan or type the receipt # (e.g. SALES-001 or RCP-xxx); displays green 'Within 7-Day Window' badge or policy notice if purchase exceeds 7 days."
+* **Box 3 [Receipt Proof Photo Upload]**: "Camera capture or image upload field attaching a photo of the customer's physical receipt for buyer verification."
+* **Box 4 [Replaced Item Inventory Action]**: "Selects warehouse disposition for the returned shoe: 'Defective / Not Sellable' or 'Back to Stock (Restock)'."
+* **Box 5 [Step 2: Select Replaced Product Table]**: "Lists shoes from the validated receipt; allows selecting item and setting returnable quantity via stepper."
+* **Box 6 [Step 3: Same Product Replacement & Variant Picker]**: "Displays chosen replacement unit with stock badge. Clicking 'Choose Size / Variant' opens available sizes and colors of the same shoe model."
+* **Box 7 [Step 4: Quantity Stepper (1:1 Even Exchange)]**: "Centered [- 1 +] stepper specifying quantity of pairs to exchange under 1:1 even exchange policy."
+* **Box 8 [Replacement Reason Dropdown]**: "Selects reason for exchange: 'Wrong size', 'Damaged item', 'Defective item', 'Wrong item received', or 'Others'."
+* **Box 9 [Finalize Replacement Action Button]**: "Commits the 1:1 exchange, updates warehouse stock, creates audit logs, and closes intake."
 
 #### STEPS
 1. In the Replacement module, click **Process Replacement**.
-2. **Step 1**: Type or scan the customer's **Official Receipt Number** and click **Validate**. The system verifies that the purchase date is within the 7-day policy window. Upload a photo of the receipt proof.
-3. **Step 2**: From the list of shoes on that receipt, click the specific pair the customer is returning.
-4. **Step 3**: Select the **Defect Category** from the dropdown, write descriptive inspection notes, and upload a clear photo of the defect.
-5. **Step 4**: Select the replacement shoe model and requested size from available stock.
-6. **Step 5**: Review the **Price Difference**. If the customer chooses an identical model in a different size, difference is ₱0.00. If upgrading, collect the balance.
-7. Click **Submit Replacement Claim**. The claim is queued for final managerial approval.
+2. **Step 1**: Enter the receipt number (e.g., `SALES-001`) and click **Verify Receipt**. The system validates the transaction within the 7-day warranty window.
+3. Click **Upload Receipt** to take or attach a photo of the printed customer receipt.
+4. Set the **Replaced Item Inventory Action** (`Defective / Not Sellable` for damaged shoes or `Back to Stock` for unworn size returns).
+5. **Step 2**: Click **Select** on the purchased shoe row being returned.
+6. **Step 3**: The system automatically selects an identical replacement pair. To exchange for a different size (e.g., EU 40 &rarr; EU 41) or colorway of the same shoe model, click **Choose Size / Variant** and select the desired in-stock option.
+7. **Step 4**: Adjust the exchange quantity using the centered **Quantity Stepper** (1:1 even exchange at ₱0.00 difference).
+8. Select the **Reason** for replacement (e.g., *Wrong size* or *Defective item*).
+9. Click **Finalize Replacement** to record the exchange and automatically update inventory stock.
 
 ---
 
