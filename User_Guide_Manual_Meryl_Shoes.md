@@ -717,21 +717,23 @@ Opens by clicking Send Email Blast on an active promotional campaign. Dispatches
 
 ### Section 2.29: Business Intelligence Reports & Document Export (PDF / CSV)
 #### Screen Description
-The Reports & Analytics module compiles financial statements, sales registers, cashier shift summaries, and inventory valuation reports into formal executive PDF documents and raw CSV spreadsheet files.
+The Reports & Analytics module compiles financial statements, sales registers, cashier shift summaries, category breakdowns, and inventory valuation reports into formal executive PDF documents and raw CSV spreadsheet files. It includes flexible Date Range controls (Daily, Weekly, Monthly, Quarterly, Annually, and Custom Range with From/To calendar date pickers) allowing staff to audit any arbitrary historic timeframe.
 
 #### Screenshot Callout Labels
-* **Box 1 [Report Type Dropdown Selector]**: "Select report: Daily Sales Summary, Category Turnover, Cashier Reconciliation, or Inventory Valuation."
-* **Box 2 [Date Range Picker]**: "Set start and end dates for the financial audit reporting period."
-* **Box 3 [Generate Report Button]**: "Executes data aggregation and displays executive metric charts on screen."
-* **Box 4 [Download PDF Report Button]**: "Generates a formal, printable PDF document complete with store branding, charts, and audit tables."
-* **Box 5 [Export Raw CSV Button]**: "Downloads raw database rows into Excel-compatible CSV format for external accounting."
+* **Box 1 [Date Range Dropdown Selector]**: "Select period: Daily, Weekly, Monthly, Quarterly, Annually, or Custom Range."
+* **Box 2 [From Date & To Date Calendar Pickers]**: "Active when Custom Range is selected; allows typing or selecting exact start and end dates (e.g., Jan 1–31, 2020)."
+* **Box 3 [Report Type Dropdown Selector]**: "Select report view: Overview Report, Sales Report, Revenue Report, or Inventory Report."
+* **Box 4 [Compare Previous Period Checkbox]**: "Toggles comparative delta indicators showing percentage growth or contraction versus the preceding period."
+* **Box 5 [Export PDF Button]**: "Generates a formal, printable PDF document complete with store branding, charts, and audit tables."
+* **Box 6 [Export CSV Button]**: "Downloads raw database rows into Excel-compatible CSV format for external accounting."
 
 #### STEPS
-1. Click **Reports** in the navigation sidebar.
-2. Select the report type from the dropdown (e.g., *Daily Sales & Revenue Report*).
-3. Choose the reporting period from the calendar pickers.
-4. Click **Generate Report** to preview totals on screen.
-5. Click **Download PDF** to export a clean, printable report for management, or click **Export CSV** for spreadsheet auditing.
+1. Click **Reports** in the left navigation sidebar.
+2. In the **Date Range** dropdown, choose your desired timeframe (e.g., *Daily*, *Monthly*, or *Custom Range*).
+3. If **Custom Range** is chosen, select the **From Date** and **To Date** (e.g., `2020-01-01` to `2020-01-31`).
+4. Select the **Report Type** (e.g., *Overview Report*, *Sales Report*, *Revenue Report*, or *Inventory Report*).
+5. Review the updated KPI summary cards and performance graphs on screen.
+6. Click **Export PDF** for a printable executive document or **Export CSV** for spreadsheet auditing.
 
 ---
 
