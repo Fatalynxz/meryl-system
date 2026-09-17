@@ -438,116 +438,131 @@ The Inventory Movement Log (`/inventory-log`) provides an immutable, chronologic
 
 ### Section 2.16: Sales Transaction Management & Order Register
 #### Screen Description
-The Sales Management module centralizes the store's complete sales transaction ledger, allowing administrators to audit cashier shifts, inspect receipts, and verify transaction totals.
+The Sales Management module (`/sales`) serves as the master sales transaction ledger for store administrators. It centralizes all completed cashier checkout orders, payment methods, transaction timestamps, items sold, receipt numbers, and provides instant lookup for audit compliance, customer inquiries, and receipt reprinting.
 
 #### Screenshot Callout Labels
-* **Box 1 [Receipt Number Search Bar]**: "Fast lookup by Official Receipt Number (e.g., OR-2026-0042) or customer name."
-* **Box 2 [Date Range & Cashier Filters]**: "Filters transactions by day/month and isolates sales processed by specific cashier accounts."
-* **Box 3 [Sales Master Table]**: "Lists Transaction ID, Receipt #, Date/Time, Items Sold, Total Amount (₱), Tender Type, and Cashier Name."
-* **Box 4 [View Order Details Button]**: "Opens the transaction inspection modal displaying itemized products, applied promos, and payment breakdown."
-* **Box 5 [Reprint Receipt Button]**: "Generates an official duplicate copy of the sales receipt on thermal print format."
+* **Box 1 [Receipt & Customer Search Bar]**: "Real-time search field allowing instant lookup by Official Receipt number (e.g., OR-2026-0042), transaction ID, or customer name."
+* **Box 2 [Date Range & Cashier Filter Controls]**: "Calendar date pickers to isolate sales by day/week/month, alongside a cashier dropdown filter to audit specific staff shifts."
+* **Box 3 [Sales Master Data Table]**: "Comprehensive ledger columns: Transaction ID, Receipt #, Timestamp, Items Sold count, Total Amount in PHP (₱), Payment Method (Cash/GCash), and Cashier Name."
+* **Box 4 [Payment & Tender Method Badges]**: "Color-coded pills indicating tender type: Green for Cash checkouts, Blue for GCash digital wallet payments."
+* **Box 5 [Order Inspection & Reprint Action Buttons]**: "Row action buttons: Blue Eye icon to view the itemized order breakdown, and Printer icon to generate an official duplicate thermal receipt."
 
 #### STEPS
-1. Click **Sales** in the left navigation sidebar.
-2. Enter the Receipt Number or customer name into the search bar to locate an order.
-3. Click the blue **View** icon on any transaction row to open the complete itemized order breakdown.
-4. Review items purchased, size variants, discounts applied, and cashier name.
-5. Click **Reprint Receipt** if the customer requests a duplicate official copy.
+1. Click **Sales** in the left navigation sidebar (or navigate to `http://localhost:5173/sales`).
+2. Review the chronological sales register to audit daily store transactions and total revenue.
+3. In the **Search Bar (Box 1)**, type a customer name or Official Receipt number to locate a specific sale.
+4. Use the **Date Range & Cashier Filters (Box 2)** to narrow down orders processed during a specific cashier shift.
+5. In the **Sales Master Table (Box 3)**, inspect the transaction timestamp, items sold, and verify the payment tender type **(Box 4)**.
+6. Under **Actions (Box 5)**:
+   - Click the **Eye icon** (`View`) to open the **Itemized Order Details Modal**.
+   - Click the **Printer icon** (`Reprint`) to generate a duplicate customer receipt.
 
 ---
 
 ### Section 2.17: Itemized Order Details & Transaction Audit Modal
 #### Screen Description
-Opens by clicking the blue View icon on any transaction row in the sales register. Used to inspect every item, size, and discount associated with an order.
+Triggered by clicking the blue Eye icon on any transaction row in the Sales Register. Provides an in-depth operational breakdown of the selected sale, displaying itemized footwear models, size variants, individual line totals, promotional discounts, customer profile details, and payment verification.
 
 #### Screenshot Callout Labels
-* **Box 1 [Order Overview Header]**: "Displays Official Receipt Number, Transaction Timestamp, Terminal ID, and Cashier Name."
-* **Box 2 [Customer Information Card]**: "Shows customer full name, contact number, and loyalty status (or 'Walk-In Customer')."
-* **Box 3 [Itemized Products Table]**: "Lists shoe photo, model name, colorway, size variant, unit price, quantity, and line total."
-* **Box 4 [Financial Audit Summary]**: "Itemizes Gross Subtotal, Promo Deductions, Net Total Paid, Tender Method, Cash Received, and Change Given."
-* **Box 5 [Reprint Receipt Action Button]**: "Opens the print dialog to reissue an official customer thermal receipt."
+* **Box 1 [Order Audit Header & Metadata]**: "Displays the Official Receipt Number, transaction timestamp, terminal station ID, and processing cashier username."
+* **Box 2 [Customer Information Panel]**: "Summary card displaying registered customer name, contact phone number, loyalty tier, or tagged as 'Walk-In Customer'."
+* **Box 3 [Itemized Footwear Products Table]**: "Data table listing shoe thumbnail photo, model title, colorway, EU size variant, unit price, purchased quantity, and line subtotal (₱)."
+* **Box 4 [Financial Settlement & Tax Summary]**: "Complete payment calculation: Gross Subtotal, Promo / BOGO Deductions, VAT, Net Total Paid, Tender Method, Cash Received, and Change Due."
+* **Box 5 [Receipt Reprint & Close Actions]**: "Footer buttons: Yellow 'Reprint Receipt' button to dispatch a duplicate thermal print job, and 'Close' button to return to the sales ledger."
 
 #### STEPS
-1. Navigate to **Sales** in the left sidebar.
-2. Search for the receipt number or filter by date range.
-3. Click the **View** icon on the transaction row.
-4. Review all items, sizes, and pricing details in the modal.
-5. Click **Reprint Receipt** if the customer needs a duplicate copy, or click **Close** to exit.
+1. In the Sales table, click the blue **Eye icon (👁️)** on the transaction row you wish to inspect.
+2. The **Order Details** modal opens with the complete transaction metadata **(Box 1)**.
+3. Check the **Customer Information Panel (Box 2)** to verify buyer registration or walk-in status.
+4. Review the **Itemized Products Table (Box 3)** to confirm shoe models, sizes (e.g., Size 42), quantities, and individual prices.
+5. In the **Financial Settlement Summary (Box 4)**, verify applied promotional discounts, net paid amount, cash tendered, and exact change released.
+6. Click **Reprint Receipt (Box 5)** if a duplicate receipt is required, or click **Close** to exit.
 
 ---
 
 ### Section 2.18: Duplicate Thermal Sales Receipt Reprint Modal
 #### Screen Description
-Opens when clicking Reprint from either the Sales Management table or the Order Details modal. Re-renders the thermal receipt layout branded with an official duplicate watermark.
+Opens when clicking Reprint from either the Sales Management table or the Order Details modal. Re-renders the standardized 58mm/80mm thermal receipt formatted with store branding, BIR compliance indicators, transaction breakdowns, and an official duplicate watermark.
 
 #### Screenshot Callout Labels
-* **Box 1 [Duplicate Receipt Notice]**: "Header watermark identifying document as an Official Duplicate Copy."
-* **Box 2 [Thermal Receipt Preview Canvas]**: "Full itemized receipt matching original POS checkout formatting."
-* **Box 3 [Print Button]**: "Sends the receipt directly to connected thermal receipt printers."
+* **Box 1 [Store Branding & Branch Header]**: "Enterprise header featuring Meryl Shoes logo, store branch address, TIN, and terminal accreditation numbers."
+* **Box 2 [Official Receipt & Cashier Credentials]**: "Official Receipt number, transaction date/time, POS register identifier, and cashier staff name."
+* **Box 3 [Itemized Cart Listing Canvas]**: "Clean monospace table detailing item descriptions, sizes, quantities, unit prices, and line amounts."
+* **Box 4 [Payment Tender & Change Calculation]**: "Summary lines showing Subtotal, Applied Discounts, Net VATable Sales, VAT Amount, Total Due, Cash/GCash Paid, and Change."
+* **Box 5 [Official Duplicate Watermark & Barcode]**: "Security watermark designating the printout as an Official Duplicate Copy, along with a scannable transaction barcode."
+* **Box 6 [Print Dispatch & Download Controls]**: "Action buttons: 'Print Receipt' to send the job to the thermal slip printer, and 'Save as PDF' for digital archiving."
 
 #### STEPS
-1. In the Sales table, click the **Reprint** button on the target order row.
-2. Review the preview on screen.
-3. Click **Print** to send to the receipt printer, or choose **Save as PDF**.
+1. In the Sales table or Order Details dialog, click **Reprint Receipt**.
+2. Review the **Receipt Canvas (Boxes 1–4)** on screen to ensure all items, payment amounts, and VAT details are accurate.
+3. Verify the **Official Duplicate Notice (Box 5)** is present on the slip.
+4. Click **Print Receipt (Box 6)** to print on the connected thermal receipt printer, or select **Save as PDF** to save an electronic copy.
+5. Click **Close** to dismiss the modal.
 
 ---
 
 ### Section 2.19: Customer Directory & Loyalty Management CRM
 #### Screen Description
-The Customer Management module houses the store's customer database, purchase history records, loyalty status tags, and contact profiles for targeted marketing.
+The Customer Management module (`/customers`) manages the store's customer database, contact profiles, shoe sizing preferences, accumulated loyalty points, and purchase histories. It enables store managers to deliver personalized service, target promotional marketing campaigns, and monitor customer lifetime value.
 
 #### Screenshot Callout Labels
-* **Box 1 [Customer Search & Filter Bar]**: "Search customers by mobile phone number, full name, or email address."
-* **Box 2 [Add New Customer Button]**: "Opens a modal form to register walk-in shoppers into the store CRM database."
-* **Box 3 [Customer Summary Table]**: "Displays Customer Name, Mobile Number, Email, Total Orders, Lifetime Spend (₱), and Last Visit Date."
-* **Box 4 [Customer Profile Details Button]**: "Opens the detailed customer dossier showing complete footwear purchase history and preferred shoe categories."
-* **Box 5 [Marketing Tag Indicator]**: "Tags customers as 'Frequent Buyer', 'Running Enthusiast', or 'BOGO Candidate' based on purchase patterns."
+* **Box 1 [Customer Directory Header & Total Count Badge]**: "Module title with a badge displaying the total number of registered customer profiles (e.g., 124 Customers)."
+* **Box 2 [+ Add Customer Action Button]**: "Yellow action button with plus icon that triggers the Add Customer registration modal."
+* **Box 3 [Customer Multi-Field Search Input]**: "Search input accepting customer full name, mobile phone number, or email address with instant filtering."
+* **Box 4 [Customer Directory Data Table]**: "Data grid displaying Customer Name, Mobile Number, Email Address, Default Shoe Size Preference, Total Orders, Lifetime Spend (₱), and Action buttons."
+* **Box 5 [Row Action Controls (History & Edit)]**: "Quick action buttons: Clock/History icon to open Customer Purchase Dossier, and Pencil/Edit icon to modify contact details and size preferences."
 
 #### STEPS
-1. Click **Customers** in the navigation sidebar.
-2. Search for a customer using their mobile phone number or surname.
-3. Click on the customer's name to view their profile dossier.
-4. Inspect their **Purchase History** to review previously purchased footwear models and sizes.
-5. To manually register a new customer, click **Add Customer**, fill in their contact details, and click **Save Profile**.
+1. Click **Customers** in the left navigation sidebar (or navigate to `http://localhost:5173/customers`).
+2. View the customer directory table **(Box 4)** to inspect active client profiles and lifetime spend totals.
+3. In the **Search Bar (Box 3)**, type a customer's phone number or name to locate their record.
+4. Click **+ Add Customer (Box 2)** to enroll a new shopper into the loyalty database.
+5. Under **Actions (Box 5)**:
+   - Click the **Pencil icon** (`Edit`) to update contact info or preferred shoe sizes.
+   - Click the **Clock icon** (`Purchase History`) to view their complete purchase dossier.
 
 ---
 
 ### Section 2.20: Add / Edit Customer Profile & Sizing Preferences Modal
 #### Screen Description
-Opens when clicking Add Customer or clicking the Edit icon on an existing customer card. Enrolls shoppers into the store CRM database.
+Triggered by clicking "+ Add Customer" or the yellow Edit button on a customer record. Allows store personnel to enroll new shoppers or update contact info, delivery addresses, and default footwear sizing preferences for fast POS checkouts.
 
 #### Screenshot Callout Labels
-* **Box 1 [Full Name Input Fields]**: "First Name and Last Name inputs for customer identification."
-* **Box 2 [Mobile Contact Number]**: "Primary mobile phone number for SMS transaction alerts and pickup notifications."
-* **Box 3 [Email Address Field]**: "Verified email address used for digital receipt delivery and automated promotional newsletters."
-* **Box 4 [Delivery / Home Address]**: "Mailing address for delivery orders and regional customer segmentation."
-* **Box 5 [Preferred Footwear Size Dropdown]**: "Saves customer's standard shoe size (EU 36–46) to provide personalized restock alerts."
-* **Box 6 [Save Customer Button]**: "Commits profile data to the database and generates a unique Customer ID."
+* **Box 1 [Modal Header & Exit Control]**: "Modal title 'Add Customer' or 'Edit Customer Profile' with close button (X)."
+* **Box 2 [Full Name & Contact Phone Inputs]**: "Required fields for customer first/last name and 11-digit mobile phone number (e.g., 09171234567)."
+* **Box 3 [Email Address Input]**: "Optional email field for dispatching digital PDF receipts, promotional vouchers, and warranty claim updates."
+* **Box 4 [Shoe Sizing Preferences Selector]**: "Dropdown menu to record the customer's standard footwear size (EU 36–46) and preferred department (Men/Women/Kids)."
+* **Box 5 [Customer Notes & Delivery Address]**: "Text area for recording residential delivery address, delivery instructions, or special footwear fit notes."
+* **Box 6 [Save Customer Submission Button]**: "Yellow button validating mobile number format and saving the customer profile into Supabase."
 
 #### STEPS
-1. Go to **Customers** in the navigation sidebar.
-2. Click the blue **Add Customer** button.
-3. Enter the customer's **Full Name**, **Mobile Number**, and **Email Address**.
-4. Select their **Preferred Shoe Size** from the dropdown.
-5. Click **Save Customer**. The profile is saved and immediately available for POS selection and email marketing campaigns.
+1. In Customer Management, click **+ Add Customer** (or click the **Pencil icon** on an existing customer).
+2. Enter the customer's **Full Name \*** and **Mobile Number \*** in the designated fields **(Box 2)**.
+3. Input the customer's **Email Address (Box 3)** to enable digital receipt transmission.
+4. Select their **Preferred Shoe Size (Box 4)** (e.g., *Size 42 - Men*) to automatically pre-select sizes during future POS transactions.
+5. Add any delivery address or special notes in **Customer Notes (Box 5)**.
+6. Click **Save Customer (Box 6)** to commit the record.
 
 ---
 
 ### Section 2.21: Customer Purchase Dossier & Lifetime Spending Analytics Modal
 #### Screen Description
-Opens by clicking on any customer's name in the directory. Displays their lifetime spending history and purchased footwear models.
+Opens by clicking the History icon on any customer record in the CRM table. Provides store managers with a 360-degree historical spending dossier, displaying total lifetime purchases, average order value, preferred footwear styles, and itemized receipts.
 
 #### Screenshot Callout Labels
-* **Box 1 [Customer KPI Cards]**: "Displays Lifetime Spend (₱), Total Pairs Purchased, Average Order Value, and Membership Tier."
-* **Box 2 [Marketing Segmentation Tag]**: "Auto-assigned tags such as 'VIP Shopper', 'Running Enthusiast', or 'BOGO Candidate'."
-* **Box 3 [Historical Transactions Table]**: "Chronological register of past purchases with OR#, Date, Items, Sizes, and Total Amount."
-* **Box 4 [Favorite Footwear Categories]**: "Visual breakdown showing preferred shoe types based on past checkout history."
+* **Box 1 [Customer Summary Profile Card]**: "Header banner showing customer full name, mobile number, email, member enrollment date, and loyalty status badge."
+* **Box 2 [Customer Spending KPI Cards]**: "Three metric cards displaying: Lifetime Spend (₱), Total Completed Transactions, and Average Basket Size."
+* **Box 3 [Favorite Brands & Shoe Categories Pill Row]**: "Pill tags highlighting the shopper's most frequently purchased footwear brands (e.g., Nike, Adidas) and categories (Basketball, Running)."
+* **Box 4 [Historical Orders Ledger Table]**: "Table listing past receipts: Date, Receipt #, Pairs Purchased, Total Amount (₱), Payment Type, and View Receipt action."
+* **Box 5 [Order Details Drawer Trigger]**: "Action button allowing managers to open and reprint past receipts directly from the customer dossier."
 
 #### STEPS
-1. In the Customer directory, click on the customer's name.
-2. Inspect the **Lifetime Spend** card to evaluate customer loyalty value.
-3. Review the **Historical Transactions** table to verify past shoe sizes and purchased styles.
-4. Click **Close** when finished.
+1. In the Customer Directory table, click the **Clock icon** on any customer row.
+2. The **Customer Dossier** modal opens displaying their profile banner **(Box 1)**.
+3. Review the **KPI Metrics (Box 2)** to analyze customer lifetime value and purchasing frequency.
+4. Inspect the **Favorite Brands / Categories (Box 3)** to tailor recommendations for upcoming promotions.
+5. In the **Orders Ledger (Box 4)**, review chronological past purchases, or click **View Receipt (Box 5)** to inspect an individual past order.
+6. Click **Close** to return to the Customer Directory.
 
 ---
 
