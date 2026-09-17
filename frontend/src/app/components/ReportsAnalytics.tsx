@@ -1098,7 +1098,19 @@ export function ReportsAnalytics() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-yellow-200/70">Date Range</span>
-            <Select value={timeRange} onValueChange={(value) => setTimeRange(value as ReportPeriod)}>
+            <Select
+              value={timeRange}
+              onValueChange={(value) => {
+                setTimeRange(value as ReportPeriod);
+                if (value === 'custom' && !customStartDate && !customEndDate) {
+                  const now = new Date();
+                  const past = new Date();
+                  past.setDate(now.getDate() - 30);
+                  setCustomStartDate(past.toISOString().split('T')[0]);
+                  setCustomEndDate(now.toISOString().split('T')[0]);
+                }
+              }}
+            >
               <SelectTrigger className="w-44 bg-[#0b0b0f] border-[#24242d] text-white">
                 <SelectValue />
               </SelectTrigger>
@@ -1108,9 +1120,32 @@ export function ReportsAnalytics() {
                 <SelectItem value="monthly">Monthly</SelectItem>
                 <SelectItem value="quarterly">Quarterly</SelectItem>
                 <SelectItem value="annually">Annually</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {timeRange === 'custom' && (
+            <>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-wide text-yellow-200/70">From Date</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="h-9 rounded-md border border-[#24242d] bg-[#0b0b0f] px-3 text-sm text-white focus:border-yellow-400/70 focus:outline-none [color-scheme:dark]"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-wide text-yellow-200/70">To Date</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="h-9 rounded-md border border-[#24242d] bg-[#0b0b0f] px-3 text-sm text-white focus:border-yellow-400/70 focus:outline-none [color-scheme:dark]"
+                />
+              </div>
+            </>
+          )}
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-yellow-200/70">Report Type</span>
             <Select value={reportType} onValueChange={setReportType}>
