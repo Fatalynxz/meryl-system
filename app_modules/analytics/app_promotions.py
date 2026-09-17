@@ -149,6 +149,10 @@ def _gmail_error_reason(error_body, fallback):
         try:
             parsed = json.loads(body)
             error = parsed.get("error") if isinstance(parsed, dict) else None
+            error_code = str(error if isinstance(error, str) else "").strip().lower()
+            error_desc = str(parsed.get("error_description") or "").strip()
+            if error_code == "invalid_grant" or "expired" in error_desc.lower() or "revoked" in error_desc.lower() or error_desc.lower() == "bad request":
+                return "Gmail refresh token expired or revoked. Please update GMAIL_REFRESH_TOKEN via Google Cloud Console / OAuth Playground."
             if isinstance(error, dict):
                 message = str(error.get("message") or "").strip()
                 status = str(error.get("status") or "").strip()
@@ -156,8 +160,8 @@ def _gmail_error_reason(error_body, fallback):
                     return f"{status}: {message}"
                 if message:
                     return message
-            if isinstance(parsed, dict) and parsed.get("error_description"):
-                return str(parsed.get("error_description")).strip()
+            if error_desc:
+                return error_desc
         except Exception:
             pass
         return body[:500]
