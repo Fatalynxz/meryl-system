@@ -415,21 +415,24 @@ Opens when clicking Adjust Stock during routine stockroom physical inventory cou
 
 ### Section 2.15: Stock Movement Log & Audit Trail Ledger
 #### Screen Description
-The Inventory Movement Log is an immutable, chronological ledger recording every addition, deduction, transfer, and adjustment that occurs across store inventory.
+The Inventory Movement Log (`/inventory-log`) provides an immutable, chronological audit trail recording every addition, deduction, transfer, and adjustment that occurs across store inventory. It equips store managers and warehouse custodians with high-level KPI cards (Stock In, Stock Out, Net Movement), real-time search, category filtering, and direct transaction reference traceability.
 
 #### Screenshot Callout Labels
-* **Box 1 [Date & Transaction Type Filter]**: "Filter logs by Date Range, Movement Type (Stock-In, Sale, Return, Scrap Adjustment), or Staff Member."
-* **Box 2 [Timestamp & SKU Reference Column]**: "Shows the exact date, time, shoe model, and size variant involved."
-* **Box 3 [Quantity Delta Column (+ / -)]**: "Color-coded units indicator showing additions in green (+10) and deductions in red (-1)."
-* **Box 4 [Reference Note & Invoice #]**: "Displays related official receipt numbers, supplier delivery receipts, or write-off reasons."
-* **Box 5 [Export Log Button]**: "Exports the filtered audit ledger to CSV format for warehouse compliance audits."
+* **Box 1 [Inventory Flow KPI Summary Cards]**: "Summary KPI cards tracking overall inventory flow: Stock In (total received pairs), Stock Out (sales & deductions), and Net Movement."
+* **Box 2 [Real-Time Search Input]**: "Real-time search field filtering logs by shoe model, brand, SKU, movement type, or transaction reference."
+* **Box 3 [Movement Type Filter & Refresh Action]**: "Filter logs by movement category (Sales, Restocks, Holds, Adjustments) and click Refresh to pull live updates."
+* **Box 4 [Chronological Movement Ledger Table]**: "Chronological audit ledger recording timestamp, shoe model, EU size, colorway, and SKU barcode for each stock event."
+* **Box 5 [Movement Category & Quantity Delta Badges]**: "Color-coded classification pills (Restock, Sale, Reserved/Hold, Adjustment) with signed inventory deltas (+50, -1)."
+* **Box 6 [Reference & Transaction Traceability Hash]**: "System transaction UUID or delivery reference linking the stock movement directly to sales receipts or restocks."
 
 #### STEPS
-1. Click **Inventory Log** in the left navigation sidebar.
-2. Select the desired date range using the calendar date pickers.
-3. Select a filter type (e.g., *Deliveries*, *POS Sales*, or *Damaged Write-Offs*).
-4. Review the chronological rows to inspect inventory flow and verify staff accountability.
-5. Click **Export to CSV** if an external spreadsheet copy is required for inventory auditing.
+1. Click **Inventory Log** in the left navigation sidebar (or access `http://localhost:5173/inventory-log`).
+2. Review the top KPI cards **(Box 1)** to monitor total **Stock In**, **Stock Out**, and **Net Movement**.
+3. In the **Search input (Box 2)**, type a footwear style name, brand, SKU code, or movement reference to quickly filter log entries.
+4. Select a specific movement filter from the **All movement types dropdown (Box 3)** (e.g., *Restock*, *Sale*, *Reserved / Hold*, or *Adjustment*), or click **Refresh** to reload the latest database events.
+5. In the **Movement Ledger Table (Box 4)**, inspect each row for the exact date/time, shoe model, EU sizing, and SKU identifier.
+6. Verify the signed units in the **Qty Change column (Box 5)** to track additions (green) vs deductions (red).
+7. Trace the transaction via the **Reference column (Box 6)** to verify corresponding customer receipt numbers or delivery shipment invoices.
 
 ---
 
