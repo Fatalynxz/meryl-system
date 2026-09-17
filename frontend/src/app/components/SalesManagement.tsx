@@ -444,52 +444,56 @@ export function SalesManagement() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-red-700 border-red-800">
+        <Card className="bg-[#15151D] border-[#24242F] shadow-xl rounded-2xl">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">Total Revenue</p>
-                <p className="text-2xl text-zinc-100">₱{totalRevenue.toFixed(2)}</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Total Revenue</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1">₱{totalRevenue.toFixed(2)}</p>
               </div>
-              <ShoppingCart className="h-8 w-8 text-yellow-400" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400">
+                <ShoppingCart className="h-6 w-6" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-red-700 border-red-800">
+        <Card className="bg-[#15151D] border-[#24242F] shadow-xl rounded-2xl">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">Today's Sales</p>
-                <p className="text-2xl text-zinc-100">{todaySales.length}</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Today's Sales</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1">{todaySales.length}</p>
               </div>
-              <Calendar className="h-8 w-8 text-yellow-400" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400">
+                <Calendar className="h-6 w-6" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="bg-red-700 border-red-800">
-        <CardHeader>
+      <Card className="bg-[#15151D] border-[#24242F] shadow-xl rounded-2xl">
+        <CardHeader className="border-b border-[#24242F] pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <CardTitle className="text-zinc-100 flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5" />
+            <CardTitle className="text-white flex items-center gap-2 text-lg font-bold">
+              <ShoppingCart className="w-5 h-5 text-yellow-400" />
               Sales Records
             </CardTitle>
             <div className="flex items-center gap-2 text-xs text-zinc-300">
-              <span className="bg-red-800/80 px-2.5 py-1 rounded-full border border-red-900/60">
-                Total: <strong className="text-yellow-300">{visibleSales.length}</strong> orders
+              <span className="bg-[#181824] px-2.5 py-1 rounded-full border border-[#282836] text-zinc-300">
+                Total: <strong className="text-yellow-400">{visibleSales.length}</strong> orders
               </span>
               {hasActiveFilters && (
-                <span className="bg-yellow-500/20 text-yellow-300 px-2.5 py-1 rounded-full border border-yellow-500/40">
-                  Filtered: <strong>{filteredSales.length}</strong> orders (PHP {filteredRevenue.toFixed(2)})
+                <span className="bg-yellow-400/10 text-yellow-300 px-2.5 py-1 rounded-full border border-yellow-400/30">
+                  Filtered: <strong>{filteredSales.length}</strong> orders (₱{filteredRevenue.toFixed(2)})
                 </span>
               )}
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           {/* FILTER CONTROLS BAR: Search, Cashier Filter, Date Range Presets & Pickers */}
-          <div className="space-y-3 bg-red-800/40 p-3.5 rounded-xl border border-red-800">
+          <div className="space-y-3 bg-[#12121A] p-3.5 rounded-xl border border-[#24242F]">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
               {/* Box 1: Search Bar */}
               <div className="relative lg:col-span-5">
@@ -498,20 +502,20 @@ export function SalesManagement() {
                   placeholder="Search by sales ID, customer, product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-zinc-100/50 text-sm focus-visible:ring-yellow-400"
+                  className="pl-10 bg-[#181824] border-[#282836] text-white placeholder:text-zinc-500 text-sm focus-visible:ring-yellow-400/40 rounded-xl"
                 />
               </div>
 
               {/* Box 2: Cashier & Staff Dropdown Filter */}
               <div className="lg:col-span-4">
                 <Select value={selectedCashier} onValueChange={setSelectedCashier}>
-                  <SelectTrigger className="w-full bg-red-600 border-red-800 text-yellow-200 text-sm focus:ring-yellow-400">
+                  <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
                     <div className="flex items-center gap-2 truncate">
                       <Users className="w-4 h-4 text-yellow-400 shrink-0" />
                       <SelectValue placeholder="All Cashiers / Staff" />
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="bg-red-700 border-red-800 text-yellow-200 max-h-64">
+                  <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 max-h-64 shadow-2xl">
                     <SelectItem value="all">All Cashiers / Staff</SelectItem>
                     {cashierOptions.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
@@ -524,7 +528,7 @@ export function SalesManagement() {
 
               {/* Day / Week / Month Quick Isolation Presets */}
               <div className="lg:col-span-3 flex items-center justify-between lg:justify-end gap-1.5 flex-wrap">
-                <div className="inline-flex items-center p-0.5 rounded-lg bg-red-900/60 border border-red-950/60 text-xs">
+                <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs">
                   <Button
                     type="button"
                     size="sm"
@@ -532,8 +536,8 @@ export function SalesManagement() {
                     onClick={() => applyDatePreset("all")}
                     className={`h-7 px-2 text-xs rounded-md transition-all ${
                       datePreset === "all"
-                        ? "bg-yellow-400 text-red-950 font-bold shadow"
-                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                        ? "bg-yellow-400 text-black font-bold shadow"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     All
@@ -545,8 +549,8 @@ export function SalesManagement() {
                     onClick={() => applyDatePreset("today")}
                     className={`h-7 px-2 text-xs rounded-md transition-all ${
                       datePreset === "today"
-                        ? "bg-yellow-400 text-red-950 font-bold shadow"
-                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                        ? "bg-yellow-400 text-black font-bold shadow"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     Today
@@ -558,8 +562,8 @@ export function SalesManagement() {
                     onClick={() => applyDatePreset("week")}
                     className={`h-7 px-2 text-xs rounded-md transition-all ${
                       datePreset === "week"
-                        ? "bg-yellow-400 text-red-950 font-bold shadow"
-                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                        ? "bg-yellow-400 text-black font-bold shadow"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     Week
@@ -571,8 +575,8 @@ export function SalesManagement() {
                     onClick={() => applyDatePreset("month")}
                     className={`h-7 px-2 text-xs rounded-md transition-all ${
                       datePreset === "month"
-                        ? "bg-yellow-400 text-red-950 font-bold shadow"
-                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                        ? "bg-yellow-400 text-black font-bold shadow"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     Month
@@ -585,7 +589,7 @@ export function SalesManagement() {
                     size="sm"
                     variant="ghost"
                     onClick={handleResetFilters}
-                    className="h-7 px-2 text-xs text-yellow-300 hover:text-yellow-100 hover:bg-red-600/80 flex items-center gap-1"
+                    className="h-7 px-2 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10 flex items-center gap-1 rounded-md"
                     title="Reset all filters"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -596,9 +600,9 @@ export function SalesManagement() {
             </div>
 
             {/* Custom Date Pickers Sub-Row */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-red-800/60 text-xs text-zinc-300">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-[#24242F] text-xs text-zinc-300">
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1.5 font-medium text-yellow-300">
+                <div className="flex items-center gap-1.5 font-medium text-yellow-400">
                   <Calendar className="w-4 h-4 text-yellow-400" />
                   <span>Date Range:</span>
                 </div>
@@ -608,7 +612,7 @@ export function SalesManagement() {
                     type="date"
                     value={startDate}
                     onChange={(e) => handleCustomDateChange("start", e.target.value)}
-                    className="h-8 w-36 bg-red-600 border-red-800 text-yellow-200 text-xs px-2.5 rounded cursor-pointer [color-scheme:dark]"
+                    className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -617,37 +621,37 @@ export function SalesManagement() {
                     type="date"
                     value={endDate}
                     onChange={(e) => handleCustomDateChange("end", e.target.value)}
-                    className="h-8 w-36 bg-red-600 border-red-800 text-yellow-200 text-xs px-2.5 rounded cursor-pointer [color-scheme:dark]"
+                    className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
                   />
                 </div>
               </div>
 
-              <div className="text-xs text-zinc-300">
-                Showing <strong className="text-yellow-300">{filteredSales.length}</strong> of {visibleSales.length} sales
+              <div className="text-xs text-zinc-400">
+                Showing <strong className="text-yellow-400">{filteredSales.length}</strong> of {visibleSales.length} sales
               </div>
             </div>
           </div>
 
-          <div className="border border-red-800 rounded-lg overflow-x-auto">
+          <div className="border border-[#24242F] rounded-xl overflow-x-auto bg-[#121218]">
             <Table className="w-full min-w-[860px]">
               <TableHeader>
-                <TableRow className="bg-red-800 hover:bg-red-800 border-red-900">
-                  <TableHead className="text-zinc-100 whitespace-nowrap text-center">Sales ID</TableHead>
-                  {isAdmin && <TableHead className="text-zinc-100 whitespace-nowrap text-center">Cashier</TableHead>}
-                  <TableHead className="text-zinc-100 whitespace-nowrap text-center">Customer</TableHead>
-                  <TableHead className="text-zinc-100 whitespace-nowrap text-center">Amount</TableHead>
-                  <TableHead className="text-zinc-100 whitespace-nowrap text-center">Status</TableHead>
-                  <TableHead className="text-zinc-100 whitespace-nowrap text-center">Date</TableHead>
-                  <TableHead className="text-zinc-100 whitespace-nowrap text-center">Actions</TableHead>
+                <TableRow className="bg-[#181824] hover:bg-[#181824] border-b border-[#24242F]">
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Sales ID</TableHead>
+                  {isAdmin && <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Cashier</TableHead>}
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Customer</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Amount</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Status</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Date</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredSales.length === 0 ? (
-                  <TableRow className="border-red-800">
+                  <TableRow className="border-b border-[#24242F]">
                     <TableCell colSpan={isAdmin ? 7 : 6} className="h-32 text-center text-zinc-300">
-                      <div className="flex flex-col items-center justify-center gap-1.5 py-4">
-                        <ShoppingCart className="w-8 h-8 text-yellow-400/50 mb-1" />
-                        <p className="font-semibold text-yellow-200">No sales transactions found</p>
+                      <div className="flex flex-col items-center justify-center gap-1.5 py-6">
+                        <ShoppingCart className="w-8 h-8 text-yellow-400/40 mb-1" />
+                        <p className="font-semibold text-white">No sales transactions found</p>
                         <p className="text-xs text-zinc-400">
                           {hasActiveFilters ? "Try adjusting your search keywords, cashier shift, or date range." : "No sales recorded yet."}
                         </p>
@@ -657,7 +661,7 @@ export function SalesManagement() {
                             size="sm"
                             variant="ghost"
                             onClick={handleResetFilters}
-                            className="mt-2 text-xs text-yellow-400 hover:text-zinc-100 hover:bg-red-600"
+                            className="mt-2 text-xs text-yellow-400 hover:text-white hover:bg-yellow-400/10 rounded-lg"
                           >
                             <RotateCcw className="w-3.5 h-3.5 mr-1" />
                             Clear Filters
@@ -668,19 +672,19 @@ export function SalesManagement() {
                   </TableRow>
                 ) : (
                   filteredSales.map((sale: any) => (
-                  <TableRow key={sale.sales_id} className="border-red-800">
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{sale.display_sales_id}</TableCell>
+                  <TableRow key={sale.sales_id} className="border-b border-[#20202C] hover:bg-[#1A1A26]/70 transition-colors">
+                    <TableCell className="text-yellow-400 font-mono font-medium whitespace-nowrap text-center">{sale.display_sales_id}</TableCell>
                     {isAdmin && (
-                      <TableCell className="text-yellow-200 whitespace-nowrap text-center">
-                        <div className="flex flex-col">
-                          <span>{sale.cashierName}</span>
-                          <span className="text-xs text-zinc-100/80">{sale.cashierCode}</span>
-                          {sale.cashierUsername && <span className="text-xs text-yellow-200/60">@{sale.cashierUsername}</span>}
+                      <TableCell className="text-zinc-200 whitespace-nowrap text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="font-medium text-white">{sale.cashierName}</span>
+                          <span className="text-xs text-zinc-400">{sale.cashierCode}</span>
+                          {sale.cashierUsername && <span className="text-xs text-yellow-400/60">@{sale.cashierUsername}</span>}
                         </div>
                       </TableCell>
                     )}
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{sale.customerName}</TableCell>
-                    <TableCell className="text-zinc-100 whitespace-nowrap text-center">PHP {Number(sale.total_amount ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-zinc-200 whitespace-nowrap text-center">{sale.customerName}</TableCell>
+                    <TableCell className="text-white font-semibold whitespace-nowrap text-center">PHP {Number(sale.total_amount ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
                         {isAdmin ? (
@@ -689,10 +693,10 @@ export function SalesManagement() {
                             onValueChange={(value) => void handleStatusUpdate(sale, value as SaleStatus)}
                             disabled={updatingSaleId === sale.sales_id}
                           >
-                            <SelectTrigger className="h-8 w-full bg-red-600 border-red-800 text-yellow-200">
+                            <SelectTrigger className="h-8 w-28 bg-[#181824] border-[#282836] text-zinc-200 text-xs">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-red-700 border-red-800 text-yellow-200">
+                            <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200">
                               <SelectItem value="Completed">Completed</SelectItem>
                               <SelectItem value="Pending">Pending</SelectItem>
                               <SelectItem value="Voided">Voided</SelectItem>
@@ -702,28 +706,28 @@ export function SalesManagement() {
                           <Badge
                             className={
                               sale.status === "Completed"
-                                ? "bg-green-600 text-white"
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                                 : sale.status === "Pending"
-                                  ? "bg-yellow-600 text-red-900"
-                                  : "bg-red-900 text-yellow-200"
+                                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                                  : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
                             }
                           >
                             {sale.status}
                           </Badge>
                         )}
                         {replacementLabelBySaleId.get(sale.sales_id) !== "Not Replaced" && (
-                          <Badge className="bg-blue-700 text-white" title="Replaced">Replaced</Badge>
+                          <Badge className="bg-blue-500/20 text-blue-400 border border-blue-500/30" title="Replaced">Replaced</Badge>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-yellow-200 text-sm whitespace-nowrap text-center">{sale.lastActivityDate}</TableCell>
+                    <TableCell className="text-zinc-400 text-sm whitespace-nowrap text-center">{sale.lastActivityDate}</TableCell>
                     <TableCell className="text-center whitespace-nowrap">
                       <Dialog open={viewingSale?.sales_id === sale.sales_id} onOpenChange={(open) => !open && setViewingSale(null)}>
                         <DialogTrigger asChild>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-yellow-400 hover:text-zinc-100 hover:bg-red-600"
+                            className="text-yellow-400 hover:text-white hover:bg-yellow-400/10 rounded-lg"
                             onClick={() => setViewingSale(sale)}
                           >
                             <Eye className="w-4 h-4" />
