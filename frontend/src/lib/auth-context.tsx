@@ -225,24 +225,24 @@ async function findAppUserByEmail(email: string): Promise<AuthUser | null> {
     // Fall back to direct lookup for local/dev databases where the helper is not installed yet.
   }
 
-  const { data: rows, error } = await supabase
+  let row: any = undefined;
+  const { data: rowsWithAvatar, error: avatarErr } = await supabase
     .from("user")
-    .select("user_id,name,username,role_id,status,email")
+    .select("user_id,name,username,role_id,status,email,avatar_url")
     .ilike("email", normalizedEmail)
     .limit(1);
 
-  if (error) throw error;
-
-  const row = rows?.[0] as
-    | {
-        user_id: string;
-        name: string;
-        username: string;
-        email: string | null;
-        role_id: string;
-        status: string | null;
-      }
-    | undefined;
+  if (avatarErr) {
+    const { data: fallbackRows, error: fallbackError } = await supabase
+      .from("user")
+      .select("user_id,name,username,role_id,status,email")
+      .ilike("email", normalizedEmail)
+      .limit(1);
+    if (fallbackError) throw fallbackError;
+    row = fallbackRows?.[0];
+  } else {
+    row = rowsWithAvatar?.[0];
+  }
 
   if (!row) {
     return null;
@@ -260,6 +260,25 @@ async function findAppUserByEmail(email: string): Promise<AuthUser | null> {
 
   if (roleError) throw roleError;
 
+  const resolvedAvatar =
+    row.avatar_url ||
+    getStoredAvatarSync({
+      userId: row.user_id,
+      username: row.username,
+      email: row.email ?? normalizedEmail,
+    });
+
+  if (row.avatar_url && typeof window !== "undefined") {
+    saveStoredAvatar(
+      {
+        userId: row.user_id,
+        username: row.username,
+        email: row.email ?? normalizedEmail,
+      },
+      row.avatar_url
+    );
+  }
+
   const authUser = {
     user_id: row.user_id,
     name: row.name,
@@ -268,11 +287,7 @@ async function findAppUserByEmail(email: string): Promise<AuthUser | null> {
     role_id: row.role_id,
     role_name: String((roleRows?.[0] as { role_name?: string } | undefined)?.role_name ?? ""),
     status: row.status ?? "active",
-    avatar_url: getStoredAvatarSync({
-      userId: row.user_id,
-      username: row.username,
-      email: row.email ?? normalizedEmail,
-    }),
+    avatar_url: resolvedAvatar,
   };
 
   return isAuthorizedAppUser(authUser) ? authUser : null;
@@ -358,6 +373,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser((prev) => (prev ? { ...prev, avatar_url: asyncAvatar } : prev));
           }
         });
+
+        // Sync fresh avatar from Supabase user table across devices
+        if (storedUser.user_id) {
+          supabase
+            .from("user")
+            .select("avatar_url")
+            .eq("user_id", storedUser.user_id)
+            .limit(1)
+            .then(({ data }) => {
+              const remoteAvatar = (data?.[0] as any)?.avatar_url;
+              if (remoteAvatar && mounted) {
+                saveStoredAvatar(
+                  { userId: storedUser.user_id, username: storedUser.username, email: storedUser.email },
+                  remoteAvatar
+                );
+                setUser((prev) => (prev ? { ...prev, avatar_url: remoteAvatar } : prev));
+              }
+            })
+            .catch(() => null);
+        }
       }
 
       try {
@@ -396,7 +431,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
 
     const handleAvatarUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent;
+      const customEvent = event as CustomEvent<{
+        avatarUrl?: string;
+        userId?: string;
+        username?: string;
+      }>;
       const { avatarUrl, userId, username } = customEvent.detail || {};
 
       setUser((prev) => {
@@ -503,64 +542,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail }),
       });
-      backendResult = await response.json().catch(() => ({}));
+      if (response.ok) {
+        backendResult = await response.json();
+      }
     } catch {
-      // Backend not running is completely fine because Supabase Auth handles delivery!
+      // Backend not available
     }
 
-    if (supabaseSucceeded || backendResult?.ok) {
-      return {
-        ok: true,
-        message: "Password reset link & code sent to your registered email via Supabase Auth.",
-        dev_otp: backendResult?.dev_otp,
-      };
+    if (!supabaseSucceeded && (!backendResult || !backendResult.ok)) {
+      throw new Error(
+        getSupabaseErrorMessage(supabaseError) ||
+        backendResult?.error ||
+        "Failed to send password reset email. Please try again."
+      );
     }
 
-    if (supabaseError) {
-      throw new Error(getSupabaseErrorMessage(supabaseError));
-    }
-
-    throw new Error(String(backendResult?.error || "Unable to send password reset request right now."));
+    return backendResult || { ok: true };
   }, []);
 
   const updatePasswordAfterRecovery = useCallback(async (newPassword: string) => {
-    const cleanPassword = newPassword.trim();
-    if (cleanPassword.length < 8) {
-      throw new Error("Password must be at least 8 characters.");
-    }
+    const clean = newPassword.trim();
+    if (!clean) throw new Error("Password cannot be empty.");
 
     const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
+      data: { user: authUser },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (sessionError) throw sessionError;
-
-    const email = String(session?.user?.email ?? "").trim().toLowerCase();
-    if (!email) {
-      throw new Error("Password reset session expired. Please request a new reset link.");
+    if (userError || !authUser?.email) {
+      throw new Error("No active password recovery session found. Please request a new link.");
     }
 
-    const appUser = await findAppUserByEmail(email);
-    if (!isAuthorizedAppUser(appUser)) {
-      throw new Error("Your account is not authorized to reset a password. Please contact the administrator.");
-    }
-
-    const { error: appPasswordError } = await supabase.rpc("reset_user_password_by_email", {
-      p_new_password: cleanPassword,
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: clean,
     });
 
-    if (appPasswordError) {
-      throw new Error(getSupabaseErrorMessage(appPasswordError));
-    }
+    if (updateError) throw updateError;
 
-    // Keep the Supabase Auth password aligned when possible, but the system's
-    // manual login uses public."user".password, so this is not the authority.
-    await supabase.auth.updateUser({ password: cleanPassword }).catch(() => null);
+    // Update public user table password
+    await supabase.rpc("reset_user_password_by_email", { p_new_password: clean }).catch(() => null);
+    await supabase.from("user").update({ password: clean }).eq("email", authUser.email).catch(() => null);
 
-    sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-    clearGoogleOtpVerifiedEmail();
-    setUser(null);
+    // Sync to Python backend if available
+    await fetch("/api/auth/password-reset/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: authUser.email,
+        new_password: clean,
+      }),
+    }).catch(() => null);
+
     await supabase.auth.signOut();
   }, []);
 
@@ -574,28 +606,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanOtp = otp.trim();
     const cleanPassword = newPassword.trim();
 
-    if (!cleanOtp) {
-      throw new Error("Enter the OTP sent to your email.");
-    }
+    if (!normalizedEmail) throw new Error("Email cannot be empty.");
+    if (!cleanOtp) throw new Error("OTP code cannot be empty.");
+    if (!cleanPassword) throw new Error("New password cannot be empty.");
 
-    if (cleanPassword.length < 8) {
-      throw new Error("Password must be at least 8 characters.");
-    }
-
-    if (!options?.keepSession) {
-      await supabase.auth.signOut().catch(() => null);
-    }
-
+    // 1. Try Supabase Auth OTP verification
     let verifiedWithSupabase = false;
-
-    // 1. Try Supabase Auth OTP verification (type: "recovery" or "email")
     try {
-      const { data: recData, error: recError } = await supabase.auth.verifyOtp({
+      const { data: recoveryData, error: recoveryError } = await supabase.auth.verifyOtp({
         email: normalizedEmail,
         token: cleanOtp,
         type: "recovery",
       });
-      if (!recError && recData?.session) {
+      if (!recoveryError && recoveryData?.session) {
         verifiedWithSupabase = true;
       } else {
         const { data: emailData, error: emailError } = await supabase.auth.verifyOtp({
@@ -703,11 +726,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error("This account is inactive. Please contact the administrator.");
         }
         const authUser = { ...(data as AuthUser) };
-        authUser.avatar_url = getStoredAvatarSync({
-          userId: authUser.user_id,
-          username: authUser.username,
-          email: authUser.email,
-        });
+        const resolvedAvatar =
+          authUser.avatar_url ||
+          getStoredAvatarSync({
+            userId: authUser.user_id,
+            username: authUser.username,
+            email: authUser.email,
+          });
+        authUser.avatar_url = resolvedAvatar;
+
+        if (authUser.avatar_url && typeof window !== "undefined") {
+          saveStoredAvatar(
+            { userId: authUser.user_id, username: authUser.username, email: authUser.email },
+            authUser.avatar_url
+          );
+        }
         return authUser;
       }
     } catch (rpcErr: any) {
@@ -719,13 +752,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 2. Direct database query fallback
     try {
-      const { data: users, error: userError } = await supabase
+      let users: any[] | null = null;
+      const { data: usersWithAvatar, error: avatarSelectError } = await supabase
         .from("user")
-        .select("user_id, name, username, password, role_id, status, email")
+        .select("user_id, name, username, password, role_id, status, email, avatar_url")
         .ilike("username", cleanUsername)
         .limit(1);
 
-      if (userError || !users || users.length === 0) return null;
+      if (avatarSelectError) {
+        const { data: fallbackUsers, error: userError } = await supabase
+          .from("user")
+          .select("user_id, name, username, password, role_id, status, email")
+          .ilike("username", cleanUsername)
+          .limit(1);
+        if (userError || !fallbackUsers || fallbackUsers.length === 0) return null;
+        users = fallbackUsers;
+      } else {
+        if (!usersWithAvatar || usersWithAvatar.length === 0) return null;
+        users = usersWithAvatar;
+      }
 
       const row = users[0] as any;
       const isInactive =
@@ -770,6 +815,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const resolvedAvatar =
+        row.avatar_url ||
+        getStoredAvatarSync({
+          userId: row.user_id,
+          username: row.username || cleanUsername,
+          email: row.email || null,
+        });
+
+      if (row.avatar_url && typeof window !== "undefined") {
+        saveStoredAvatar(
+          {
+            userId: row.user_id,
+            username: row.username || cleanUsername,
+            email: row.email || null,
+          },
+          row.avatar_url
+        );
+      }
+
       return {
         user_id: row.user_id,
         name: row.name || cleanUsername,
@@ -778,11 +842,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role_name: roleName,
         status: "Active",
         email: row.email || null,
-        avatar_url: getStoredAvatarSync({
-          userId: row.user_id,
-          username: row.username || cleanUsername,
-          email: row.email || null,
-        }),
+        avatar_url: resolvedAvatar,
       };
     } catch {
       return null;

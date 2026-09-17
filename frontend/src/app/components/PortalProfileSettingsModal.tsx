@@ -105,10 +105,32 @@ export function PortalProfileSettingsModal({
           userId: currentUser.user_id,
           username: currentUser.username,
           email: currentUser.email,
-        }).then((asyncAvatar) => {
+        }).then(async (asyncAvatar) => {
           if (asyncAvatar) {
             setAvatarUrl(asyncAvatar);
             setUrlInput(asyncAvatar);
+          } else {
+            try {
+              const { data } = await supabase
+                .from("user")
+                .select("avatar_url")
+                .eq("user_id", currentUser.user_id)
+                .maybeSingle();
+              if (data?.avatar_url) {
+                setAvatarUrl(data.avatar_url);
+                setUrlInput(data.avatar_url);
+                saveStoredAvatar(
+                  {
+                    userId: currentUser.user_id,
+                    username: currentUser.username,
+                    email: currentUser.email,
+                  },
+                  data.avatar_url
+                );
+              }
+            } catch {
+              // Ignore if column doesn't exist or network error
+            }
           }
         });
       }
@@ -256,15 +278,28 @@ export function PortalProfileSettingsModal({
       }
 
       // 2. Update user row in database
-      const updateData: { name: string; email?: string } = { name: trimmedName };
+      const updateData: { name: string; email?: string; avatar_url?: string | null } = {
+        name: trimmedName,
+        avatar_url: avatarUrl ? avatarUrl : null,
+      };
       if (trimmedEmail) {
         updateData.email = trimmedEmail;
       }
 
-      const { error: dbError } = await supabase
+      let { error: dbError } = await supabase
         .from("user")
         .update(updateData)
         .eq("user_id", currentUser.user_id);
+
+      // If avatar_url column doesn't exist yet in user's Supabase schema, retry without it
+      if (dbError && String(dbError.message || "").toLowerCase().includes("avatar_url")) {
+        delete updateData.avatar_url;
+        const retry = await supabase
+          .from("user")
+          .update(updateData)
+          .eq("user_id", currentUser.user_id);
+        dbError = retry.error;
+      }
 
       if (dbError) {
         throw new Error(dbError.message || "Failed to update profile in database.");

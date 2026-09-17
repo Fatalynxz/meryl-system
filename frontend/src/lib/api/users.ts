@@ -12,7 +12,12 @@ function shouldFallbackFromRpc(error: any) {
 
 function isMissingStaffCodeColumn(error: any) {
   const message = String(error?.message ?? "").toLowerCase();
-  return message.includes("staff_code") && message.includes("column");
+  return message.includes("staff_code") && (message.includes("column") || message.includes("does not exist"));
+}
+
+function isMissingAvatarUrlColumn(error: any) {
+  const message = String(error?.message ?? "").toLowerCase();
+  return message.includes("avatar_url") && (message.includes("column") || message.includes("does not exist"));
 }
 
 async function assertUniqueUserConstraints(payload: any, excludeUserId?: string) {
@@ -47,30 +52,36 @@ async function assertUniqueUserConstraints(payload: any, excludeUserId?: string)
 
 async function createUserFallback(payload: any) {
   await assertUniqueUserConstraints(payload);
+  const insertPayload: any = {
+    name: payload.name,
+    username: payload.username,
+    password: payload.password,
+    role_id: payload.role_id,
+    status: payload.status,
+    email: payload.email,
+    staff_code: payload.staff_code || null,
+  };
+  if (payload.avatar_url !== undefined) {
+    insertPayload.avatar_url = payload.avatar_url || null;
+  }
   let { data, error } = await supabase
     .from("user")
-    .insert({
-      name: payload.name,
-      username: payload.username,
-      password: payload.password,
-      role_id: payload.role_id,
-      status: payload.status,
-      email: payload.email,
-      staff_code: payload.staff_code || null,
-    } as any)
+    .insert(insertPayload)
     .select("*, role:role(*)")
     .single();
   if (error && isMissingStaffCodeColumn(error)) {
+    delete insertPayload.staff_code;
     ({ data, error } = await supabase
       .from("user")
-      .insert({
-        name: payload.name,
-        username: payload.username,
-        password: payload.password,
-        role_id: payload.role_id,
-        status: payload.status,
-        email: payload.email,
-      } as any)
+      .insert(insertPayload)
+      .select("*, role:role(*)")
+      .single());
+  }
+  if (error && isMissingAvatarUrlColumn(error)) {
+    delete insertPayload.avatar_url;
+    ({ data, error } = await supabase
+      .from("user")
+      .insert(insertPayload)
       .select("*, role:role(*)")
       .single());
   }
@@ -88,6 +99,9 @@ async function updateUserFallback(id: string, payload: any) {
     email: payload.email,
     staff_code: payload.staff_code || null,
   };
+  if (payload.avatar_url !== undefined) {
+    updatePayload.avatar_url = payload.avatar_url || null;
+  }
   if (String(payload.password ?? "").trim()) {
     updatePayload.password = payload.password;
   }
@@ -99,6 +113,15 @@ async function updateUserFallback(id: string, payload: any) {
     .single();
   if (error && isMissingStaffCodeColumn(error)) {
     delete updatePayload.staff_code;
+    ({ data, error } = await supabase
+      .from("user")
+      .update(updatePayload)
+      .eq("user_id", id)
+      .select("*, role:role(*)")
+      .single());
+  }
+  if (error && isMissingAvatarUrlColumn(error)) {
+    delete updatePayload.avatar_url;
     ({ data, error } = await supabase
       .from("user")
       .update(updatePayload)
@@ -132,6 +155,13 @@ export const usersApi = {
           .eq("user_id", String((data as any)?.user_id ?? ""));
         if (patchError && !isMissingStaffCodeColumn(patchError)) throw patchError;
       }
+      if (payload.avatar_url !== undefined) {
+        const { error: patchError } = await supabase
+          .from("user")
+          .update({ avatar_url: payload.avatar_url || null } as any)
+          .eq("user_id", String((data as any)?.user_id ?? ""));
+        if (patchError && !isMissingAvatarUrlColumn(patchError)) throw patchError;
+      }
       return data;
     }
     if (!shouldFallbackFromRpc(error)) throw error;
@@ -156,6 +186,13 @@ export const usersApi = {
           .update({ staff_code: payload.staff_code || null } as any)
           .eq("user_id", id);
         if (patchError && !isMissingStaffCodeColumn(patchError)) throw patchError;
+      }
+      if (payload.avatar_url !== undefined) {
+        const { error: patchError } = await supabase
+          .from("user")
+          .update({ avatar_url: payload.avatar_url || null } as any)
+          .eq("user_id", id);
+        if (patchError && !isMissingAvatarUrlColumn(patchError)) throw patchError;
       }
       return data;
     }

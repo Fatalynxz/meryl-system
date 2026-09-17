@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS "user" (
   role_id UUID NOT NULL REFERENCES role(role_id) ON DELETE RESTRICT,
   status VARCHAR(20) CHECK (status IN ('active', 'inactive')) DEFAULT 'active',
   email VARCHAR(100),
+  avatar_url TEXT,
+  staff_code VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

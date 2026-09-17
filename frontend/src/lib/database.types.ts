@@ -554,33 +554,39 @@ export type Database = {
       }
       user: {
         Row: {
+          avatar_url: string | null
           created_at: string | null
           email: string | null
           name: string
           password: string
           role_id: string
+          staff_code: string | null
           status: string | null
           updated_at: string | null
           user_id: string
           username: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string | null
           email?: string | null
           name: string
           password: string
           role_id: string
+          staff_code?: string | null
           status?: string | null
           updated_at?: string | null
           user_id: string
           username: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string | null
           email?: string | null
           name?: string
           password?: string
           role_id?: string
+          staff_code?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string
