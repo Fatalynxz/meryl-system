@@ -7,9 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Calendar, Eye, Search, ShoppingCart } from "lucide-react";
+import { Calendar, Eye, RotateCcw, Search, ShoppingCart, Users } from "lucide-react";
 import { toast } from "sonner";
-import { useProducts, useReturns, useSales } from "../../lib/hooks";
+import { useProducts, useReturns, useSales, useUsers } from "../../lib/hooks";
 import { useAuth } from "../../lib/auth-context";
 import { supabase } from "../../lib/supabase";
 import { writeAuditLog } from "../../lib/audit";
@@ -80,8 +80,13 @@ export function SalesManagement() {
   const salesQuery = useSales();
   const returnsQuery = useReturns();
   const productsQuery = useProducts();
+  const usersQuery = useUsers();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCashier, setSelectedCashier] = useState("all");
+  const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "custom">("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [viewingSale, setViewingSale] = useState<any | null>(null);
   const [updatingSaleId, setUpdatingSaleId] = useState<string | null>(null);
 
@@ -252,18 +257,132 @@ export function SalesManagement() {
     [isAdmin, uiSales, user?.user_id],
   );
 
-  const filteredSales = useMemo(
-    () =>
-      visibleSales.filter(
-        (s) =>
-          s.sales_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.display_sales_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.cashierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.cashierUsername.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.saleDetails.some((d: any) => d.productName.toLowerCase().includes(searchTerm.toLowerCase())),
-      ),
-    [visibleSales, searchTerm],
+  const cashierOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; code: string; roleName: string }>();
+
+    const allUsers = (usersQuery.data as any[]) ?? [];
+    for (const u of allUsers) {
+      const uId = String(u.user_id ?? "");
+      const role = String(u.role?.name ?? u.role_name ?? "Staff").trim();
+      if (uId) {
+        map.set(uId, {
+          id: uId,
+          name: String(u.name || u.username || "Staff").trim(),
+          code: formatStaffCode(u.staff_code, u.user_id, u.username),
+          roleName: role,
+        });
+      }
+    }
+
+    for (const s of visibleSales) {
+      const uId = String(s.user_id ?? "");
+      if (uId && !map.has(uId)) {
+        map.set(uId, {
+          id: uId,
+          name: s.cashierName || "Staff",
+          code: s.cashierCode || "",
+          roleName: "Cashier",
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [usersQuery.data, visibleSales]);
+
+  const applyDatePreset = (preset: "all" | "today" | "week" | "month" | "custom") => {
+    setDatePreset(preset);
+    const now = new Date();
+    const formatYMD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+    } else if (preset === "today") {
+      const todayStr = formatYMD(now);
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === "week") {
+      const weekAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      setStartDate(formatYMD(weekAgo));
+      setEndDate(formatYMD(now));
+    } else if (preset === "month") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(formatYMD(firstDay));
+      setEndDate(formatYMD(now));
+    }
+  };
+
+  const handleCustomDateChange = (type: "start" | "end", val: string) => {
+    setDatePreset("custom");
+    if (type === "start") {
+      setStartDate(val);
+    } else {
+      setEndDate(val);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedCashier("all");
+    setDatePreset("all");
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    selectedCashier !== "all" ||
+    startDate ||
+    endDate ||
+    datePreset !== "all"
+  );
+
+  const filteredSales = useMemo(() => {
+    return visibleSales.filter((s) => {
+      if (searchTerm.trim()) {
+        const query = searchTerm.toLowerCase();
+        const matchesSearch =
+          s.sales_id.toLowerCase().includes(query) ||
+          s.display_sales_id.toLowerCase().includes(query) ||
+          s.cashierName.toLowerCase().includes(query) ||
+          s.cashierUsername.toLowerCase().includes(query) ||
+          s.customerName.toLowerCase().includes(query) ||
+          s.payment_method.toLowerCase().includes(query) ||
+          s.saleDetails.some((d: any) => d.productName.toLowerCase().includes(query));
+        if (!matchesSearch) return false;
+      }
+
+      if (selectedCashier !== "all") {
+        const matchesCashier =
+          s.user_id === selectedCashier ||
+          s.cashierUsername === selectedCashier ||
+          s.cashierName === selectedCashier;
+        if (!matchesCashier) return false;
+      }
+
+      if (startDate && s.transaction_date !== "N/A" && s.transaction_date < startDate) {
+        return false;
+      }
+      if (endDate && s.transaction_date !== "N/A" && s.transaction_date > endDate) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [visibleSales, searchTerm, selectedCashier, startDate, endDate]);
+
+  const filteredCompletedSales = useMemo(
+    () => filteredSales.filter((s) => s.status === "Completed"),
+    [filteredSales]
+  );
+  const filteredRevenue = useMemo(
+    () => filteredCompletedSales.reduce((sum, sale) => sum + sale.total_amount, 0),
+    [filteredCompletedSales]
   );
 
   const replacementLabelBySaleId = useMemo(() => {
@@ -351,22 +470,162 @@ export function SalesManagement() {
 
       <Card className="bg-red-700 border-red-800">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <CardTitle className="text-zinc-100 flex items-center gap-2">
               <ShoppingCart className="w-5 h-5" />
               Sales Records
             </CardTitle>
+            <div className="flex items-center gap-2 text-xs text-zinc-300">
+              <span className="bg-red-800/80 px-2.5 py-1 rounded-full border border-red-900/60">
+                Total: <strong className="text-yellow-300">{visibleSales.length}</strong> orders
+              </span>
+              {hasActiveFilters && (
+                <span className="bg-yellow-500/20 text-yellow-300 px-2.5 py-1 rounded-full border border-yellow-500/40">
+                  Filtered: <strong>{filteredSales.length}</strong> orders (PHP {filteredRevenue.toFixed(2)})
+                </span>
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400" />
-            <Input
-              placeholder="Search by sales ID, customer, or product..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-zinc-100/50"
-            />
+        <CardContent className="space-y-4">
+          {/* FILTER CONTROLS BAR: Search, Cashier Filter, Date Range Presets & Pickers */}
+          <div className="space-y-3 bg-red-800/40 p-3.5 rounded-xl border border-red-800">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+              {/* Box 1: Search Bar */}
+              <div className="relative lg:col-span-5">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400 pointer-events-none" />
+                <Input
+                  placeholder="Search by sales ID, customer, product..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-zinc-100/50 text-sm focus-visible:ring-yellow-400"
+                />
+              </div>
+
+              {/* Box 2: Cashier & Staff Dropdown Filter */}
+              <div className="lg:col-span-4">
+                <Select value={selectedCashier} onValueChange={setSelectedCashier}>
+                  <SelectTrigger className="w-full bg-red-600 border-red-800 text-yellow-200 text-sm focus:ring-yellow-400">
+                    <div className="flex items-center gap-2 truncate">
+                      <Users className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <SelectValue placeholder="All Cashiers / Staff" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-red-700 border-red-800 text-yellow-200 max-h-64">
+                    <SelectItem value="all">All Cashiers / Staff</SelectItem>
+                    {cashierOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.code || c.roleName})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Day / Week / Month Quick Isolation Presets */}
+              <div className="lg:col-span-3 flex items-center justify-between lg:justify-end gap-1.5 flex-wrap">
+                <div className="inline-flex items-center p-0.5 rounded-lg bg-red-900/60 border border-red-950/60 text-xs">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("all")}
+                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                      datePreset === "all"
+                        ? "bg-yellow-400 text-red-950 font-bold shadow"
+                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                    }`}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("today")}
+                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                      datePreset === "today"
+                        ? "bg-yellow-400 text-red-950 font-bold shadow"
+                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                    }`}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("week")}
+                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                      datePreset === "week"
+                        ? "bg-yellow-400 text-red-950 font-bold shadow"
+                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                    }`}
+                  >
+                    Week
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("month")}
+                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                      datePreset === "month"
+                        ? "bg-yellow-400 text-red-950 font-bold shadow"
+                        : "text-zinc-300 hover:text-white hover:bg-red-700/60"
+                    }`}
+                  >
+                    Month
+                  </Button>
+                </div>
+
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleResetFilters}
+                    className="h-7 px-2 text-xs text-yellow-300 hover:text-yellow-100 hover:bg-red-600/80 flex items-center gap-1"
+                    title="Reset all filters"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Custom Date Pickers Sub-Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-red-800/60 text-xs text-zinc-300">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 font-medium text-yellow-300">
+                  <Calendar className="w-4 h-4 text-yellow-400" />
+                  <span>Date Range:</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">From</span>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => handleCustomDateChange("start", e.target.value)}
+                    className="h-8 w-36 bg-red-600 border-red-800 text-yellow-200 text-xs px-2.5 rounded cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">To</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => handleCustomDateChange("end", e.target.value)}
+                    className="h-8 w-36 bg-red-600 border-red-800 text-yellow-200 text-xs px-2.5 rounded cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-zinc-300">
+                Showing <strong className="text-yellow-300">{filteredSales.length}</strong> of {visibleSales.length} sales
+              </div>
+            </div>
           </div>
 
           <div className="border border-red-800 rounded-lg overflow-x-auto">
@@ -383,7 +642,32 @@ export function SalesManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSales.map((sale: any) => (
+                {filteredSales.length === 0 ? (
+                  <TableRow className="border-red-800">
+                    <TableCell colSpan={isAdmin ? 7 : 6} className="h-32 text-center text-zinc-300">
+                      <div className="flex flex-col items-center justify-center gap-1.5 py-4">
+                        <ShoppingCart className="w-8 h-8 text-yellow-400/50 mb-1" />
+                        <p className="font-semibold text-yellow-200">No sales transactions found</p>
+                        <p className="text-xs text-zinc-400">
+                          {hasActiveFilters ? "Try adjusting your search keywords, cashier shift, or date range." : "No sales recorded yet."}
+                        </p>
+                        {hasActiveFilters && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleResetFilters}
+                            className="mt-2 text-xs text-yellow-400 hover:text-zinc-100 hover:bg-red-600"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                            Clear Filters
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredSales.map((sale: any) => (
                   <TableRow key={sale.sales_id} className="border-red-800">
                     <TableCell className="text-yellow-200 whitespace-nowrap text-center">{sale.display_sales_id}</TableCell>
                     {isAdmin && (
@@ -642,7 +926,7 @@ export function SalesManagement() {
                       </Dialog>
                     </TableCell>
                   </TableRow>
-                ))}
+                )))}
               </TableBody>
             </Table>
           </div>
