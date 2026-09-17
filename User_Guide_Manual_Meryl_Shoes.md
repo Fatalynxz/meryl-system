@@ -320,23 +320,24 @@ The Product Settings dashboard provides high-level inventory health metrics acro
 
 ### Section 2.11: Product Settings – Configure Product Parameters Modal (Stock-In, Markup % & POS Visibility)
 #### Screen Description
-Opens when clicking Configure Parameters (gear icon) on any product in the Product Settings matrix. Used to record delivery stock-ins, adjust retail markup percentages, recalculate SRP selling prices, establish safety reorder thresholds, and set expiration or manufacturing batch dates.
+Opens when clicking Configure Parameters (gear icon) on any product row. Used by managers to record delivery stock-ins, set reserved quantities, adjust retail markup percentages, verify live SRP calculations, establish safety reorder alert thresholds, record batch manufacturing/expiration dates, and toggle POS sellable status.
 
 #### Screenshot Callout Labels
-* **Box 1 [Product Specifications Summary]**: "Displays thumbnail, style name, SKU barcode, category, colorway, and current unit cost."
-* **Box 2 [Stock-In Intake & Current On-Hand Panel]**: "Shows Current On-Hand units with an 'Add Stock Quantity' field that automatically projects new available shelf stock."
-* **Box 3 [Markup % & Live SRP Calculator]**: "Input markup percentage to automatically calculate SRP, displaying the exact gross profit margin in Pesos (₱)."
-* **Box 4 [Reorder Point (ROP) & Safety Stock Input]**: "Configures the minimum quantity threshold that triggers automated low-stock restocking alerts."
-* **Box 5 [Batch Dates & Active Status Toggle]**: "Input fields for manufacturing batch date and expiration/warranty date, plus an Active/Inactive status selector."
-* **Box 6 [Save Parameters Confirmation Button]**: "Commits the new stock quantity, updates retail prices across all connected POS terminals, and logs an inventory movement audit entry."
+* **Box 1 [Product Identity & Department Specifications]**: "Header banner showing footwear thumbnail, style name, Brand, SKU barcode, Category, Color, Size, base Unit Cost, and target Department (Men, Women, Kids, Unisex)."
+* **Box 2 [Stock Intake & Current Shelf Stock Panel]**: "Displays Current On-Hand units alongside the 'Add Stock Quantity (+Units)' input field that automatically projects new available shelf inventory."
+* **Box 3 [Reserved / Held Stock & Supplier Base Cost]**: "Editable input for stock held aside for reservations or store transfers, plus supplier wholesale cost per pair in Philippine Pesos (₱)."
+* **Box 4 [Markup % Calculator & Margin Multiplier]**: "Markup percentage input with quick preset buttons (20%, 35%, 50%, 90%), dynamic multiplier badge (e.g., `1.00x (+100% margin)`), and live calculated retail SRP (₱)."
+* **Box 5 [Reorder Alert Level & Batch Quality Dates]**: "Safety reorder threshold (ROP Alert) field alongside calendar date pickers for Manufactured Date and Expiration/Warranty Date."
+* **Box 6 [Sellable Status Toggle & Save Parameters Button]**: "Active (Sellable) vs. Inactive (Disabled) toggle buttons and the golden 'Save Parameters' button to commit changes across all POS terminals."
 
 #### STEPS
-1. In the Product Settings table, click the **Gear/Configure** icon on the desired shoe style.
-2. To intake incoming deliveries, enter the number of pairs received into the **Add Stock Quantity** field (e.g., `24`).
-3. To adjust pricing, input a new **Markup %** (e.g., `35%`); the system instantly calculates and displays the new retail SRP and margin.
-4. Set the **Reorder Level (ROP)** (e.g., `10 pairs`) to define when the system should raise low-stock warnings.
-5. Verify the **Status** is set to `Active` so the shoe is sellable on POS cash registers.
-6. Click **Save Parameters**. The physical count increments immediately and a delivery intake audit entry is logged.
+1. In the Product Settings or Sellable Inventory table, click the **Gear icon (⚙️)** on the desired footwear row.
+2. Review the **Product Identity & Department Specifications (Box 1)** to verify the shoe style, variant sizing, and department.
+3. In **Add Stock Quantity (Box 2)**, type the number of received pairs (e.g., `24`) to increment physical inventory upon delivery.
+4. If pairs need to be held for reservations or transfers, specify the quantity in **Reserved / Held Stock (Box 3)**.
+5. In **Markup % (Box 4)**, select a preset button (e.g., *+35%*) or type a custom markup percentage. Observe the live margin multiplier (e.g., `0.35x (+35% margin)`) and the calculated retail **SRP**.
+6. Set the **Reorder Level (Box 5)** (e.g., `10`) to trigger low-stock alerts when inventory drops, and pick the **Manufactured Date** and **Expiration Date**.
+7. Ensure the status toggle **(Box 6)** is set to **Active (Sellable)**, then click **Save Parameters** to immediately commit the updates.
 
 ---
 
@@ -345,22 +346,23 @@ Opens when clicking Configure Parameters (gear icon) on any product in the Produ
 The Sellable Inventory portal provides centralized visibility over all active footwear items currently stocked and available for sale. It equips warehouse custodians and store supervisors with multi-attribute search, category filtering dropdowns and quick pills, stock availability indicators, and instant access to detailed stock audit specifications and inline parameter configuration.
 
 #### Screenshot Callout Labels
-* **Box 1 [Warehouse Title & Records Counter Badge]**: "Displays 'Sellable Inventory' header alongside a golden badge indicating total active matching stock records."
-* **Box 2 [Unified Search Input]**: "Real-time search field filtering items across SKU barcode, product name, brand, category, and variant attributes."
-* **Box 3 [Category Filter Dropdown & Quick-Filter Pills]**: "Allows fast classification filtering (e.g., All Categories, Running, Lifestyle, Basketball) with dynamic quantity badges."
-* **Box 4 [Sellable Inventory Grid Table]**: "Clean data table rendering Thumbnail, Shoe Model Name, Variant Badges (Color, Size, Department), SRP (₱), Available Stock, Status, and Actions."
-* **Box 5 [Available Stock Availability Badge]**: "Color-coded stock level indicator displaying available sellable quantity (Green for positive available units, Red/Amber for zero available)."
-* **Box 6 [Row Action Controls (Eye & Gear Buttons)]**: "Eye icon opens the comprehensive Inventory Details modal; Gear icon opens the Configure Product Parameters modal for inline adjustments."
+* **Box 1 [Real-Time Search Input]**: "Real-time search input (Search by SKU, product, brand, category, or variant...) that immediately filters table rows as characters are typed."
+* **Box 2 [Header Banner & Total Records Badge]**: "Header banner showing the yellow Warehouse icon, Sellable Inventory title, and a golden pill displaying total active inventory records (e.g., 8 records)."
+* **Box 3 [Quick Classification Selector]**: "Quick classification selector (All Categories) located in the upper-right corner of the inventory card."
+* **Box 4 [Interactive Category Filter Pills]**: "Horizontal row of filter pills showing live quantities per footwear category."
+* **Box 5 [High-Contrast Inventory Data Table]**: "High-contrast data table displaying seven core columns (Image, Product, Variant, Price, Available, Status, Actions)."
+* **Box 6 [Row Action Controls (Eye & Gear Buttons)]**: "Use the Eye icon to view detailed inventory audits, and the Gear icon to configure product settings."
 
 #### STEPS
 1. Navigate to **Inventory** in the sidebar navigation (or access `/inventory`).
 2. Review the list of active footwear products configured with sellable stock.
-3. To filter items:
-   - Type a keyword into the **Search** input (e.g., shoe model, brand, colorway, or SKU).
-   - Select a specific category from the **Category dropdown** or click one of the **Quick-Filter Category Pills** (e.g., *Running*, *Basketball*).
-4. Monitor the **Available** stock count badge on each footwear variant to identify inventory availability at a glance.
-5. Click the **Eye icon** (`View details`) on any item row to inspect physical on-hand units, reserved stock, condition assessments, and batch dates.
-6. Click the **Gear icon** (`Product settings`) to immediately adjust markup percentages, add stock intake, or update reorder thresholds.
+3. In the **Real-Time Search Input (Box 1)**, type a keyword (SKU barcode, shoe model, brand, colorway, or variant) to filter records in real time.
+4. Observe the **Header Banner & Total Records Badge (Box 2)** to see the count of matching items.
+5. Use the **Quick Classification Selector (Box 3)** or click any of the **Interactive Category Filter Pills (Box 4)** (e.g., *Basketball Shoes (2)*, *Casual Shoes (4)*, *Running Shoes (2)*) to isolate specific footwear styles.
+6. Inspect the **High-Contrast Inventory Data Table (Box 5)**, observing the **Available** column badge (green indicates in-stock sellable units ready for POS checkouts).
+7. Under the **Row Action Controls (Box 6)**:
+   - Click the **Eye icon** to view detailed inventory audits (physical on-hand vs. reservations, condition, and batch dates).
+   - Click the **Gear icon** to configure product settings (restock intake, markups, ROP, department, and expiration dates).
 
 ---
 
