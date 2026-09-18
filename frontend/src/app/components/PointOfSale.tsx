@@ -1959,6 +1959,7 @@ function formatReceiptNumber(salesId?: string) {
                             <SelectItem value="Female">Female</SelectItem>
                             <SelectItem value="Kids (Boy)">Kids (Boy)</SelectItem>
                             <SelectItem value="Kids (Girl)">Kids (Girl)</SelectItem>
+                            <SelectItem value="Unisex">Unisex</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

@@ -193,42 +193,24 @@ function parsePromotionTargets(text: unknown) {
   };
 }
 
-function getCustomerGender(customer: any) {
-  const raw = String(customer?.gender ?? customer?.customer_gender ?? customer?.sex ?? "Unknown").trim();
-  if (!raw) return "Unknown";
-  const normalized = raw.toLowerCase();
-  if (normalized.includes("men") || normalized === "male" || normalized === "m") return "Men";
-  if (normalized.includes("women") || normalized === "female" || normalized === "f") return "Women";
-  if (normalized.includes("boy")) return "Kids (Boy)";
-  if (normalized.includes("girl")) return "Kids (Girl)";
-  if (normalized.includes("kid") || normalized.includes("child")) return "Kids";
-  return raw;
-}
-
-function getCustomerAge(customer: any) {
-  const direct = Number(customer?.age ?? customer?.customer_age);
-  if (Number.isFinite(direct) && direct > 0) return direct;
-  const birthDate = toDate(customer?.birthdate ?? customer?.birth_date ?? customer?.date_of_birth);
-  if (!birthDate) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birthDate.getFullYear();
-  const monthDelta = now.getMonth() - birthDate.getMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < birthDate.getDate())) age -= 1;
-  return age;
-}
-
-function getAgeRange(customer: any) {
-  const existing = String(customer?.age_range ?? "").trim();
-  if (existing) return existing;
-  const age = getCustomerAge(customer);
-  if (!age) return "Unknown Age";
-  if (age <= 12) return "Kids 12 below";
-  if (age <= 17) return "Teens 13-17";
-  if (age <= 24) return "Young Adults 18-24";
-  if (age <= 34) return "Adults 25-34";
-  if (age <= 44) return "Adults 35-44";
-  if (age <= 59) return "Adults 45-59";
-  return "Seniors 60+";
+function getCustomerGender(customer: any, fallbackProductGender?: string) {
+  const raw = String(customer?.gender ?? customer?.customer_gender ?? customer?.sex ?? "").trim();
+  if (raw) {
+    const normalized = raw.toLowerCase();
+    if (normalized === "unisex" || normalized.includes("unisex")) return "Unisex";
+    if (normalized.includes("men") || normalized === "male" || normalized === "m") return "Men";
+    if (normalized.includes("women") || normalized === "female" || normalized === "f") return "Women";
+    if (normalized.includes("boy") || normalized.includes("girl") || normalized.includes("kid") || normalized.includes("child")) return "Kids";
+    return raw;
+  }
+  if (fallbackProductGender) {
+    const pNorm = String(fallbackProductGender).trim().toLowerCase();
+    if (pNorm === "unisex" || pNorm.includes("unisex")) return "Unisex";
+    if (pNorm.includes("men") || pNorm === "male" || pNorm === "m") return "Men";
+    if (pNorm.includes("women") || pNorm === "female" || pNorm === "f") return "Women";
+    if (pNorm.includes("boy") || pNorm.includes("girl") || pNorm.includes("kid") || pNorm.includes("child")) return "Kids";
+  }
+  return "";
 }
 
 function movementBadgeClass(movement: string) {
@@ -459,9 +441,7 @@ export function PredictiveAnalytics() {
     const categoryStats = new Map<string, any>();
     const brandStats = new Map<string, any>();
     const sizeStats = new Map<string, any>();
-    const customerSegments = new Map<string, any>();
     const genderSegments = new Map<string, any>();
-    const ageSegments = new Map<string, any>();
     const dailySales = new Map<string, { date: Date; revenue: number; units: number }>();
 
     products.forEach((product: any) => {
@@ -498,71 +478,7 @@ export function PredictiveAnalytics() {
       const customer = inCustomerPeriod
         ? (getOne(sale.customer) ?? customerMap.get(String(sale.customer_id ?? "")))
         : null;
-      const gender = inCustomerPeriod ? getCustomerGender(customer) : "";
-      const ageRange = inCustomerPeriod ? getAgeRange(customer) : "";
-      const segmentKey = inCustomerPeriod ? `${gender} / ${ageRange}` : "";
-      const segment = inCustomerPeriod
-        ? (customerSegments.get(segmentKey) ?? {
-            segment: segmentKey,
-            gender,
-            ageRange,
-            customers: new Set<string>(),
-            orders: 0,
-            units: 0,
-            revenue: 0,
-            topCategories: new Map<string, number>(),
-            topBrands: new Map<string, number>(),
-            topSizes: new Map<string, number>(),
-            topProducts: new Map<string, number>(),
-          })
-        : null;
-
-      if (inCustomerPeriod && segment) {
-        if (customer?.customer_id) segment.customers.add(String(customer.customer_id));
-        segment.orders += 1;
-        segment.revenue += getSaleAmount(sale);
-      }
-
-      const genderSegment = inCustomerPeriod
-        ? (genderSegments.get(gender) ?? {
-            label: gender,
-            customers: new Set<string>(),
-            orders: 0,
-            units: 0,
-            revenue: 0,
-            topCategories: new Map<string, number>(),
-            topBrands: new Map<string, number>(),
-            topSizes: new Map<string, number>(),
-            topProducts: new Map<string, number>(),
-          })
-        : null;
-      const ageSegment = inCustomerPeriod
-        ? (ageSegments.get(ageRange) ?? {
-            label: ageRange,
-            customers: new Set<string>(),
-            orders: 0,
-            units: 0,
-            revenue: 0,
-            topCategories: new Map<string, number>(),
-            topBrands: new Map<string, number>(),
-            topSizes: new Map<string, number>(),
-            topProducts: new Map<string, number>(),
-          })
-        : null;
-      if (inCustomerPeriod && customer?.customer_id) {
-        genderSegment?.customers.add(String(customer.customer_id));
-        ageSegment?.customers.add(String(customer.customer_id));
-      }
-      if (inCustomerPeriod) {
-        if (genderSegment) {
-          genderSegment.orders += 1;
-          genderSegment.revenue += getSaleAmount(sale);
-        }
-        if (ageSegment) {
-          ageSegment.orders += 1;
-          ageSegment.revenue += getSaleAmount(sale);
-        }
-      }
+      const explicitCustomerGender = inCustomerPeriod ? getCustomerGender(customer) : "";
 
       const dayKey = date.toISOString().slice(0, 10);
       const day = dailySales.get(dayKey) ?? { date, revenue: 0, units: 0 };
@@ -577,28 +493,35 @@ export function PredictiveAnalytics() {
         const brand = String(product?.brand ?? "N/A");
         const size = String(product?.size ?? "N/A");
         const productName = String(product?.product_name ?? detail?.product_name ?? "Unknown Product");
+        const productGender = String(product?.gender ?? "").trim();
 
         day.units += qty;
-        if (inCustomerPeriod && segment) {
-          segment.units += qty;
-          segment.topCategories.set(category, (segment.topCategories.get(category) ?? 0) + qty);
-          segment.topBrands.set(brand, (segment.topBrands.get(brand) ?? 0) + qty);
-          segment.topSizes.set(size, (segment.topSizes.get(size) ?? 0) + qty);
-          segment.topProducts.set(productName, (segment.topProducts.get(productName) ?? 0) + qty);
-        }
-        if (inCustomerPeriod && genderSegment) {
+
+        if (inCustomerPeriod) {
+          const itemGender = explicitCustomerGender || getCustomerGender(null, productGender) || "Unisex";
+          const genderSegment = genderSegments.get(itemGender) ?? {
+            label: itemGender,
+            customers: new Set<string>(),
+            orders: new Set<string>(),
+            units: 0,
+            revenue: 0,
+            topCategories: new Map<string, number>(),
+            topBrands: new Map<string, number>(),
+            topSizes: new Map<string, number>(),
+            topProducts: new Map<string, number>(),
+          };
+
+          const customerKey = customer?.customer_id ? String(customer.customer_id) : sale.sales_id ? `walkin-${sale.sales_id}` : "";
+          if (customerKey) genderSegment.customers.add(customerKey);
+          if (sale.sales_id) genderSegment.orders.add(String(sale.sales_id));
           genderSegment.units += qty;
+          genderSegment.revenue += revenue;
           genderSegment.topCategories.set(category, (genderSegment.topCategories.get(category) ?? 0) + qty);
           genderSegment.topBrands.set(brand, (genderSegment.topBrands.get(brand) ?? 0) + qty);
           genderSegment.topSizes.set(size, (genderSegment.topSizes.get(size) ?? 0) + qty);
           genderSegment.topProducts.set(productName, (genderSegment.topProducts.get(productName) ?? 0) + qty);
-        }
-        if (inCustomerPeriod && ageSegment) {
-          ageSegment.units += qty;
-          ageSegment.topCategories.set(category, (ageSegment.topCategories.get(category) ?? 0) + qty);
-          ageSegment.topBrands.set(brand, (ageSegment.topBrands.get(brand) ?? 0) + qty);
-          ageSegment.topSizes.set(size, (ageSegment.topSizes.get(size) ?? 0) + qty);
-          ageSegment.topProducts.set(productName, (ageSegment.topProducts.get(productName) ?? 0) + qty);
+
+          genderSegments.set(itemGender, genderSegment);
         }
 
         if (id) {
@@ -651,9 +574,6 @@ export function PredictiveAnalytics() {
       });
 
       dailySales.set(dayKey, day);
-      if (inCustomerPeriod && segment) customerSegments.set(segmentKey, segment);
-      if (inCustomerPeriod && genderSegment) genderSegments.set(gender, genderSegment);
-      if (inCustomerPeriod && ageSegment) ageSegments.set(ageRange, ageSegment);
     });
 
     const productRows = Array.from(productStats.values());
@@ -937,33 +857,13 @@ export function PredictiveAnalytics() {
       .slice(0, 5)
       .map((row, index) => ({ ...row, fill: ["#facc15", "#fde047", "#fef08a", "#fbbf24", "#fef9c3"][index] }));
 
-    const segmentRows = Array.from(customerSegments.values())
-      .map((segment) => {
-        const topCategory = getTopKey(segment.topCategories);
-        const topSize = getTopKey(segment.topSizes);
-        return {
-          segment: segment.segment,
-          gender: segment.gender,
-          ageRange: segment.ageRange,
-          customers: segment.customers.size,
-          orders: segment.orders,
-          units: segment.units,
-          revenue: segment.revenue,
-          topCategory,
-          topBrand: getTopKey(segment.topBrands),
-          topSize,
-          topProduct: getTopKey(segment.topProducts),
-        };
-      })
-      .sort((a, b) => b.revenue - a.revenue);
-
     const formatCustomerSegment = (segment: any) => {
       const topCategory = getTopKey(segment.topCategories);
       const topSize = getTopKey(segment.topSizes);
       return {
         label: segment.label,
-        customers: segment.customers.size,
-        orders: segment.orders,
+        customers: segment.customers instanceof Set ? segment.customers.size : Number(segment.customers ?? 0),
+        orders: segment.orders instanceof Set ? segment.orders.size : Number(segment.orders ?? 0),
         units: segment.units,
         revenue: segment.revenue,
         topCategory,
@@ -974,31 +874,29 @@ export function PredictiveAnalytics() {
     };
 
     const isKnownGender = (label: string) => !["unknown", "n/a", "none"].includes(String(label).trim().toLowerCase());
-    const isKnownAgeRange = (label: string) => !["unknown age", "unknown", "n/a", "none"].includes(String(label).trim().toLowerCase());
+
+    const genderColorMap: Record<string, string> = {
+      Women: "#fb7185",
+      Men: "#38bdf8",
+      Unisex: "#facc15",
+      Kids: "#4ade80",
+    };
 
     const genderRows = Array.from(genderSegments.values())
       .map(formatCustomerSegment)
       .filter((row) => isKnownGender(row.label))
-      .sort((a, b) => b.revenue - a.revenue);
-    const ageRows = Array.from(ageSegments.values())
-      .map(formatCustomerSegment)
-      .filter((row) => isKnownAgeRange(row.label))
-      .sort((a, b) => b.revenue - a.revenue);
-    const genderChart = genderRows.map((row, index) => ({
-      name: shortLabel(row.label, 14),
+      .sort((a, b) => b.units - a.units || b.revenue - a.revenue);
+
+    const topBuyingGender = genderRows[0] ?? null;
+
+    const genderChart = genderRows.map((row) => ({
+      name: row.label,
       fullLabel: row.label,
       revenue: Math.round(row.revenue),
+      units: row.units,
       orders: row.orders,
       customers: row.customers,
-      fill: ["#facc15", "#f97316", "#22c55e", "#38bdf8", "#a78bfa"][index % 5],
-    }));
-    const ageChart = ageRows.map((row, index) => ({
-      name: shortLabel(row.label, 16),
-      fullLabel: row.label,
-      revenue: Math.round(row.revenue),
-      orders: row.orders,
-      customers: row.customers,
-      fill: ["#38bdf8", "#facc15", "#22c55e", "#f97316", "#a78bfa", "#fb7185"][index % 6],
+      fill: genderColorMap[row.label] ?? "#facc15",
     }));
 
     const buildRankingRows = (rows: any[]) => {
@@ -1137,11 +1035,9 @@ export function PredictiveAnalytics() {
       hasReliableForecastHistory,
       salesForecastPeriodLabel,
       categoryChart,
-      segmentRows,
       genderRows,
-      ageRows,
       genderChart,
-      ageChart,
+      topBuyingGender,
       customerPeriodLabel,
       topBrands,
       topSizes,
@@ -1310,7 +1206,7 @@ export function PredictiveAnalytics() {
 
   const filterTabs = [
     { id: "product" as const, label: "Product Analytics", icon: Package, count: analytics.productMovement.length },
-    { id: "customer" as const, label: "Customer Analytics", icon: Users, count: analytics.genderRows.length + analytics.ageRows.length },
+    { id: "customer" as const, label: "Customer Analytics", icon: Users, count: analytics.genderRows.length },
     { id: "sales" as const, label: "Sales Analytics", icon: TrendingUp, count: analytics.trendChart.length },
     { id: "promotion" as const, label: "Promotion Analytics", icon: Sparkles, count: analytics.promotionPerformance.length },
   ];
@@ -2080,7 +1976,7 @@ export function PredictiveAnalytics() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-white">Customer Analytics Period</p>
-                <p className="text-xs text-white/50">Filter gender and age charts by time window.</p>
+                <p className="text-xs text-white/50">Filter customer demand and sales by gender across time windows.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {customerPeriodOptions.map((option) => {
@@ -2112,12 +2008,50 @@ export function PredictiveAnalytics() {
                 <CardTitle className="flex items-center gap-2 text-white">
                   <Users className="h-5 w-5 text-yellow-400" /> Gender Analytics
                 </CardTitle>
-                <p className="mt-2 text-sm text-white/55">Demand grouped by customer gender ({analytics.customerPeriodLabel}).</p>
+                <p className="mt-2 text-sm text-white/55">
+                  Demand and purchase volume grouped by customer demographic ({analytics.customerPeriodLabel}).
+                </p>
               </div>
-              <Badge className="bg-yellow-400 text-red-950">{analytics.genderRows.length} groups</Badge>
+              <Badge className="bg-yellow-400 text-red-950">{analytics.genderRows.length} categories</Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
+            {analytics.topBuyingGender && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-yellow-400/30 bg-gradient-to-r from-yellow-400/15 via-yellow-400/5 to-transparent p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-400/20 text-yellow-300 font-bold text-xl">
+                    🏆
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
+                      Top Buying Customer Demographic
+                    </p>
+                    <p className="text-lg font-bold text-white">
+                      {analytics.topBuyingGender.label} Customers Buy The Most
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-6 text-xs">
+                  <div className="text-right">
+                    <p className="text-white/60">Units Bought</p>
+                    <p className="font-bold text-yellow-300 text-sm">{analytics.topBuyingGender.units} pairs</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/60">Total Revenue</p>
+                    <p className="font-bold text-yellow-300 text-sm">{money(analytics.topBuyingGender.revenue)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/60">Top Brand</p>
+                    <p className="font-bold text-white text-sm">{analytics.topBuyingGender.topBrand}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/60">Top Product</p>
+                    <p className="font-bold text-white text-sm max-w-[150px] truncate">{analytics.topBuyingGender.topProduct}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {analytics.genderRows.length ? (
               <div className="space-y-3">
                 <div className="rounded-2xl border border-[#2b2b36] bg-[#111118] p-4">
@@ -2131,7 +2065,10 @@ export function PredictiveAnalytics() {
                           contentStyle={{ background: "#101017", border: "1px solid #2b2b36", borderRadius: 12 }}
                           labelStyle={{ color: "#facc15" }}
                           itemStyle={{ color: "#facc15" }}
-                          formatter={(value: any, name: string) => (name === "revenue" ? money(Number(value)) : value)}
+                          formatter={(value: any, _name: string, item: any) => [
+                            `${money(Number(value))} (${item?.payload?.units ?? 0} units)`,
+                            "Revenue",
+                          ]}
                         />
                         <Bar dataKey="revenue" radius={[8, 8, 0, 0]}>
                           {analytics.genderChart.map((row: any) => (
@@ -2147,37 +2084,42 @@ export function PredictiveAnalytics() {
                   <div className="overflow-x-auto">
                   <Table className="table-fixed w-full min-w-[980px]">
                     <colgroup>
-                      <col className="w-[11%]" />
-                      <col className="w-[11%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[24%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[18%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[22%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[14%]" />
                     </colgroup>
                     <TableHeader className="bg-[#1f1f28]">
                       <TableRow className="border-[#2b2b36] hover:bg-[#1f1f28]">
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Gender</TableHead>
+                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Demographic</TableHead>
                         <TableHead className="py-3 text-center text-sm font-semibold text-white">Top Brand</TableHead>
                         <TableHead className="py-3 text-center text-sm font-semibold text-white">Top Size</TableHead>
                         <TableHead className="py-3 text-center text-sm font-semibold text-white">Top Product</TableHead>
                         <TableHead className="py-3 text-center text-sm font-semibold text-white">Customers</TableHead>
                         <TableHead className="py-3 text-center text-sm font-semibold text-white">Orders</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Units</TableHead>
+                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Units Sold</TableHead>
                         <TableHead className="py-3 text-center text-sm font-semibold text-white">Revenue</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {analytics.genderRows.map((row: any) => (
+                      {analytics.genderRows.map((row: any, idx: number) => (
                         <TableRow key={row.label} className="border-[#2b2b36] hover:bg-white/[0.03]">
-                          <TableCell className="py-3 text-center align-middle font-semibold text-white">{row.label}</TableCell>
+                          <TableCell className="py-3 text-center align-middle font-semibold text-white">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {idx === 0 && <span title="Top Buyer">👑</span>}
+                              <span>{row.label}</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="py-3 text-center align-middle text-white/80">{row.topBrand}</TableCell>
                           <TableCell className="py-3 text-center align-middle text-white/80">{row.topSize}</TableCell>
                           <TableCell className="py-3 text-center align-middle truncate text-white/80">{row.topProduct}</TableCell>
                           <TableCell className="py-3 text-center align-middle text-white">{row.customers}</TableCell>
                           <TableCell className="py-3 text-center align-middle text-white">{row.orders}</TableCell>
-                          <TableCell className="py-3 text-center align-middle text-yellow-300">{row.units}</TableCell>
+                          <TableCell className="py-3 text-center align-middle font-semibold text-yellow-300">{row.units}</TableCell>
                           <TableCell className="py-3 text-center align-middle font-semibold text-yellow-300">{money(row.revenue)}</TableCell>
                         </TableRow>
                       ))}
@@ -2189,99 +2131,9 @@ export function PredictiveAnalytics() {
             ) : (
               <div className="rounded-2xl border border-dashed border-[#2b2b36] bg-[#111118] p-6 text-center">
                 <p className="font-semibold text-white/70">No gender analytics yet</p>
-                <p className="mt-1 text-sm text-white/45">Add gender values to customer profiles to unlock this view.</p>
+                <p className="mt-1 text-sm text-white/45">Record sales or adjust the period filter to view customer demographic demand.</p>
               </div>
             )} 
-          </CardContent>
-        </Card>
-
-        <Card className="bg-[#16161d] border-[#2b2b36]">
-          <CardHeader className="pb-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Users className="h-5 w-5 text-yellow-400" /> Age Range Analytics
-                </CardTitle>
-                <p className="mt-2 text-sm text-white/55">Demand grouped by recorded age ({analytics.customerPeriodLabel}).</p>
-              </div>
-              <Badge className="bg-yellow-400 text-red-950">{analytics.ageRows.length} groups</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {analytics.ageRows.length ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-[#2b2b36] bg-[#111118] p-4">
-                  <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics.ageChart} layout="vertical" margin={{ left: 20 }}>
-                        <CartesianGrid stroke="#2b2b36" horizontal={false} />
-                        <XAxis type="number" stroke="#a1a1aa" tick={{ fill: "#d4d4d8", fontSize: 12 }} />
-                        <YAxis type="category" dataKey="name" stroke="#a1a1aa" tick={{ fill: "#d4d4d8", fontSize: 12 }} width={140} />
-                        <Tooltip
-                          contentStyle={{ background: "#101017", border: "1px solid #2b2b36", borderRadius: 12 }}
-                          labelStyle={{ color: "#facc15" }}
-                          itemStyle={{ color: "#facc15" }}
-                          formatter={(value: any, name: string) => (name === "revenue" ? money(Number(value)) : value)}
-                        />
-                        <Bar dataKey="revenue" radius={[0, 8, 8, 0]}>
-                          {analytics.ageChart.map((row: any) => (
-                            <Cell key={row.fullLabel} fill={row.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-[#2b2b36] bg-[#111118]">
-                  <div className="overflow-x-auto">
-                  <Table className="table-fixed w-full min-w-[980px]">
-                    <colgroup>
-                      <col className="w-[12%]" />
-                      <col className="w-[11%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[23%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[9%]" />
-                      <col className="w-[18%]" />
-                    </colgroup>
-                    <TableHeader className="bg-[#1f1f28]">
-                      <TableRow className="border-[#2b2b36] hover:bg-[#1f1f28]">
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Age Range</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Top Brand</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Top Size</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Top Product</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Customers</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Orders</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Units</TableHead>
-                        <TableHead className="py-3 text-center text-sm font-semibold text-white">Revenue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {analytics.ageRows.map((row: any) => (
-                        <TableRow key={row.label} className="border-[#2b2b36] hover:bg-white/[0.03]">
-                          <TableCell className="py-3 text-center align-middle font-semibold text-white">{row.label}</TableCell>
-                          <TableCell className="py-3 text-center align-middle text-white/80">{row.topBrand}</TableCell>
-                          <TableCell className="py-3 text-center align-middle text-white/80">{row.topSize}</TableCell>
-                          <TableCell className="py-3 text-center align-middle truncate text-white/80">{row.topProduct}</TableCell>
-                          <TableCell className="py-3 text-center align-middle text-white">{row.customers}</TableCell>
-                          <TableCell className="py-3 text-center align-middle text-white">{row.orders}</TableCell>
-                          <TableCell className="py-3 text-center align-middle text-yellow-300">{row.units}</TableCell>
-                          <TableCell className="py-3 text-center align-middle font-semibold text-yellow-300">{money(row.revenue)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-[#2b2b36] bg-[#111118] p-6 text-center">
-                <p className="font-semibold text-white/70">No age range analytics yet</p>
-                <p className="mt-1 text-sm text-white/45">Add age or birthdate values to customer profiles to unlock this view.</p>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
