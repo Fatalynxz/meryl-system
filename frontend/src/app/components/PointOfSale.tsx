@@ -1414,7 +1414,7 @@ function formatReceiptNumber(salesId?: string) {
                       </div>
                     </div>
                     <p className="mt-3 text-center text-xs text-yellow-200/50">
-                      💡 Tip: Click any shoe or &quot;Select&quot; to load it onto the POS screen and choose your color &amp; size tiles.
+                      Tip: Click any shoe or &quot;Select&quot; to load it onto the POS screen and choose your color &amp; size tiles.
                     </p>
                   </div>
                 )}

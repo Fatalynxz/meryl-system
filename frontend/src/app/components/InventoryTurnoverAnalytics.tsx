@@ -105,7 +105,7 @@ function ProductTable({ products, emptyMessage, columns }: ProductTableProps) {
                     </Badge>
                   ) : (
                     <Badge className="bg-green-500/20 text-green-400 border-green-500/30 border">
-                      ✓ Optimal
+                      Optimal
                     </Badge>
                   )}
                 </TableCell>
@@ -326,8 +326,9 @@ export function InventoryTurnoverAnalytics() {
         <Card className="bg-[#1D1D25] border-white/10">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-white">
-                ⚡ High Velocity Products ({data.high_velocity_products.length})
+              <CardTitle className="text-white flex items-center gap-2">
+                <Zap className="h-4 w-4 text-emerald-400" />
+                High Velocity Products ({data.high_velocity_products.length})
               </CardTitle>
               <Badge className="bg-green-500/20 text-green-400 border-green-500/30 border">Best Performers</Badge>
             </div>
@@ -347,8 +348,9 @@ export function InventoryTurnoverAnalytics() {
         <Card className="bg-[#1D1D25] border-white/10">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-white">
-                🐌 Slow Moving Products ({data.slow_moving_products.length})
+              <CardTitle className="text-white flex items-center gap-2">
+                <Package className="h-4 w-4 text-yellow-400" />
+                Slow Moving Products ({data.slow_moving_products.length})
               </CardTitle>
               <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 border">Consider Promotion</Badge>
             </div>
@@ -368,8 +370,9 @@ export function InventoryTurnoverAnalytics() {
         <Card className="bg-red-500/10 border-red-500/30">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-red-400">
-                💀 Dead Stock Alert ({data.dead_stock_products.length})
+              <CardTitle className="text-red-400 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+                Dead Stock Alert ({data.dead_stock_products.length})
               </CardTitle>
               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 border">Action Required</Badge>
             </div>
@@ -392,7 +395,10 @@ export function InventoryTurnoverAnalytics() {
       {/* Category Breakdown */}
       <Card className="bg-[#1D1D25] border-white/10">
         <CardHeader>
-          <CardTitle className="text-white">📊 Category Breakdown</CardTitle>
+          <CardTitle className="text-white flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-yellow-400" />
+            Category Breakdown
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { BarChart3, Package, RefreshCw, Sparkles, TrendingUp, Users } from "lucide-react";
+import { Award, BarChart3, Package, RefreshCw, Sparkles, TrendingUp, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -1225,7 +1225,7 @@ export function PredictiveAnalytics() {
                 onClick={() => setAnalyticsView(tab.id)}
                 className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                   isActive
-                    ? "bg-yellow-400 text-red-950 shadow-lg shadow-yellow-400/10"
+                    ? "bg-yellow-400 text-red-950 font-bold"
                     : "bg-white/[0.03] text-white/70 hover:bg-white/[0.07] hover:text-white"
                 }`}
               >
@@ -1387,7 +1387,7 @@ export function PredictiveAnalytics() {
                         ].filter(Boolean) as Array<{ label: string; value: number; color: string }>;
 
                         return (
-                          <div className="min-w-[230px] rounded-xl border border-[#3a3a45] bg-[#18181f] p-3 shadow-2xl shadow-black/60">
+                          <div className="min-w-[230px] rounded-xl border border-[#3a3a45] bg-[#18181f] p-3">
                             <p className="text-sm font-semibold text-yellow-300">{label}</p>
                             <div className="mt-2 space-y-1.5">
                               {rows.map((row) => (
@@ -1771,7 +1771,7 @@ export function PredictiveAnalytics() {
                               {product ? (
                                 <div className="flex flex-col items-center gap-0.5">
                                   <span
-                                    className="inline-flex items-center justify-center rounded-full border border-white/25 text-[10px] font-bold text-white shadow-sm"
+                                    className="inline-flex items-center justify-center rounded-full border border-white/25 text-[10px] font-bold text-white"
                                     style={{ width: `${diameter}px`, height: `${diameter}px`, backgroundColor }}
                                   >
                                     {stock}
@@ -2017,10 +2017,10 @@ export function PredictiveAnalytics() {
           </CardHeader>
           <CardContent className="space-y-4">
             {analytics.topBuyingGender && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-yellow-400/30 bg-gradient-to-r from-yellow-400/15 via-yellow-400/5 to-transparent p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#2b2b36] bg-[#111118] p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-yellow-400/20 text-yellow-300 font-bold text-xl">
-                    🏆
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#22222e] text-yellow-400 border border-[#2f2f3e]">
+                    <Award className="h-5 w-5 text-yellow-400" />
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
@@ -2110,8 +2110,12 @@ export function PredictiveAnalytics() {
                         <TableRow key={row.label} className="border-[#2b2b36] hover:bg-white/[0.03]">
                           <TableCell className="py-3 text-center align-middle font-semibold text-white">
                             <div className="flex items-center justify-center gap-1.5">
-                              {idx === 0 && <span title="Top Buyer">👑</span>}
                               <span>{row.label}</span>
+                              {idx === 0 && (
+                                <span className="rounded border border-yellow-400/40 bg-yellow-400/10 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-300">
+                                  Top
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="py-3 text-center align-middle text-white/80">{row.topBrand}</TableCell>

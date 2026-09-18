@@ -645,9 +645,9 @@ function UserForm({ formData, setFormData, requirePassword = false }: {
             </SelectContent>
           </Select>
           <p className="text-[11px] text-yellow-300/60 mt-1">
-            {formData.role === 'admin' && '🔑 Administrator: Full access to all modules, analytics, and user accounts.'}
-            {formData.role === 'sales' && '💳 Cashier: Access to Point of Sale (POS), Sales History, Customer records, and Returns.'}
-            {formData.role === 'inventory' && '📦 Inventory Staff: Access to Stock Management, Product Catalog, and Stock Movements.'}
+            {formData.role === 'admin' && 'Administrator: Full access to all modules, analytics, and user accounts.'}
+            {formData.role === 'sales' && 'Cashier: Access to Point of Sale (POS), Sales History, Customer records, and Returns.'}
+            {formData.role === 'inventory' && 'Inventory Staff: Access to Stock Management, Product Catalog, and Stock Movements.'}
           </p>
         </div>
         <div className="space-y-2">
