@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -2386,107 +2387,95 @@ export function ReturnManagement() {
           </DialogHeader>
 
           {printExchangeSlip && (
-            <div id="printable-exchange-slip" className="bg-[#fffdf9] text-zinc-900 p-6 rounded-xl border border-zinc-300 shadow-inner font-mono text-xs space-y-3">
-              {/* STORE HEADER */}
-              <div className="text-center space-y-1 border-b border-dashed border-zinc-400 pb-3">
-                <h2 className="text-base font-black tracking-wider text-black font-sans uppercase">MERYL SHOES</h2>
-                <p className="text-[10px] text-zinc-600">Official Retailer & Shoe Center</p>
-                <p className="text-[10px] text-zinc-600">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
-                <p className="text-[10px] text-zinc-600 font-semibold">TIN: 432-891-002-000-VAT • TEL: (034) 435 0128</p>
-                <div className="mt-2 inline-block bg-black text-white px-3 py-0.5 rounded font-sans font-bold text-[10px] uppercase tracking-wider">
-                  ITEM REPLACEMENT / EXCHANGE SLIP
-                </div>
+            <div id="printable-exchange-slip" className="bg-white text-black p-5 rounded border border-zinc-300 font-mono text-[11px] leading-[1.4] w-[302px] mx-auto">
+              {/* ── STORE HEADER ── */}
+              <div className="text-center mb-1">
+                <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>
+                <p className="text-[10px]">Official Retailer &amp; Shoe Center</p>
+                <p className="text-[10px]">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
+                <p className="text-[10px]">TIN: 432-891-002-000 VAT REGISTERED</p>
+                <p className="text-[10px]">TEL: (034) 435 0128</p>
+              </div>
+              <p className="text-center font-bold text-[11px] mt-1 mb-0.5 tracking-wider">ITEM REPLACEMENT / EXCHANGE SLIP</p>
+
+              {/* ── SLIP METADATA ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between"><span>Slip No:</span><span className="font-bold">{printExchangeSlip.display_return_id}</span></div>
+                <div className="flex justify-between"><span>Orig. Receipt:</span><span className="font-bold">{printExchangeSlip.display_sales_id}</span></div>
+                <div className="flex justify-between"><span>Date:</span><span>{printExchangeSlip.return_date}</span></div>
+                <div className="flex justify-between"><span>Processed By:</span><span>{printExchangeSlip.processedBy}</span></div>
+                <div className="flex justify-between"><span>Customer:</span><span>{printExchangeSlip.customerName}</span></div>
               </div>
 
-              {/* SLIP METADATA */}
-              <div className="space-y-1 text-[11px] border-b border-dashed border-zinc-400 pb-3">
-                <div className="flex justify-between font-bold text-zinc-900">
-                  <span>EXCHANGE SLIP NO:</span>
-                  <span className="text-black font-black">{printExchangeSlip.display_return_id}</span>
-                </div>
-                <div className="flex justify-between font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                  <span>ORIGINAL PURCHASE RECEIPT:</span>
-                  <span className="font-black">{printExchangeSlip.display_sales_id}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>REPLACEMENT DATE:</span>
-                  <span>{printExchangeSlip.return_date}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>PROCESSED BY:</span>
-                  <span>{printExchangeSlip.processedBy} ({printExchangeSlip.staffCode})</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>CUSTOMER:</span>
-                  <span>{printExchangeSlip.customerName}</span>
-                </div>
-              </div>
-
-              {/* ITEM EXCHANGE BREAKDOWN */}
-              <div className="space-y-2 border-b border-dashed border-zinc-400 pb-3">
-                <div className="text-[10px] font-bold uppercase text-zinc-700 tracking-wider">
-                  Exchange Items Breakdown
-                </div>
+              {/* ── ITEM EXCHANGE BREAKDOWN ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-2 text-[11px]">
                 {printExchangeSlip.returnDetails.map((detail, idx) => (
-                  <div key={idx} className="space-y-1 bg-zinc-50 p-2.5 rounded border border-zinc-200 text-[11px]">
-                    <div className="flex justify-between font-bold text-red-700">
-                      <span>[RETURNED] {detail.productName}</span>
-                      <span className="tabular-nums">-₱{(detail.productPrice * detail.quantity_returned).toFixed(2)}</span>
+                  <div key={idx}>
+                    <p className="font-bold">[RETURNED]</p>
+                    <p className="pl-1 uppercase truncate">{detail.productName}</p>
+                    <p className="text-[10px] pl-1">{detail.productColor} / Size {detail.productSize}</p>
+                    <div className="flex justify-between pl-1">
+                      <span>{detail.quantity_returned} @ {detail.productPrice.toFixed(2)}</span>
+                      <span className="tabular-nums">-{(detail.productPrice * detail.quantity_returned).toFixed(2)}</span>
                     </div>
-                    <div className="text-[10px] text-zinc-600 pl-2">
-                      Color: {detail.productColor} • Size: {detail.productSize} • {detail.quantity_returned}x @ ₱{detail.productPrice.toFixed(2)}
-                    </div>
-                    <div className="flex justify-between font-bold text-emerald-700 pt-1 border-t border-zinc-200">
-                      <span>[REPLACEMENT] {detail.replacementProductName}</span>
-                      <span className="tabular-nums">+₱{(detail.replacementProductPrice * detail.replacementQuantity).toFixed(2)}</span>
-                    </div>
-                    <div className="text-[10px] text-zinc-600 pl-2">
-                      Color: {detail.replacementProductColor} • Size: {detail.replacementProductSize} • {detail.replacementQuantity}x @ ₱{detail.replacementProductPrice.toFixed(2)}
+                    <p className="font-bold mt-1">[REPLACEMENT]</p>
+                    <p className="pl-1 uppercase truncate">{detail.replacementProductName}</p>
+                    <p className="text-[10px] pl-1">{detail.replacementProductColor} / Size {detail.replacementProductSize}</p>
+                    <div className="flex justify-between pl-1">
+                      <span>{detail.replacementQuantity} @ {detail.replacementProductPrice.toFixed(2)}</span>
+                      <span className="tabular-nums">+{(detail.replacementProductPrice * detail.replacementQuantity).toFixed(2)}</span>
                     </div>
                     {detail.reason && (
-                      <div className="text-[9px] text-zinc-500 italic pl-2 pt-0.5">
-                        Reason: {detail.reason} • Action: {detail.inventory_action}
-                      </div>
+                      <p className="text-[9px] pl-1 mt-0.5">Reason: {detail.reason}</p>
                     )}
                   </div>
                 ))}
               </div>
 
-              {/* FINANCIAL SUMMARY */}
-              <div className="space-y-1.5 text-[11px] border-b border-dashed border-zinc-400 pb-3">
-                <div className="flex justify-between text-zinc-700">
-                  <span>Additional Payment Due:</span>
-                  <span className="tabular-nums font-bold">₱{printExchangeSlip.additional_payment.toFixed(2)}</span>
+              {/* ── FINANCIAL SUMMARY ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between">
+                  <span>Additional Payment:</span>
+                  <span className="tabular-nums font-bold">{printExchangeSlip.additional_payment.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>Refund / Cash Return:</span>
-                  <span>₱0.00 (Exchange Policy Only)</span>
-                </div>
-                <div className="flex justify-between text-sm font-black text-black border-t border-zinc-400 pt-1">
-                  <span>NET AMOUNT COLLECTED:</span>
-                  <span className="text-base tabular-nums">₱{printExchangeSlip.additional_payment.toFixed(2)}</span>
+                <div className="flex justify-between font-black text-[13px] pt-0.5">
+                  <span>NET COLLECTED</span>
+                  <span className="tabular-nums">{printExchangeSlip.additional_payment.toFixed(2)}</span>
                 </div>
               </div>
 
-              {/* SIGNATURES */}
-              <div className="pt-2 grid grid-cols-2 gap-4 text-center text-[9px] text-zinc-600">
+              {/* ── SIGNATURES ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="grid grid-cols-2 gap-4 text-center text-[9px] pt-1">
                 <div>
-                  <div className="border-b border-zinc-400 h-8 mb-1"></div>
+                  <div className="border-b border-black h-8 mb-1"></div>
                   <p>Customer Signature</p>
                 </div>
                 <div>
-                  <div className="border-b border-zinc-400 h-8 mb-1"></div>
+                  <div className="border-b border-black h-8 mb-1"></div>
                   <p>Authorized Cashier</p>
                 </div>
               </div>
 
-              {/* FOOTER */}
-              <div className="text-center pt-2">
-                <div className="inline-block tracking-widest text-[14px] font-mono text-zinc-800 scale-y-125">
-                  ||| | |||| ||| ||||| || |||| ||| |||
-                </div>
-                <p className="text-[9px] text-zinc-500 font-mono mt-1">*{printExchangeSlip.display_return_id}*</p>
+              {/* ── QR CODE ── */}
+              <div className="flex justify-center pt-2 pb-1">
+                <QRCodeSVG
+                  value={printExchangeSlip.display_return_id || "N/A"}
+                  size={80}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
               </div>
+              <p className="text-center text-[9px] font-mono">*{printExchangeSlip.display_return_id}*</p>
+
+              {/* ── FOOTER ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center text-[10px] font-bold tracking-wide">THIS SERVES AS YOUR</p>
+              <p className="text-center text-[10px] font-bold tracking-wide">OFFICIAL EXCHANGE SLIP</p>
             </div>
           )}
 

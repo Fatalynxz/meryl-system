@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -2081,135 +2082,128 @@ function formatReceiptNumber(salesId?: string) {
           </DialogHeader>
 
           {receiptData && (
-            <div id="printable-receipt" className="bg-[#fffdf9] text-zinc-900 p-6 rounded-xl border border-zinc-300 shadow-inner font-mono text-xs space-y-3 relative">
-              {/* STORE HEADER */}
-              <div className="text-center space-y-1 border-b border-dashed border-zinc-400 pb-3">
-                <h2 className="text-base font-black tracking-wider text-black font-sans uppercase">MERYL SHOES</h2>
-                <p className="text-[10px] text-zinc-600">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
-                <p className="text-[10px] text-zinc-600 font-semibold">TIN: 432-891-002-000-VAT • TEL: (034) 435 0128</p>
-              </div>
-              <div className="space-y-1 text-[11px] border-b border-dashed border-zinc-400 pb-3">
-                <div className="flex justify-between font-bold text-zinc-900">
-                  <span>OR / INVOICE NO:</span>
-                  <span className="text-black font-black">{receiptData.receiptNumber}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>DATE & TIME:</span>
-                  <span>{receiptData.date}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>CASHIER:</span>
-                  <span>{receiptData.cashier}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>CUSTOMER:</span>
-                  <span>{receiptData.customerName}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>TERMINAL:</span>
-                  <span>POS-01 (MAIN REGISTER)</span>
-                </div>
+            <div id="printable-receipt" className="bg-white text-black p-5 rounded border border-zinc-300 font-mono text-[11px] leading-[1.4] w-[302px] mx-auto">
+              {/* ── STORE HEADER ── */}
+              <div className="text-center mb-1">
+                <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>
+                <p className="text-[10px]">Official Retailer &amp; Shoe Center</p>
+                <p className="text-[10px]">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
+                <p className="text-[10px]">TIN: 432-891-002-000 VAT REGISTERED</p>
+                <p className="text-[10px]">TEL: (034) 435 0128</p>
               </div>
 
-              {/* ITEM LIST */}
-              <div className="space-y-2 border-b border-dashed border-zinc-400 pb-3">
-                <div className="flex justify-between font-bold text-zinc-900 border-b border-zinc-300 pb-1 text-[10px]">
-                  <span>ITEM / VARIANT</span>
-                  <span className="w-10 text-center">QTY</span>
-                  <span className="text-right">AMOUNT</span>
-                </div>
+              {/* ── TRANSACTION INFO ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between"><span>OR No:</span><span className="font-bold">{receiptData.receiptNumber}</span></div>
+                <div className="flex justify-between"><span>Date:</span><span>{receiptData.date}</span></div>
+                <div className="flex justify-between"><span>Cashier:</span><span>{receiptData.cashier}</span></div>
+                <div className="flex justify-between"><span>Terminal:</span><span>POS-01</span></div>
+              </div>
 
+              {/* ── CUSTOMER ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="text-[11px]">
+                <span>Customer: {receiptData.customerName}</span>
+              </div>
+
+              {/* ── ITEMS HEADER ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+
+              {/* ── ITEM LINES ── */}
+              <div className="space-y-2 text-[11px]">
                 {receiptData.items.map((item: CartItem, index: number) => {
                   const lineTotal = getLineTotal(item);
                   return (
-                    <div key={index} className="space-y-0.5 text-[11px]">
-                      <div className="flex justify-between font-bold text-zinc-900">
-                        <span className="truncate max-w-[190px]">{item.productName}</span>
-                        <span className="w-10 text-center text-zinc-700">{item.quantity}x</span>
-                        <span className="text-right tabular-nums">₱{lineTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="text-[10px] text-zinc-600 flex justify-between">
-                        <span>{item.brand} • {item.color} • Size {item.size}</span>
-                        <span>@ ₱{item.price.toFixed(2)}</span>
+                    <div key={index}>
+                      <p className="font-bold uppercase truncate">{item.productName}</p>
+                      <p className="text-[10px] pl-1">{item.brand} / {item.color} / Size {item.size}</p>
+                      <div className="flex justify-between pl-1">
+                        <span>{item.quantity} @ {item.price.toFixed(2)}</span>
+                        <span className="tabular-nums font-bold">{lineTotal.toFixed(2)} V</span>
                       </div>
                       {item.promotionType && (
-                        <div className="text-[10px] text-emerald-700 font-semibold flex justify-between">
-                          <span>PROMO: {getPromoBadgeLabel(item.promotionType)}</span>
-                          {isBogoCartItem(item) && <span>(Buy 1 Get 1)</span>}
-                        </div>
+                        <p className="text-[10px] pl-1">PROMO: {getPromoBadgeLabel(item.promotionType)}{isBogoCartItem(item) ? " (Buy 1 Get 1)" : ""}</p>
                       )}
                     </div>
                   );
                 })}
               </div>
 
-              {/* TOTALS & TAX BREAKDOWN */}
-              <div className="space-y-1.5 text-[11px] border-b border-dashed border-zinc-400 pb-3">
-                <div className="flex justify-between text-zinc-700">
-                  <span>Subtotal ({receiptData.items.reduce((s: number, i: any) => s + i.quantity, 0)} pairs):</span>
-                  <span className="tabular-nums">₱{receiptData.subtotal.toFixed(2)}</span>
-                </div>
+              {/* ── TOTALS ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
                 {receiptData.discount > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-semibold">
-                    <span>Total Discount / Promos:</span>
-                    <span className="tabular-nums">-₱{receiptData.discount.toFixed(2)}</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span className="tabular-nums">{receiptData.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Discount:</span>
+                      <span className="tabular-nums">-{receiptData.discount.toFixed(2)}</span>
+                    </div>
+                  </>
                 )}
-                <div className="flex justify-between text-sm font-black text-black border-t border-zinc-400 pt-1">
-                  <span>TOTAL AMOUNT DUE:</span>
-                  <span className="text-base tabular-nums">₱{receiptData.total.toFixed(2)}</span>
+                <div className="flex justify-between font-black text-[13px] pt-0.5">
+                  <span>TOTAL</span>
+                  <span className="tabular-nums">{receiptData.total.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-700 pt-1">
-                  <span>PAYMENT MODE:</span>
-                  <span className="font-bold text-zinc-900">{receiptData.paymentMethod.toUpperCase()}</span>
-                </div>
+              </div>
+
+              {/* ── PAYMENT ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
                 {receiptData.paymentMethod === "GCash" ? (
                   <>
-                    <div className="flex justify-between text-zinc-700">
-                      <span>GCASH REF NO:</span>
-                      <span className="font-mono font-bold text-zinc-900 tracking-wide">{receiptData.gcashRefNumber || "N/A"}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-zinc-900">
-                      <span>AMOUNT TRANSFERRED:</span>
-                      <span className="tabular-nums">₱{receiptData.total.toFixed(2)}</span>
-                    </div>
+                    <div className="flex justify-between"><span>GCash:</span><span className="font-bold">GCash</span></div>
+                    <div className="flex justify-between"><span>Ref No:</span><span className="font-bold">{receiptData.gcashRefNumber || "N/A"}</span></div>
+                    <div className="flex justify-between"><span>Total Tender:</span><span className="tabular-nums">{receiptData.total.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span>Change Due:</span><span className="tabular-nums">0.00</span></div>
                   </>
                 ) : (
                   <>
-                    <div className="flex justify-between text-zinc-700">
-                      <span>CASH RECEIVED:</span>
-                      <span className="tabular-nums font-semibold">₱{(receiptData.cashReceived || receiptData.total).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-zinc-900">
-                      <span>CHANGE GIVEN:</span>
-                      <span className="tabular-nums">₱{receiptData.change_amount.toFixed(2)}</span>
-                    </div>
+                    <div className="flex justify-between"><span>Cash:</span><span className="font-bold">Cash</span></div>
+                    <div className="flex justify-between"><span>Total Tender:</span><span className="tabular-nums">{(receiptData.cashReceived || receiptData.total).toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span>Change Due:</span><span className="tabular-nums">{receiptData.change_amount.toFixed(2)}</span></div>
                   </>
                 )}
-              </div>
-
-              {/* TAX SUMMARY */}
-              <div className="space-y-0.5 text-[10px] text-zinc-600 border-b border-dashed border-zinc-400 pb-3">
-                <div className="flex justify-between"><span>VATable Sales (12%):</span><span className="tabular-nums">₱{receiptData.vatableSales.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>VAT Amount:</span><span className="tabular-nums">₱{receiptData.vatAmount.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>VAT-Exempt Sales:</span><span className="tabular-nums">₱{receiptData.vatExemptSales.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Zero-Rated Sales:</span><span className="tabular-nums">₱{receiptData.zeroRatedSales.toFixed(2)}</span></div>
-              </div>
-
-              {/* RETURN POLICY NOTICE */}
-              <div className="text-center space-y-1 text-[9px] text-zinc-600 leading-tight pt-1">
-                <p className="font-bold text-zinc-800 uppercase tracking-wide">Exchange & Warranty Policy</p>
-                <p>Shoes may be exchanged within 7 days with original receipt and box in unworn, sellable condition.</p>
-                <p className="font-semibold text-black pt-1">THANK YOU FOR YOUR PATRONAGE!</p>
-              </div>
-
-              {/* BARCODE FOOTER */}
-              <div className="text-center pt-2">
-                <div className="inline-block tracking-widest text-[14px] font-mono text-zinc-800 scale-y-125">
-                  ||| | |||| ||| ||||| || |||| ||| |||
+                <div className="flex justify-between pt-0.5">
+                  <span>Qty of item(s) purchased:</span>
+                  <span>{receiptData.items.reduce((s: number, i: CartItem) => s + i.quantity, 0)}.00</span>
                 </div>
-                <p className="text-[9px] text-zinc-500 font-mono mt-1">*{receiptData.receiptNumber}*</p>
               </div>
+
+              {/* ── VAT SUMMARY ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center font-bold text-[11px] mb-0.5">VAT SUMMARY</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between"><span>Vatable Amt(V):</span><span className="tabular-nums">{receiptData.vatableSales.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Vat Amt(V +12%):</span><span className="tabular-nums">{receiptData.vatAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Vat Exempted Sale(E):</span><span className="tabular-nums">{receiptData.vatExemptSales.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Zero Rated Amt(Z):</span><span className="tabular-nums">{receiptData.zeroRatedSales.toFixed(2)}</span></div>
+              </div>
+
+              {/* ── CUSTOMER COPY ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center font-bold text-[11px]">Customer Copy</p>
+
+              {/* ── QR CODE ── */}
+              <div className="flex justify-center pt-2 pb-1">
+                <QRCodeSVG
+                  value={receiptData.rawSalesId || receiptData.receiptNumber}
+                  size={80}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
+              </div>
+              <p className="text-center text-[9px] font-mono">*{receiptData.receiptNumber}*</p>
+
+              {/* ── FOOTER ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center text-[10px] font-bold tracking-wide">THIS SERVES AS YOUR</p>
+              <p className="text-center text-[10px] font-bold tracking-wide">OFFICIAL RECEIPT</p>
             </div>
           )}
 
