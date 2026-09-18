@@ -2387,7 +2387,11 @@ export function ReturnManagement() {
           </DialogHeader>
 
           {printExchangeSlip && (
-            <div id="printable-exchange-slip" className="bg-white text-black p-5 rounded border border-zinc-300 font-mono text-[11px] leading-[1.4] w-[302px] mx-auto">
+            <div
+              id="printable-exchange-slip"
+              style={{ backgroundColor: "#ffffff", color: "#000000" }}
+              className="p-5 rounded border border-zinc-200 shadow-2xl font-mono text-[11px] leading-[1.4] w-[302px] mx-auto"
+            >
               {/* ── STORE HEADER ── */}
               <div className="text-center mb-1">
                 <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>

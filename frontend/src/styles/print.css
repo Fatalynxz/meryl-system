@@ -1,8 +1,30 @@
 /* ==========================================================================
-   THERMAL RECEIPT PRINT STYLES
-   Target: 80mm (3.15in) thermal receipt printers
+   THERMAL RECEIPT STYLES
+   - High-contrast white paper preview on screen (overriding dark mode)
+   - Target: 80mm (3.15in) thermal receipt printers on print
    ========================================================================== */
 
+/* SCREEN PREVIEW: Force authentic crisp white paper & dark ink */
+#printable-receipt,
+#printable-exchange-slip {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  box-sizing: border-box;
+}
+
+#printable-receipt *,
+#printable-exchange-slip * {
+  color: #000000 !important;
+}
+
+#printable-receipt svg,
+#printable-exchange-slip svg {
+  background-color: #ffffff !important;
+}
+
+/* ==========================================================================
+   PRINT MEDIA RULES
+   ========================================================================== */
 @media print {
   /* Hide everything except the printable receipt / exchange slip */
   body * {
@@ -25,8 +47,8 @@
     max-width: 80mm !important;
     margin: 0 !important;
     padding: 2mm 3mm !important;
-    background: #fff !important;
-    color: #000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
@@ -52,7 +74,7 @@
     margin: 0;
   }
 
-  /* Ensure QR code prints */
+  /* Ensure QR code prints with pure solid contrast */
   #printable-receipt svg,
   #printable-exchange-slip svg {
     visibility: visible !important;
@@ -60,4 +82,3 @@
     -webkit-print-color-adjust: exact;
   }
 }
-
