@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "./ui/badge";
 import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera, Calendar, Package, TrendingUp, Users } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
+import jsQR from "jsqr";
 import { toast } from "sonner";
 import { useAuth } from "../../lib/auth-context";
 import { useInventory, useProducts, useReturns, useSales, useUsers } from "../../lib/hooks";
@@ -208,6 +209,87 @@ function formatReceiptNumber(salesId?: string, transactionDate?: string) {
   if (salesId.startsWith("RCP-") || salesId.startsWith("INV-") || salesId.startsWith("SAL-")) return salesId;
   const cleanSuffix = salesId.replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase();
   return `RCP-${dateStr}-${cleanSuffix}`;
+}
+
+async function decodeQrFromImageFile(file: File): Promise<string | null> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (!ctx) return resolve(null);
+
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0);
+
+          // Pass 1: Full image
+          const fullData = ctx.getImageData(0, 0, w, h);
+          let code = jsQR(fullData.data, w, h, { inversionAttempts: "dontInvert" });
+          if (code?.data) return resolve(code.data.trim());
+
+          code = jsQR(fullData.data, w, h, { inversionAttempts: "onlyInvert" });
+          if (code?.data) return resolve(code.data.trim());
+
+          // Pass 2: Bottom half crop (receipt QR codes are located at the bottom of the receipt)
+          const bottomY = Math.floor(h * 0.45);
+          const cropH = h - bottomY;
+          const cropCanvas = document.createElement("canvas");
+          cropCanvas.width = w;
+          cropCanvas.height = cropH;
+          const cropCtx = cropCanvas.getContext("2d", { willReadFrequently: true });
+          if (cropCtx) {
+            cropCtx.drawImage(canvas, 0, bottomY, w, cropH, 0, 0, w, cropH);
+            const bottomData = cropCtx.getImageData(0, 0, w, cropH);
+            code = jsQR(bottomData.data, w, cropH, { inversionAttempts: "attemptBoth" });
+            if (code?.data) return resolve(code.data.trim());
+
+            // Pass 3: Bottom 30% crop (tight zoom on footer)
+            const bottom30Y = Math.floor(h * 0.7);
+            const crop30H = h - bottom30Y;
+            const crop30Canvas = document.createElement("canvas");
+            crop30Canvas.width = w;
+            crop30Canvas.height = crop30H;
+            const crop30Ctx = crop30Canvas.getContext("2d", { willReadFrequently: true });
+            if (crop30Ctx) {
+              crop30Ctx.drawImage(canvas, 0, bottom30Y, w, crop30H, 0, 0, w, crop30H);
+              const data30 = crop30Ctx.getImageData(0, 0, w, crop30H);
+              code = jsQR(data30.data, w, crop30H, { inversionAttempts: "attemptBoth" });
+              if (code?.data) return resolve(code.data.trim());
+            }
+          }
+
+          // Pass 4: Scaled down (in case photo is from high-megapixel phone)
+          if (w > 1200 || h > 1600) {
+            const scale = Math.min(800 / w, 1200 / h);
+            const scaledCanvas = document.createElement("canvas");
+            scaledCanvas.width = Math.floor(w * scale);
+            scaledCanvas.height = Math.floor(h * scale);
+            const scaledCtx = scaledCanvas.getContext("2d", { willReadFrequently: true });
+            if (scaledCtx) {
+              scaledCtx.drawImage(img, 0, 0, scaledCanvas.width, scaledCanvas.height);
+              const scaledData = scaledCtx.getImageData(0, 0, scaledCanvas.width, scaledCanvas.height);
+              code = jsQR(scaledData.data, scaledCanvas.width, scaledCanvas.height, { inversionAttempts: "attemptBoth" });
+              if (code?.data) return resolve(code.data.trim());
+            }
+          }
+
+          resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = String(reader.result ?? "");
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
 }
 
 async function tryUpdateById(table: string, idColumn: string, id: string, payloads: Record<string, any>[]) {
@@ -573,19 +655,30 @@ export function ReturnManagement() {
   };
 
   const validateReceiptNumber = (queryToValidate?: string) => {
-    const rawQuery = (queryToValidate ?? receiptNumberInput).trim();
+    let rawQuery = (queryToValidate ?? receiptNumberInput).trim();
     if (!rawQuery) {
       toast.error("Please enter a receipt number to validate.");
       return;
     }
 
-    const q = rawQuery.toLowerCase();
-    const cleanDigits = q.replace(/\D/g, "");
+    // Unpack possible JSON encoded QR payloads (e.g. {"sales_id":"..."})
+    try {
+      if (rawQuery.startsWith("{") && rawQuery.endsWith("}")) {
+        const parsed = JSON.parse(rawQuery);
+        rawQuery = parsed.sales_id || parsed.id || parsed.receiptNumber || parsed.receipt || rawQuery;
+      }
+    } catch {}
 
-    // 1. Search in all sales (by Sales ID, Display ID, Official Receipt Number, or Suffix)
+    // Strip out enclosing asterisks (e.g. *RCP-20260501-C425*) or quotes
+    const cleanQuery = rawQuery.replace(/^[\*"'`\s]+|[\*"'`\s]+$/g, "").trim();
+    const q = cleanQuery.toLowerCase();
+    const cleanDigits = q.replace(/\D/g, "");
+    const qLastFour = q.replace(/[^a-z0-9]/g, "").slice(-4);
+
+    // 1. Search in all sales (by Sales ID UUID, Display ID RCP-xxx, Official Receipt Number, or Suffix)
     const matchedSale = sales.find((s: any) => {
-      const displayId = (salesDisplayMap.get(String(s.sales_id ?? "")) ?? "").toLowerCase();
       const saleId = String(s.sales_id ?? "").toLowerCase();
+      const displayId = (salesDisplayMap.get(String(s.sales_id ?? "")) ?? "").toLowerCase();
       const rcpNum = formatReceiptNumber(s.sales_id, s.transaction_date).toLowerCase();
       const lastFour = saleId.replace(/[^a-z0-9]/g, "").slice(-4);
       const displayDigits = displayId.replace(/\D/g, "");
@@ -597,9 +690,11 @@ export function ReturnManagement() {
         displayId.includes(q) ||
         saleId.includes(q) ||
         rcpNum.includes(q) ||
-        (cleanDigits.length > 0 && displayDigits === cleanDigits) ||
-        (q.startsWith("rcp-") && q.endsWith(lastFour)) ||
-        (lastFour.length === 4 && q.includes(lastFour))
+        q.includes(saleId) ||
+        q.includes(displayId) ||
+        q.includes(rcpNum) ||
+        (lastFour.length === 4 && (qLastFour === lastFour || q.endsWith(lastFour) || q.includes(lastFour))) ||
+        (cleanDigits.length > 0 && (displayDigits === cleanDigits || cleanDigits.endsWith(displayDigits) || saleId.includes(cleanDigits)))
       );
     });
 
@@ -697,40 +792,83 @@ export function ReturnManagement() {
       const initScanner = async () => {
         try {
           qrScanner = new Html5Qrcode("receipt-qr-reader");
-          await qrScanner.start(
-            { facingMode: "environment" },
-            {
-              fps: 10,
-              aspectRatio: 1.0,
-              qrbox: { width: 220, height: 220 },
-            },
-            (decodedText) => {
-              if (isMounted) {
-                const clean = decodedText.trim();
-                setIsQrScannerOpen(false);
-                setReceiptNumberInput(clean);
-                setValidatedViaQr(true);
-                validateReceiptNumber(clean);
-                toast.success(`Receipt QR Code scanned successfully!`);
-              }
-            },
-            () => {}
-          );
-          if (isMounted) setCameraLoading(false);
+
+          // Auto-detect cameras: prefer rear on mobile, webcam on desktop/laptop
+          let cameraConfig: any = { facingMode: "environment" };
+          try {
+            const cameras = await Html5Qrcode.getCameras();
+            if (cameras && cameras.length > 0) {
+              const rearCamera = cameras.find((c) => /back|rear|environment|world/i.test(c.label));
+              cameraConfig = rearCamera ? rearCamera.id : cameras[0].id;
+            }
+          } catch {
+            cameraConfig = { facingMode: { ideal: "environment" } };
+          }
+
+          const qrBoxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrboxSize = Math.floor(minEdge * 0.85);
+            return {
+              width: Math.max(180, qrboxSize),
+              height: Math.max(180, qrboxSize),
+            };
+          };
+
+          try {
+            await qrScanner.start(
+              cameraConfig,
+              { fps: 15, qrbox: qrBoxFunction },
+              (decodedText) => {
+                if (isMounted) {
+                  const clean = decodedText.trim();
+                  setIsQrScannerOpen(false);
+                  setReceiptNumberInput(clean);
+                  setValidatedViaQr(true);
+                  validateReceiptNumber(clean);
+                  toast.success(`Receipt QR Code scanned successfully!`);
+                }
+              },
+              () => {}
+            );
+            if (isMounted) setCameraLoading(false);
+            return;
+          } catch (primaryStartErr) {
+            // Fallback for laptops/desktops where environment constraint throws OverconstrainedError
+            console.warn("Primary camera start failed, trying front webcam fallback:", primaryStartErr);
+            if (isMounted && qrScanner) {
+              await qrScanner.start(
+                { facingMode: "user" },
+                { fps: 15, qrbox: qrBoxFunction },
+                (decodedText) => {
+                  if (isMounted) {
+                    const clean = decodedText.trim();
+                    setIsQrScannerOpen(false);
+                    setReceiptNumberInput(clean);
+                    setValidatedViaQr(true);
+                    validateReceiptNumber(clean);
+                    toast.success(`Receipt QR Code scanned successfully!`);
+                  }
+                },
+                () => {}
+              );
+              if (isMounted) setCameraLoading(false);
+              return;
+            }
+          }
         } catch (err: any) {
           if (isMounted) {
             setCameraLoading(false);
             console.warn("Camera QR Scanner error:", err);
             setQrScanError(
-              err?.message?.includes("Permission") || err?.name === "NotAllowedError"
-                ? "Camera permission was denied. Please enable camera permissions in your browser or upload a photo of the receipt QR code below."
-                : "Unable to access camera directly. You can still upload or drag a photo of the receipt QR code below."
+              err?.name === "NotAllowedError" || String(err?.message ?? "").toLowerCase().includes("permission")
+                ? "Camera permission was denied. Please allow camera permissions in your browser or upload a photo of the receipt below."
+                : "Unable to access camera directly. You can upload or drag a photo of the receipt QR code below."
             );
           }
         }
       };
 
-      const timer = setTimeout(initScanner, 250);
+      const timer = setTimeout(initScanner, 200);
       return () => {
         isMounted = false;
         clearTimeout(timer);
@@ -745,16 +883,38 @@ export function ReturnManagement() {
 
   const handleScanQrFromFile = async (file: File) => {
     try {
-      const html5QrCode = new Html5Qrcode("receipt-file-qr-temp");
-      const decodedText = await html5QrCode.scanFile(file, true);
-      const clean = decodedText.trim();
-      setIsQrScannerOpen(false);
-      setReceiptNumberInput(clean);
-      setValidatedViaQr(true);
-      validateReceiptNumber(clean);
-      toast.success(`Receipt QR Code scanned from image!`);
+      // 1. High-speed multi-pass canvas decoder with jsQR
+      const decodedText = await decodeQrFromImageFile(file);
+      if (decodedText) {
+        const clean = decodedText.trim();
+        setIsQrScannerOpen(false);
+        setReceiptNumberInput(clean);
+        setValidatedViaQr(true);
+        validateReceiptNumber(clean);
+        toast.success(`Receipt QR Code decoded successfully from image!`);
+        return;
+      }
+
+      // 2. Secondary fallback via Html5Qrcode without DOM rendering
+      try {
+        const html5QrCode = new Html5Qrcode("receipt-file-qr-temp");
+        const fallbackText = await html5QrCode.scanFile(file, false);
+        if (fallbackText) {
+          const clean = fallbackText.trim();
+          setIsQrScannerOpen(false);
+          setReceiptNumberInput(clean);
+          setValidatedViaQr(true);
+          validateReceiptNumber(clean);
+          toast.success(`Receipt QR Code decoded successfully from image!`);
+          return;
+        }
+      } catch {
+        // Fallback failed
+      }
+
+      toast.error("Could not detect a QR code in this receipt image. Please ensure the QR code at the bottom is clear and visible.");
     } catch (err) {
-      toast.error("Could not detect a valid QR code in this image. Please ensure the QR code is clearly visible.");
+      toast.error("Could not process receipt image. Please try another photo.");
     }
   };
 
@@ -1058,20 +1218,34 @@ export function ReturnManagement() {
     ]);
   };
 
-  const handleReceiptProofChange = (file?: File | null) => {
+  const handleReceiptProofChange = async (file?: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Upload a receipt photo or image file.");
       return;
     }
-    if (file.size > 6 * 1024 * 1024) {
-      toast.error("Receipt photo must be 6MB or smaller.");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Receipt photo must be 10MB or smaller.");
       return;
     }
     setReceiptProofFile(file);
     const reader = new FileReader();
     reader.onload = () => setReceiptProofPreview(String(reader.result ?? ""));
     reader.readAsDataURL(file);
+
+    // Auto-detect and validate receipt from uploaded proof photo
+    try {
+      const detectedText = await decodeQrFromImageFile(file);
+      if (detectedText) {
+        const clean = detectedText.trim();
+        setReceiptNumberInput(clean);
+        setValidatedViaQr(true);
+        validateReceiptNumber(clean);
+        toast.success("Receipt QR Code detected & verified from uploaded photo!");
+      }
+    } catch {
+      // Non-blocking: user can still use manual verify or scan button
+    }
   };
 
   const clearReceiptProof = () => {
@@ -1805,16 +1979,29 @@ export function ReturnManagement() {
                             onClick={() => setIsQrScannerOpen(true)}
                             className="h-11 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-yellow-400/40 text-yellow-300 font-bold px-4 flex items-center justify-center gap-2 shadow transition"
                           >
-                            <QrCode className="w-4 h-4 text-yellow-400" />
-                            <span>Scan QR Code</span>
+                            <Camera className="w-4 h-4 text-yellow-400" />
+                            <span>Scan Camera</span>
                           </Button>
+                          <label className="h-11 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-yellow-400/40 text-yellow-300 font-bold px-4 flex items-center justify-center gap-2 shadow transition cursor-pointer">
+                            <Upload className="w-4 h-4 text-yellow-400" />
+                            <span>Upload QR Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleScanQrFromFile(file);
+                              }}
+                            />
+                          </label>
                           <Button
                             type="button"
                             onClick={() => validateReceiptNumber()}
                             className="h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] px-5 text-[#15151B] font-bold shadow-md flex items-center justify-center gap-2"
                           >
                             <ShieldCheck className="w-4 h-4 text-[#15151B]" />
-                            <span>Verify Receipt</span>
+                            <span>Verify</span>
                           </Button>
                         </div>
                       </div>
