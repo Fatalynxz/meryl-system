@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Calendar, Eye, Receipt, RotateCcw, Search, ShoppingCart, Users } from "lucide-react";
+import { Calendar, Eye, Package, Receipt, RotateCcw, Search, ShoppingCart, TrendingUp, Users } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
 import { toast } from "sonner";
@@ -86,7 +86,7 @@ export function SalesManagement() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCashier, setSelectedCashier] = useState("all");
-  const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "custom">("all");
+  const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "quarter" | "year" | "custom">("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [viewingSale, setViewingSale] = useState<any | null>(null);
@@ -348,7 +348,7 @@ export function SalesManagement() {
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [usersQuery.data, visibleSales]);
 
-  const applyDatePreset = (preset: "all" | "today" | "week" | "month" | "custom") => {
+  const applyDatePreset = (preset: "all" | "today" | "week" | "month" | "quarter" | "year" | "custom") => {
     setDatePreset(preset);
     const now = new Date();
     const formatYMD = (d: Date) => {
@@ -372,6 +372,15 @@ export function SalesManagement() {
     } else if (preset === "month") {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       setStartDate(formatYMD(firstDay));
+      setEndDate(formatYMD(now));
+    } else if (preset === "quarter") {
+      const currentQuarterMonth = Math.floor(now.getMonth() / 3) * 3;
+      const firstDayOfQuarter = new Date(now.getFullYear(), currentQuarterMonth, 1);
+      setStartDate(formatYMD(firstDayOfQuarter));
+      setEndDate(formatYMD(now));
+    } else if (preset === "year") {
+      const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+      setStartDate(formatYMD(firstDayOfYear));
       setEndDate(formatYMD(now));
     }
   };
@@ -443,6 +452,39 @@ export function SalesManagement() {
     () => filteredCompletedSales.reduce((sum, sale) => sum + sale.total_amount, 0),
     [filteredCompletedSales]
   );
+  const filteredTotalItemsSold = useMemo(() => {
+    return filteredCompletedSales.reduce((sum, sale) => {
+      const details = Array.isArray(sale.saleDetails) ? sale.saleDetails : [];
+      return sum + details.reduce((dSum: number, item: any) => dSum + Number(item.quantity ?? 0), 0);
+    }, 0);
+  }, [filteredCompletedSales]);
+  const filteredAverageOrderValue = useMemo(() => {
+    if (filteredCompletedSales.length === 0) return 0;
+    return filteredRevenue / filteredCompletedSales.length;
+  }, [filteredRevenue, filteredCompletedSales.length]);
+
+  const periodBadgeText = useMemo(() => {
+    switch (datePreset) {
+      case "today":
+        return "Daily (Today)";
+      case "week":
+        return "Weekly (7 Days)";
+      case "month":
+        return "Monthly (This Month)";
+      case "quarter":
+        return "Quarterly (This Qtr)";
+      case "year":
+        return "Annually (This Year)";
+      case "custom":
+        if (startDate && endDate) return `${startDate} to ${endDate}`;
+        if (startDate) return `From ${startDate}`;
+        if (endDate) return `Until ${endDate}`;
+        return "Custom Range";
+      case "all":
+      default:
+        return "All Time";
+    }
+  }, [datePreset, startDate, endDate]);
 
   const replacementLabelBySaleId = useMemo(() => {
     const map = new Map<string, "Fully Replaced" | "Partially Replaced" | "Not Replaced">();
@@ -502,36 +544,106 @@ export function SalesManagement() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-[#15151D] border-[#24242F] shadow-xl rounded-2xl">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+      {/* DYNAMIC METRIC KEYCARDS: Dynamically recalculated based on active period & filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1: Revenue */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Total Revenue</p>
-                <p className="text-2xl font-bold text-white tracking-tight mt-1">₱{totalRevenue.toFixed(2)}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Revenue</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
+                    {periodBadgeText}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
+                  ₱{filteredRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {filteredCompletedSales.length} completed sale{filteredCompletedSales.length === 1 ? "" : "s"}
+                </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400">
-                <ShoppingCart className="h-6 w-6" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <ShoppingCart className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-[#15151D] border-[#24242F] shadow-xl rounded-2xl">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+
+        {/* Card 2: Orders / Transactions */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Today's Sales</p>
-                <p className="text-2xl font-bold text-white tracking-tight mt-1">{todaySales.length}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Orders</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
+                    {periodBadgeText}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
+                  {filteredSales.length}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {filteredCompletedSales.length} completed{filteredSales.length > filteredCompletedSales.length ? ` • ${filteredSales.length - filteredCompletedSales.length} other` : ""}
+                </p>
               </div>
-              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400">
-                <Calendar className="h-6 w-6" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <Calendar className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Average Order Value */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Avg Order Value</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
+                    {periodBadgeText}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
+                  ₱{filteredAverageOrderValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">Per completed order</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Items Sold */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Items Sold</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
+                    {periodBadgeText}
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
+                  {filteredTotalItemsSold}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">Total units sold</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <Package className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="bg-[#15151D] border-[#24242F] shadow-xl rounded-2xl">
+      <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
         <CardHeader className="border-b border-[#24242F] pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <CardTitle className="text-white flex items-center gap-2 text-lg font-bold">
@@ -553,12 +665,12 @@ export function SalesManagement() {
         <CardContent className="space-y-4 pt-4">
           {/* FILTER CONTROLS BAR: Search, Cashier Filter, Date Range Presets & Pickers */}
           <div className="space-y-3 bg-[#12121A] p-3.5 rounded-xl border border-[#24242F]">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
               {/* Box 1: Search Bar */}
-              <div className="relative lg:col-span-5">
+              <div className="relative flex-1 min-w-[240px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400 pointer-events-none" />
                 <Input
-                  placeholder="Search by sales ID, customer, product..."
+                  placeholder="Search by receipt #, customer, product..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 bg-[#181824] border-[#282836] text-white placeholder:text-zinc-500 text-sm focus-visible:ring-yellow-400/40 rounded-xl"
@@ -566,7 +678,7 @@ export function SalesManagement() {
               </div>
 
               {/* Box 2: Cashier & Staff Dropdown Filter */}
-              <div className="lg:col-span-4">
+              <div className="w-full xl:w-64 shrink-0">
                 <Select value={selectedCashier} onValueChange={setSelectedCashier}>
                   <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
                     <div className="flex items-center gap-2 truncate">
@@ -585,17 +697,17 @@ export function SalesManagement() {
                 </Select>
               </div>
 
-              {/* Day / Week / Month Quick Isolation Presets */}
-              <div className="lg:col-span-3 flex items-center justify-between lg:justify-end gap-1.5 flex-wrap">
-                <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs">
+              {/* Presets: All, Daily, Weekly, Monthly, Quarterly, Annually */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs flex-wrap">
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
                     onClick={() => applyDatePreset("all")}
-                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
                       datePreset === "all"
-                        ? "bg-yellow-400 text-black font-bold shadow"
+                        ? "bg-yellow-400 text-black font-bold"
                         : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
@@ -606,39 +718,65 @@ export function SalesManagement() {
                     size="sm"
                     variant="ghost"
                     onClick={() => applyDatePreset("today")}
-                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
                       datePreset === "today"
-                        ? "bg-yellow-400 text-black font-bold shadow"
+                        ? "bg-yellow-400 text-black font-bold"
                         : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    Today
+                    Daily
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
                     onClick={() => applyDatePreset("week")}
-                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
                       datePreset === "week"
-                        ? "bg-yellow-400 text-black font-bold shadow"
+                        ? "bg-yellow-400 text-black font-bold"
                         : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    Week
+                    Weekly
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
                     onClick={() => applyDatePreset("month")}
-                    className={`h-7 px-2 text-xs rounded-md transition-all ${
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
                       datePreset === "month"
-                        ? "bg-yellow-400 text-black font-bold shadow"
+                        ? "bg-yellow-400 text-black font-bold"
                         : "text-zinc-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    Month
+                    Monthly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("quarter")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "quarter"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Quarterly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("year")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "year"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Annually
                   </Button>
                 </div>
 
@@ -695,7 +833,7 @@ export function SalesManagement() {
             <Table className="w-full min-w-[860px]">
               <TableHeader>
                 <TableRow className="bg-[#181824] hover:bg-[#181824] border-b border-[#24242F]">
-                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Sales ID</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Receipt #</TableHead>
                   {isAdmin && <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Cashier</TableHead>}
                   <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Customer</TableHead>
                   <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Amount</TableHead>
@@ -803,7 +941,7 @@ export function SalesManagement() {
                                   type="button"
                                   size="sm"
                                   onClick={() => openReceiptForSale(sale)}
-                                  className="bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] font-bold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 shadow"
+                                  className="bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] font-bold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 transition-colors"
                                 >
                                   <Receipt className="w-3.5 h-3.5" />
                                   <span>View Receipt</span>
@@ -992,17 +1130,6 @@ export function SalesManagement() {
                                       <p className="font-semibold text-zinc-200 mt-0.5">{sale.lastActivityDate}</p>
                                     </div>
                                   </div>
-                                </div>
-
-                                <div className="pt-2 flex justify-end">
-                                  <Button
-                                    type="button"
-                                    onClick={() => openReceiptForSale(sale)}
-                                    className="bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2 shadow"
-                                  >
-                                    <Receipt className="w-4 h-4" />
-                                    <span>View &amp; Print Official Receipt</span>
-                                  </Button>
                                 </div>
                               </div>
                             );
