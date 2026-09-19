@@ -9,12 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
-import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck } from "lucide-react";
+import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
 import { toast } from "sonner";
 import { useAuth } from "../../lib/auth-context";
 import { useInventory, useProducts, useReturns, useSales } from "../../lib/hooks";
 import { supabase } from "../../lib/supabase";
 import { saveReceiptProof, getAllReceiptProofs, StoredReceiptProof } from "../../lib/receipt-proof-store";
+import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
 
 type ReturnDetail = {
   return_detail_id: string;
@@ -288,6 +290,10 @@ export function ReturnManagement() {
   const [showManualSaleList, setShowManualSaleList] = useState(false);
   const [printExchangeSlip, setPrintExchangeSlip] = useState<ReturnRow | null>(null);
   const [storedReceiptsMap, setStoredReceiptsMap] = useState<Map<string, StoredReceiptProof>>(new Map());
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [validatedViaQr, setValidatedViaQr] = useState(false);
+  const [qrScanError, setQrScanError] = useState<string | null>(null);
+  const [cameraLoading, setCameraLoading] = useState(false);
 
   useEffect(() => {
     getAllReceiptProofs().then((map) => {
@@ -671,6 +677,77 @@ export function ReturnManagement() {
       toast.warning(`Receipt ${receiptDisplay} exceeds 7-day policy (${daysAgo} days ago).`);
     } else {
       toast.success(`Receipt ${receiptDisplay} verified successfully!`);
+    }
+  };
+
+  useEffect(() => {
+    let qrScanner: Html5Qrcode | null = null;
+    let isMounted = true;
+
+    if (isQrScannerOpen) {
+      setQrScanError(null);
+      setCameraLoading(true);
+
+      const initScanner = async () => {
+        try {
+          qrScanner = new Html5Qrcode("receipt-qr-reader");
+          await qrScanner.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 220, height: 220 },
+            },
+            (decodedText) => {
+              if (isMounted) {
+                const clean = decodedText.trim();
+                setIsQrScannerOpen(false);
+                setReceiptNumberInput(clean);
+                setValidatedViaQr(true);
+                validateReceiptNumber(clean);
+                toast.success(`Receipt QR Code scanned successfully!`);
+              }
+            },
+            () => {}
+          );
+          if (isMounted) setCameraLoading(false);
+        } catch (err: any) {
+          if (isMounted) {
+            setCameraLoading(false);
+            console.warn("Camera QR Scanner error:", err);
+            setQrScanError(
+              err?.message?.includes("Permission") || err?.name === "NotAllowedError"
+                ? "Camera permission was denied. Please enable camera permissions in your browser or upload a photo of the receipt QR code below."
+                : "Unable to access camera directly. You can still upload or drag a photo of the receipt QR code below."
+            );
+          }
+        }
+      };
+
+      const timer = setTimeout(initScanner, 250);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+        if (qrScanner) {
+          qrScanner.stop().catch(() => {}).finally(() => {
+            try { qrScanner?.clear(); } catch {}
+          });
+        }
+      };
+    }
+  }, [isQrScannerOpen]);
+
+  const handleScanQrFromFile = async (file: File) => {
+    try {
+      const html5QrCode = new Html5Qrcode("receipt-file-qr-temp");
+      const decodedText = await html5QrCode.scanFile(file, true);
+      const clean = decodedText.trim();
+      setIsQrScannerOpen(false);
+      setReceiptNumberInput(clean);
+      setValidatedViaQr(true);
+      validateReceiptNumber(clean);
+      toast.success(`Receipt QR Code scanned from image!`);
+    } catch (err) {
+      toast.error("Could not detect a valid QR code in this image. Please ensure the QR code is clearly visible.");
     }
   };
 
@@ -1502,32 +1579,51 @@ export function ReturnManagement() {
                     <div className="space-y-3 rounded-xl border border-zinc-800 p-4 bg-zinc-950">
                       {/* Receipt Number Validation Bar */}
                       <div className="space-y-1.5">
-                        <p className="text-xs text-zinc-300">
-                          Enter or scan the Receipt # (e.g. <span className="font-semibold text-yellow-300">SALES-001</span> or <span className="font-semibold text-yellow-300">RCP-...</span>) to verify purchase validity:
-                        </p>
-                        <div className="flex gap-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-zinc-300">
+                            Scan the receipt QR code or enter Receipt # (<span className="font-semibold text-yellow-300">SALES-001</span> or <span className="font-semibold text-yellow-300">RCP-...</span>):
+                          </p>
+                          {validatedViaQr && (
+                            <Badge className="bg-sky-500/20 text-sky-300 border-sky-400/40 text-[10px] flex items-center gap-1">
+                              <QrCode className="w-3 h-3 text-sky-400" />
+                              QR Verified
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <div className="relative flex-1">
                             <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400/80" />
                             <Input
                               value={receiptNumberInput}
-                              onChange={(event) => setReceiptNumberInput(event.target.value)}
+                              onChange={(event) => {
+                                setReceiptNumberInput(event.target.value);
+                                setValidatedViaQr(false);
+                              }}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") {
                                   event.preventDefault();
                                   validateReceiptNumber();
                                 }
                               }}
-                              placeholder="Enter Receipt Number (e.g. SALES-001)..."
+                              placeholder="Scan QR or enter Receipt # (e.g. RCP-20260918-XXXX or SALES-001)..."
                               className="h-11 rounded-xl pl-10 bg-[#1D1D25] border-zinc-700 text-white placeholder:text-zinc-500 focus-visible:ring-[#FFD60A]/40 font-medium"
                             />
                           </div>
                           <Button
                             type="button"
+                            onClick={() => setIsQrScannerOpen(true)}
+                            className="h-11 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-yellow-400/40 text-yellow-300 font-bold px-4 flex items-center justify-center gap-2 shadow transition"
+                          >
+                            <QrCode className="w-4 h-4 text-yellow-400" />
+                            <span>Scan QR Code</span>
+                          </Button>
+                          <Button
+                            type="button"
                             onClick={() => validateReceiptNumber()}
-                            className="h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] px-5 text-[#15151B] font-bold shadow-md flex items-center gap-2"
+                            className="h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] px-5 text-[#15151B] font-bold shadow-md flex items-center justify-center gap-2"
                           >
                             <ShieldCheck className="w-4 h-4 text-[#15151B]" />
-                            Verify Receipt
+                            <span>Verify Receipt</span>
                           </Button>
                         </div>
                       </div>
@@ -1542,9 +1638,17 @@ export function ReturnManagement() {
                                 Valid Receipt Verified — {receiptValidationStatus.displayId}
                               </span>
                             </div>
-                            <Badge className="bg-emerald-500/20 text-emerald-200 border-emerald-400/40 text-[11px]">
-                              Within 7-Day Window
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              {validatedViaQr && (
+                                <Badge className="bg-sky-500/20 text-sky-300 border-sky-400/40 text-[11px] flex items-center gap-1">
+                                  <QrCode className="w-3 h-3 text-sky-400" />
+                                  Scanned via QR
+                                </Badge>
+                              )}
+                              <Badge className="bg-emerald-500/20 text-emerald-200 border-emerald-400/40 text-[11px]">
+                                Within 7-Day Window
+                              </Badge>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-emerald-500/20">
                             <div>
@@ -1581,9 +1685,17 @@ export function ReturnManagement() {
                                 Policy Notice — {receiptValidationStatus.displayId}
                               </span>
                             </div>
-                            <Badge className="bg-amber-500/20 text-amber-200 border-amber-400/40 text-[11px]">
-                              {receiptValidationStatus.daysAgo} Days Ago (&gt;7 Days)
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              {validatedViaQr && (
+                                <Badge className="bg-sky-500/20 text-sky-300 border-sky-400/40 text-[11px] flex items-center gap-1">
+                                  <QrCode className="w-3 h-3 text-sky-400" />
+                                  Scanned via QR
+                                </Badge>
+                              )}
+                              <Badge className="bg-amber-500/20 text-amber-200 border-amber-400/40 text-[11px]">
+                                {receiptValidationStatus.daysAgo} Days Ago (&gt;7 Days)
+                              </Badge>
+                            </div>
                           </div>
                           <p className="text-xs text-amber-200/90">
                             {receiptValidationStatus.message} Transaction loaded; replacement permitted with manager/admin discretion.
@@ -2394,6 +2506,12 @@ export function ReturnManagement() {
             >
               {/* ── STORE HEADER ── */}
               <div className="text-center mb-1">
+                <img
+                  src={merylLogoBw}
+                  alt="Meryl Shoes Logo"
+                  className="h-9 mx-auto mb-1 object-contain"
+                  style={{ filter: "brightness(0)" }}
+                />
                 <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>
                 <p className="text-[10px]">Official Retailer &amp; Shoe Center</p>
                 <p className="text-[10px]">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
@@ -2501,6 +2619,84 @@ export function ReturnManagement() {
             >
               <Receipt className="w-4 h-4" />
               <span>Print Official Slip</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* RECEIPT QR CODE SCANNER MODAL */}
+      <Dialog open={isQrScannerOpen} onOpenChange={setIsQrScannerOpen}>
+        <DialogContent className="bg-[#12121a] border-[#2d2d3d] text-zinc-100 max-w-md rounded-2xl shadow-2xl p-5">
+          <DialogHeader className="border-b border-[#252536] pb-3 text-left">
+            <DialogTitle className="text-yellow-300 text-base font-bold flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-yellow-400" />
+              Scan Receipt QR Code
+            </DialogTitle>
+            <p className="text-xs text-zinc-400 mt-1">
+              Point your camera at the QR code on the customer&apos;s thermal receipt to instantly verify purchase validity.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            {/* Viewfinder Area */}
+            <div className="relative w-full aspect-square max-w-[320px] mx-auto rounded-2xl overflow-hidden bg-black border-2 border-yellow-400/40 shadow-inner flex items-center justify-center">
+              <div id="receipt-qr-reader" className="w-full h-full" />
+              <div id="receipt-file-qr-temp" className="hidden" />
+
+              {cameraLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 z-10 gap-2">
+                  <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-yellow-300 font-medium">Starting camera...</p>
+                </div>
+              )}
+
+              {qrScanError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#181824] p-4 text-center z-10 gap-3">
+                  <AlertCircle className="w-10 h-10 text-amber-400" />
+                  <p className="text-xs text-zinc-300 leading-relaxed">{qrScanError}</p>
+                </div>
+              )}
+
+              {/* Target Scan Reticle Overlay */}
+              {!qrScanError && !cameraLoading && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="w-48 h-48 border-2 border-dashed border-yellow-400/80 rounded-xl relative">
+                    <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-yellow-400" />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-yellow-400" />
+                    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-yellow-400" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-yellow-400" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Upload alternative */}
+            <div className="text-center pt-2 border-t border-[#252536]">
+              <p className="text-[11px] text-zinc-400 mb-2">Or upload a photo of the receipt QR code:</p>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 px-4 py-2 text-xs font-semibold text-yellow-200 transition">
+                <Upload className="w-3.5 h-3.5 text-yellow-400" />
+                Upload Receipt Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleScanQrFromFile(file);
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-[#252536] pt-3 flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsQrScannerOpen(false)}
+              className="border-[#343444] text-zinc-300 hover:text-white rounded-xl text-xs h-9 px-4"
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

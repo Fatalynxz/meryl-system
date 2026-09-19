@@ -17,6 +17,7 @@ import { getRoleGroup, useAuth } from "../../lib/auth-context";
 import { logAuditEvent } from "../../lib/api/audit-logger";
 import { supabase } from "../../lib/supabase";
 import { cleanProductImageUrl } from "../../lib/image-utils";
+import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
 
 type CartItem = {
   id: string;
@@ -2089,6 +2090,12 @@ function formatReceiptNumber(salesId?: string) {
             >
               {/* ── STORE HEADER ── */}
               <div className="text-center mb-1">
+                <img
+                  src={merylLogoBw}
+                  alt="Meryl Shoes Logo"
+                  className="h-9 mx-auto mb-1 object-contain"
+                  style={{ filter: "brightness(0)" }}
+                />
                 <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>
                 <p className="text-[10px]">Official Retailer &amp; Shoe Center</p>
                 <p className="text-[10px]">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
