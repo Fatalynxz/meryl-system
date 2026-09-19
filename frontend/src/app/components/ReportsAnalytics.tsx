@@ -158,6 +158,111 @@ const darkChartTooltipProps = {
   itemStyle: { color: '#FFFFFF', fontSize: 12, fontWeight: 500 },
 };
 
+function ChartWhiteTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+
+  if (payload.length === 1) {
+    const item = payload[0];
+    const name = String(item.name || item.payload?.name || label || '').trim();
+    const value = item.value;
+    const rawData = item.payload;
+    const color = item.fill || item.color || rawData?.fill || '#facc15';
+
+    let displayVal = '';
+    if (rawData?.share !== undefined && rawData?.revenue !== undefined) {
+      displayVal = `${money(Number(rawData.revenue))} (${rawData.share}%)`;
+    } else if (String(name).toLowerCase().includes('revenue') || String(item.dataKey).toLowerCase().includes('revenue')) {
+      displayVal = money(Number(value));
+    } else if (typeof value === 'number') {
+      displayVal = value.toLocaleString();
+      if (String(item.dataKey).toLowerCase().includes('sales') || String(name).toLowerCase().includes('sold') || String(name).toLowerCase().includes('pairs')) {
+        displayVal += ' pairs';
+      }
+    } else {
+      displayVal = String(value);
+    }
+
+    return (
+      <div
+        style={{
+          backgroundColor: '#12121a',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: '10px',
+          padding: '8px 12px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
+          color: '#FFFFFF',
+          fontSize: '12px',
+          fontWeight: 500,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#FFFFFF' }}>
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: color,
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ color: '#FFFFFF', fontWeight: 600 }}>{name}</span>
+          <span style={{ color: '#A1A1AA' }}>:</span>
+          <span style={{ color: '#FFFFFF', fontWeight: 700 }}>{displayVal}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        backgroundColor: '#12121a',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        borderRadius: '10px',
+        padding: '8px 12px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.85)',
+        color: '#FFFFFF',
+        fontSize: '12px',
+        fontWeight: 500,
+      }}
+    >
+      {label && (
+        <div
+          style={{
+            color: '#FFFFFF',
+            fontWeight: 700,
+            fontSize: '12px',
+            marginBottom: '6px',
+            borderBottom: '1px solid #282838',
+            paddingBottom: '4px',
+          }}
+        >
+          {label}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {payload.map((item: any, idx: number) => {
+          const name = String(item.name || item.dataKey || '').trim();
+          const value = item.value;
+          const color = item.fill || item.color || '#facc15';
+          const isRev = name.toLowerCase().includes('revenue') || String(item.dataKey).toLowerCase().includes('revenue');
+          const displayVal = typeof value === 'number'
+            ? (isRev ? money(value) : `${value.toLocaleString()} pairs`)
+            : value;
+
+          return (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#FFFFFF' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />
+              <span style={{ color: '#FFFFFF', fontWeight: 500 }}>{name}:</span>
+              <span style={{ color: '#FFFFFF', fontWeight: 700 }}>{displayVal}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 type TrendBucketMode = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
 
 function startOfDay(date: Date) {
@@ -3151,10 +3256,7 @@ export function ReportsAnalytics() {
                           <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} />
                           <YAxis yAxisId="left" stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
                           <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" fontSize={11} />
-                          <Tooltip
-                            {...darkChartTooltipProps}
-                            formatter={(val: any, name: string) => [name === 'Revenue (PHP)' ? money(Number(val)) : `${val} pairs`, name]}
-                          />
+                          <Tooltip content={<ChartWhiteTooltip />} />
                           <Legend wrapperStyle={{ fontSize: '11px', color: '#facc15' }} />
                           <Bar yAxisId="left" dataKey="revenue" fill="#facc15" name="Revenue (PHP)" radius={[4, 4, 0, 0]} />
                           <Bar yAxisId="right" dataKey="sales" fill="#38bdf8" name="Pairs Sold" radius={[4, 4, 0, 0]} />
@@ -3263,10 +3365,7 @@ export function ReportsAnalytics() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
                       <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} />
                       <YAxis stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
-                      <Tooltip
-                        {...darkChartTooltipProps}
-                        formatter={(val: any) => [money(Number(val)), 'Revenue']}
-                      />
+                      <Tooltip content={<ChartWhiteTooltip />} />
                       <Bar dataKey="revenue" fill="#facc15" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -3360,10 +3459,7 @@ export function ReportsAnalytics() {
                           <Cell key={entry.name} fill={getDepartmentColor(entry.name)} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        {...darkChartTooltipProps}
-                        formatter={(val: any, name: string) => [money(Number(val)), name]}
-                      />
+                      <Tooltip content={<ChartWhiteTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs text-zinc-300 mt-2">
@@ -3455,10 +3551,7 @@ export function ReportsAnalytics() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
                       <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} label={{ value: 'Size (EU)', position: 'insideBottom', offset: -2, fill: '#71717a', fontSize: 10 }} />
                       <YAxis stroke="#facc15" fontSize={11} allowDecimals={false} />
-                      <Tooltip
-                        {...darkChartTooltipProps}
-                        formatter={(val: any) => [`${val} pairs sold`, 'Volume']}
-                      />
+                      <Tooltip content={<ChartWhiteTooltip />} />
                       <Bar dataKey="sales" fill="#facc15" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -3526,10 +3619,7 @@ export function ReportsAnalytics() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
                       <XAxis dataKey="name" stroke="#a1a1aa" fontSize={10} />
                       <YAxis stroke="#a855f7" fontSize={11} allowDecimals={false} />
-                      <Tooltip
-                        {...darkChartTooltipProps}
-                        formatter={(val: any) => [`${val} pairs sold`, 'Volume']}
-                      />
+                      <Tooltip content={<ChartWhiteTooltip />} />
                       <Bar dataKey="sales" fill="#a855f7" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -3635,10 +3725,7 @@ export function ReportsAnalytics() {
                             <Cell key={entry.name} fill={getPaymentMethodColor(entry.name)} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          {...darkChartTooltipProps}
-                          formatter={(val: any, name: string) => [money(Number(val)), name]}
-                        />
+                        <Tooltip content={<ChartWhiteTooltip />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
