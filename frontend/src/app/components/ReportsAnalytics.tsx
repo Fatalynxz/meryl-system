@@ -246,6 +246,7 @@ export function ReportsAnalytics() {
   const [sizeFilter, setSizeFilter] = useState('all');
   const [variantFilter, setVariantFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [drilldownSection, setDrilldownSection] = useState<'all' | 'shoe' | 'brands' | 'categories' | 'departments' | 'sizes' | 'variants' | 'payments'>('all');
   const salesQuery = useSales();
   const productsQuery = useProducts();
 
@@ -1331,6 +1332,7 @@ export function ReportsAnalytics() {
       overview: 'Executive Overview Report',
       sales: 'Sales Breakdown Report',
       rankings: 'Top 5 Product Rankings',
+      specific_category_all: 'Specific & Category Performance Report (All-in-One)',
       products: `Shoe Model Report - ${shoeDetailReport?.name || 'All Models'}`,
       brands: `Brand Performance Report - ${brandFilter === 'all' ? 'All Brands' : brandFilter}`,
       categories: `Category Report - ${categoryFilter === 'all' ? 'All Categories' : categoryFilter}`,
@@ -1529,6 +1531,43 @@ export function ReportsAnalytics() {
           drawTable(['Colorway / Style', 'Pairs Sold', 'Revenue'], shoeDetailReport.variantBreakdown.map((v) => [v.color, String(v.pairs), money(v.revenue)]), [220, 145, 150]);
         }
       }
+    } else if (reportType === 'specific_category_all') {
+      drawTitle('Specific Shoe Model Performance');
+      if (shoeDetailReport) {
+        drawTable(['Metric', 'Value'], [
+          ['Selected Shoe Model', shoeDetailReport.name],
+          ['Brand / Category / Dept', `${shoeDetailReport.brand} • ${shoeDetailReport.category} • ${shoeDetailReport.department}`],
+          ['Pairs Sold & Revenue', `${shoeDetailReport.totalPairs} pairs • ${money(shoeDetailReport.totalRevenue)}`],
+          ['Profit & Gross Margin', `${money(shoeDetailReport.profit)} (${shoeDetailReport.margin}% margin)`],
+          ['Current Stock on Hand', `${shoeDetailReport.totalStock} pairs`],
+        ], [200, 315]);
+        drawTitle('Shoe Size Breakdown');
+        drawTable(['Size (EU)', 'Pairs Sold', 'Revenue', 'Stock', 'Status'], shoeDetailReport.sizeBreakdown.map((s) => [s.size, String(s.pairs), money(s.revenue), String(s.stock), s.status]), [70, 90, 140, 105, 110]);
+      }
+
+      ensureSpace(40);
+      drawTitle('Brand Performance Comparison');
+      drawTable(['Rank', 'Brand', 'Pairs Sold', 'Total Revenue', 'Revenue Share', 'Stock'], brandDetailReport.allBrandsList.map((b) => [`#${b.rank}`, b.name, String(b.sales), money(b.revenue), `${b.share}%`, String(b.stock)]), [40, 160, 75, 95, 75, 70]);
+
+      ensureSpace(40);
+      drawTitle('Category Performance');
+      drawTable(['Rank', 'Category', 'Pairs Sold', 'Revenue', 'Revenue Share', 'Avg Price'], categoryDetailReport.allCategoriesList.map((c) => [`#${c.rank}`, c.name, String(c.sales), money(c.revenue), `${c.share}%`, money(c.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+
+      ensureSpace(40);
+      drawTitle('Department Performance');
+      drawTable(['Rank', 'Department', 'Pairs Sold', 'Revenue', 'Revenue Share', 'Avg Price'], departmentDetailReport.allDeptsList.map((d) => [`#${d.rank}`, d.name, String(d.sales), money(d.revenue), `${d.share}%`, money(d.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+
+      ensureSpace(40);
+      drawTitle('Size Distribution Performance');
+      drawTable(['Rank', 'Shoe Size', 'Pairs Sold', 'Revenue', 'Volume Share', 'Avg Price'], sizeDetailReport.allSizesList.map((s) => [`#${s.rank}`, s.name, String(s.sales), money(s.revenue), `${s.unitShare}%`, money(s.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+
+      ensureSpace(40);
+      drawTitle('Variant & Colorway Performance');
+      drawTable(['Rank', 'Variant / Color', 'Pairs Sold', 'Revenue', 'Revenue Share', 'Avg Price'], variantDetailReport.allVariantsList.map((v) => [`#${v.rank}`, v.name, String(v.sales), money(v.revenue), `${v.share}%`, money(v.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+
+      ensureSpace(40);
+      drawTitle('Payment Method Performance');
+      drawTable(['Rank', 'Payment Method', 'Transactions', 'Total Collected', 'Txn Share', 'Revenue Share'], paymentDetailReport.allPaymentsList.map((p) => [`#${p.rank}`, p.name, String(p.count), money(p.revenue), `${p.txnShare}%`, `${p.share}%`]), [40, 150, 80, 95, 75, 75]);
     } else if (reportType === 'brands') {
       if (brandDetailReport.activeBrand !== 'all' && brandDetailReport.selectedBrandData) {
         drawTitle(`Brand Performance: ${brandDetailReport.activeBrand}`);
@@ -1654,6 +1693,7 @@ export function ReportsAnalytics() {
         overview: 'Executive Overview Report',
         sales: 'Sales Breakdown Report',
         rankings: 'Top 5 Product Rankings',
+        specific_category_all: 'Specific & Category Performance Report (All-in-One)',
         products: `Shoe Model Report - ${shoeDetailReport?.name || 'All Models'}`,
         brands: `Brand Performance Report - ${brandFilter === 'all' ? 'All Brands' : brandFilter}`,
         categories: `Category Report - ${categoryFilter === 'all' ? 'All Categories' : categoryFilter}`,
@@ -1801,6 +1841,72 @@ export function ReportsAnalytics() {
           });
           lines.push('');
         }
+      }
+
+      if (reportType === 'specific_category_all') {
+        if (shoeDetailReport) {
+          lines.push(formatRow(['=== SPECIFIC SHOE MODEL PERFORMANCE ===']));
+          lines.push(formatRow(['Model Name', shoeDetailReport.name]));
+          lines.push(formatRow(['Brand', shoeDetailReport.brand]));
+          lines.push(formatRow(['Category', shoeDetailReport.category]));
+          lines.push(formatRow(['Department', shoeDetailReport.department]));
+          lines.push(formatRow(['Retail Price (PHP)', shoeDetailReport.basePrice.toFixed(2)]));
+          lines.push(formatRow(['Cost Price (PHP)', shoeDetailReport.costPrice.toFixed(2)]));
+          lines.push(formatRow(['Gross Margin (%)', `${shoeDetailReport.margin}%`]));
+          lines.push(formatRow(['Total Stock on Hand', shoeDetailReport.totalStock]));
+          lines.push(formatRow(['Pairs Sold in Period', shoeDetailReport.totalPairs]));
+          lines.push(formatRow(['Gross Revenue (PHP)', shoeDetailReport.totalRevenue.toFixed(2)]));
+          lines.push(formatRow(['Estimated Profit (PHP)', shoeDetailReport.profit.toFixed(2)]));
+          lines.push('');
+          lines.push(formatRow(['--- Size Breakdown for this Shoe ---']));
+          lines.push(formatRow(['Size (EU)', 'Pairs Sold', 'Revenue (PHP)', 'In Stock', 'Status']));
+          shoeDetailReport.sizeBreakdown.forEach((s) => {
+            lines.push(formatRow([s.size, s.pairs, s.revenue.toFixed(2), s.stock, s.status]));
+          });
+          lines.push('');
+        }
+
+        lines.push(formatRow(['=== ALL BRANDS PERFORMANCE ===']));
+        lines.push(formatRow(['Rank', 'Brand Name', 'Pairs Sold', 'Gross Revenue (PHP)', 'Revenue Share (%)', 'Profit Margin (%)', 'Avg Price (PHP)', 'Stock on Hand']));
+        brandDetailReport.allBrandsList.forEach((b) => {
+          lines.push(formatRow([`#${b.rank}`, b.name, b.sales, b.revenue.toFixed(2), `${b.share}%`, `${b.margin}%`, b.avgPrice.toFixed(2), b.stock]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== CATEGORY PERFORMANCE REPORT ===']));
+        lines.push(formatRow(['Rank', 'Category', 'Pairs Sold', 'Revenue (PHP)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        categoryDetailReport.allCategoriesList.forEach((c) => {
+          lines.push(formatRow([`#${c.rank}`, c.name, c.sales, c.revenue.toFixed(2), `${c.share}%`, c.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== DEPARTMENT PERFORMANCE REPORT ===']));
+        lines.push(formatRow(['Rank', 'Department', 'Pairs Sold', 'Revenue (PHP)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        departmentDetailReport.allDeptsList.forEach((d) => {
+          lines.push(formatRow([`#${d.rank}`, d.name, d.sales, d.revenue.toFixed(2), `${d.share}%`, d.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== SIZE DISTRIBUTION REPORT ===']));
+        lines.push(formatRow(['Rank', 'Shoe Size', 'Pairs Sold', 'Revenue (PHP)', 'Volume Share (%)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        sizeDetailReport.allSizesList.forEach((s) => {
+          lines.push(formatRow([`#${s.rank}`, s.name, s.sales, s.revenue.toFixed(2), `${s.unitShare}%`, `${s.share}%`, s.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== VARIANT & COLORWAY REPORT ===']));
+        lines.push(formatRow(['Rank', 'Variant / Color', 'Pairs Sold', 'Revenue (PHP)', 'Volume Share (%)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        variantDetailReport.allVariantsList.forEach((v) => {
+          lines.push(formatRow([`#${v.rank}`, v.name, v.sales, v.revenue.toFixed(2), `${v.unitShare}%`, `${v.share}%`, v.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== PAYMENT METHOD REPORT ===']));
+        lines.push(formatRow(['Rank', 'Payment Method', 'Transaction Count', 'Total Collected (PHP)', 'Transaction Share (%)', 'Volume Share (%)', 'Average Ticket (PHP)']));
+        paymentDetailReport.allPaymentsList.forEach((p) => {
+          lines.push(formatRow([`#${p.rank}`, p.name, p.count, p.revenue.toFixed(2), `${p.txnShare}%`, `${p.share}%`, p.avgTx.toFixed(2)]));
+        });
+        lines.push('');
       }
 
       if (reportType === 'brands') {
@@ -1974,21 +2080,27 @@ export function ReportsAnalytics() {
           )}
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-yellow-200/70">Report Type</span>
-            <Select value={reportType} onValueChange={setReportType}>
-              <SelectTrigger className="w-56 bg-[#0b0b0f] border-[#24242d] text-white">
+            <Select
+              value={
+                ['products', 'brands', 'categories', 'departments', 'sizes', 'variants', 'payments', 'specific_category_all'].includes(reportType)
+                  ? 'specific_category_all'
+                  : reportType
+              }
+              onValueChange={(val) => {
+                setReportType(val);
+                if (val === 'specific_category_all') {
+                  setDrilldownSection('all');
+                }
+              }}
+            >
+              <SelectTrigger className="w-64 bg-[#0b0b0f] border-[#24242d] text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#0b0b0f] border-[#24242d] text-white">
                 <SelectItem value="overview">Executive Overview</SelectItem>
                 <SelectItem value="sales">Sales Breakdown Report</SelectItem>
                 <SelectItem value="rankings">Top 5 Product Rankings</SelectItem>
-                <SelectItem value="products">Shoe Model Report</SelectItem>
-                <SelectItem value="brands">Brand Performance Report</SelectItem>
-                <SelectItem value="categories">Category Report</SelectItem>
-                <SelectItem value="departments">Department Report</SelectItem>
-                <SelectItem value="sizes">Size Distribution Report</SelectItem>
-                <SelectItem value="variants">Variant (Color) Report</SelectItem>
-                <SelectItem value="payments">Payment Method Report</SelectItem>
+                <SelectItem value="specific_category_all">Specific & Category Reports (All-in-One)</SelectItem>
                 <SelectItem value="revenue">Revenue by Category Report</SelectItem>
                 <SelectItem value="inventory">Inventory & Stock Report</SelectItem>
               </SelectContent>
@@ -2512,9 +2624,79 @@ export function ReportsAnalytics() {
         </div>
       )}
 
-      {reportType === 'products' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+      {(reportType === 'specific_category_all' ||
+        ['products', 'brands', 'categories', 'departments', 'sizes', 'variants', 'payments'].includes(reportType)) && (
+        <div className="space-y-6">
+          {/* Main Top Header & Filter Pills */}
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl overflow-hidden">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <Layers className="w-5 h-5 text-yellow-400" />
+                    Specific & Category Performance Reports
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Comprehensive shoe models, brand performance, categories, departments, sizes, variants, and payment channels in one page • {selectedRangeLabel}
+                  </p>
+                </div>
+
+                {/* Controls: Timeframe Quick-Pills */}
+                <div className="flex items-center bg-[#151520] border border-[#2b2b3b] rounded-xl p-1 shadow-inner shrink-0">
+                  {(['daily', 'weekly', 'monthly', 'quarterly', 'annually'] as const).map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => setTimeRange(period)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
+                        timeRange === period
+                          ? 'bg-yellow-400 text-red-950 font-bold shadow'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sub-Section Filter / Jump Tabs */}
+              <div className="flex items-center gap-1.5 pt-3 overflow-x-auto [scrollbar-width:none]">
+                {[
+                  { id: 'all', label: 'All In One Page', icon: Layers },
+                  { id: 'shoe', label: 'Shoe Model Drilldown', icon: Package },
+                  { id: 'brands', label: 'Brand Performance', icon: Tag },
+                  { id: 'categories', label: 'Categories', icon: BarChart3 },
+                  { id: 'departments', label: 'Departments', icon: UserCheck },
+                  { id: 'sizes', label: 'Size Distribution', icon: Layers },
+                  { id: 'variants', label: 'Variant (Color)', icon: Sparkles },
+                  { id: 'payments', label: 'Payment Methods', icon: CreditCard },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = drilldownSection === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setDrilldownSection(tab.id as any)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                        isActive
+                          ? 'bg-yellow-400/15 text-yellow-300 border border-yellow-400/40 font-bold'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </CardHeader>
+          </Card>
+
+          {/* SECTION 1: SPECIFIC SHOE DRILLDOWN */}
+          {(drilldownSection === 'all' || drilldownSection === 'shoe') && (
+            <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -2738,12 +2920,11 @@ export function ReportsAnalytics() {
               )}
             </CardContent>
           </Card>
-        </div>
-      )}
+          )}
 
-      {reportType === 'brands' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+          {/* SECTION 2: BRAND PERFORMANCE */}
+          {(drilldownSection === 'all' || drilldownSection === 'brands') && (
+            <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -2954,12 +3135,13 @@ export function ReportsAnalytics() {
               )}
             </CardContent>
           </Card>
-        </div>
-      )}
+          )}
 
-      {reportType === 'categories' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+          {/* SECTION 3: CATEGORIES & DEPARTMENTS */}
+          {(drilldownSection === 'all' || drilldownSection === 'categories' || drilldownSection === 'departments') && (
+            <div className={`grid grid-cols-1 ${drilldownSection === 'all' ? 'xl:grid-cols-2' : ''} gap-4`}>
+              {(drilldownSection === 'all' || drilldownSection === 'categories') && (
+                <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -3025,12 +3207,10 @@ export function ReportsAnalytics() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
+          )}
 
-      {reportType === 'departments' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+          {(drilldownSection === 'all' || drilldownSection === 'departments') && (
+            <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -3093,12 +3273,15 @@ export function ReportsAnalytics() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       )}
 
-      {reportType === 'sizes' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+      {/* SECTION 4: SIZES & VARIANTS */}
+      {(drilldownSection === 'all' || drilldownSection === 'sizes' || drilldownSection === 'variants') && (
+        <div className={`grid grid-cols-1 ${drilldownSection === 'all' ? 'xl:grid-cols-2' : ''} gap-4`}>
+          {(drilldownSection === 'all' || drilldownSection === 'sizes') && (
+            <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -3146,12 +3329,10 @@ export function ReportsAnalytics() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
+          )}
 
-      {reportType === 'variants' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+          {(drilldownSection === 'all' || drilldownSection === 'variants') && (
+            <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -3199,12 +3380,13 @@ export function ReportsAnalytics() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       )}
 
-      {reportType === 'payments' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+      {/* SECTION 5: PAYMENT METHODS */}
+      {(drilldownSection === 'all' || drilldownSection === 'payments') && (
+        <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -3277,6 +3459,7 @@ export function ReportsAnalytics() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       )}
 
