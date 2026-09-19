@@ -86,7 +86,7 @@ export function SalesManagement() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCashier, setSelectedCashier] = useState("all");
-  const [replacementFilter, setReplacementFilter] = useState<"all" | "replaced" | "not_replaced" | "fully_replaced" | "partially_replaced">("all");
+  const [replacementFilter, setReplacementFilter] = useState<"all" | "replaced" | "not_replaced">("all");
   const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "quarter" | "year" | "custom">("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -413,6 +413,15 @@ export function SalesManagement() {
     datePreset !== "all"
   );
 
+  const replacementLabelBySaleId = useMemo(() => {
+    const map = new Map<string, "Replaced" | "Not Replaced">();
+    for (const sale of visibleSales) {
+      const hasReplacement = Number(sale.replacementCount ?? 0) > 0;
+      map.set(sale.sales_id, hasReplacement ? "Replaced" : "Not Replaced");
+    }
+    return map;
+  }, [visibleSales]);
+
   const filteredSales = useMemo(() => {
     return visibleSales.filter((s) => {
       if (searchTerm.trim()) {
@@ -440,8 +449,6 @@ export function SalesManagement() {
         const repStatus = replacementLabelBySaleId.get(s.sales_id) ?? "Not Replaced";
         if (replacementFilter === "replaced" && repStatus === "Not Replaced") return false;
         if (replacementFilter === "not_replaced" && repStatus !== "Not Replaced") return false;
-        if (replacementFilter === "fully_replaced" && repStatus !== "Fully Replaced") return false;
-        if (replacementFilter === "partially_replaced" && repStatus !== "Partially Replaced") return false;
       }
 
       if (startDate && s.transaction_date !== "N/A" && s.transaction_date < startDate) {
@@ -473,22 +480,6 @@ export function SalesManagement() {
     if (filteredCompletedSales.length === 0) return 0;
     return filteredRevenue / filteredCompletedSales.length;
   }, [filteredRevenue, filteredCompletedSales.length]);
-
-
-  const replacementLabelBySaleId = useMemo(() => {
-    const map = new Map<string, "Fully Replaced" | "Partially Replaced" | "Not Replaced">();
-    for (const sale of visibleSales) {
-      const details = Array.isArray(sale.saleDetails) ? sale.saleDetails : [];
-      const hasReplacement = Number(sale.replacementCount ?? 0) > 0;
-      if (!hasReplacement) {
-        map.set(sale.sales_id, "Not Replaced");
-        continue;
-      }
-      const fullyReplaced = details.length > 0 && details.every((d: any) => Number(d.returned_quantity ?? 0) >= Number(d.quantity ?? 0));
-      map.set(sale.sales_id, fullyReplaced ? "Fully Replaced" : "Partially Replaced");
-    }
-    return map;
-  }, [visibleSales]);
 
   const completedSales = visibleSales.filter((s) => s.status === "Completed");
   const totalRevenue = completedSales.reduce((sum, sale) => sum + sale.total_amount, 0);
@@ -667,20 +658,18 @@ export function SalesManagement() {
               </div>
 
               {/* Box 3: Replacement Status Dropdown Filter */}
-              <div className="w-full xl:w-52 shrink-0">
+              <div className="w-full xl:w-48 shrink-0">
                 <Select value={replacementFilter} onValueChange={(val: any) => setReplacementFilter(val)}>
                   <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
                     <div className="flex items-center gap-2 truncate">
                       <RotateCcw className="w-4 h-4 text-yellow-400 shrink-0" />
-                      <SelectValue placeholder="All Replacements" />
+                      <SelectValue placeholder="All" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 shadow-2xl">
-                    <SelectItem value="all">All Replacements</SelectItem>
-                    <SelectItem value="replaced">With Replacement</SelectItem>
-                    <SelectItem value="not_replaced">No Replacement</SelectItem>
-                    <SelectItem value="fully_replaced">Fully Replaced</SelectItem>
-                    <SelectItem value="partially_replaced">Partially Replaced</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="replaced">Replaced</SelectItem>
+                    <SelectItem value="not_replaced">Not Replaced</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
