@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
-import { Tag, Plus, Edit, Trash2, TrendingUp, Coins, ShoppingCart, Percent, Mail, CheckCircle, X, Check, ToggleLeft, ToggleRight, Power, Copy, RotateCcw } from 'lucide-react';
+import { Tag, Plus, Edit, Trash2, TrendingUp, Coins, ShoppingCart, Percent, Mail, CheckCircle, X, Check, ToggleLeft, ToggleRight, Power, Copy, RotateCcw, Calendar, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useProducts, usePromotions, usePromotionsMutations, useSales } from '../../lib/hooks';
 import { useAuth } from '../../lib/auth-context';
@@ -1210,6 +1210,71 @@ export function PromotionManagement() {
   };
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'ended'>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [datePreset, setDatePreset] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'custom'>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  const applyDatePreset = (preset: 'all' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'custom') => {
+    setDatePreset(preset);
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formatYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    if (preset === 'all') {
+      setStartDate('');
+      setEndDate('');
+    } else if (preset === 'daily') {
+      const todayStr = formatYMD(now);
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === 'weekly') {
+      const weekStart = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      setStartDate(formatYMD(weekStart));
+      setEndDate(formatYMD(now));
+    } else if (preset === 'monthly') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      setStartDate(formatYMD(firstDay));
+      setEndDate(formatYMD(lastDay));
+    } else if (preset === 'quarterly') {
+      const currentQuarterMonth = Math.floor(now.getMonth() / 3) * 3;
+      const firstDayOfQuarter = new Date(now.getFullYear(), currentQuarterMonth, 1);
+      const lastDayOfQuarter = new Date(now.getFullYear(), currentQuarterMonth + 3, 0);
+      setStartDate(formatYMD(firstDayOfQuarter));
+      setEndDate(formatYMD(lastDayOfQuarter));
+    } else if (preset === 'annually') {
+      const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+      const lastDayOfYear = new Date(now.getFullYear(), 11, 31);
+      setStartDate(formatYMD(firstDayOfYear));
+      setEndDate(formatYMD(lastDayOfYear));
+    }
+  };
+
+  const handleCustomDateChange = (type: 'start' | 'end', val: string) => {
+    setDatePreset('custom');
+    if (type === 'start') {
+      setStartDate(val);
+    } else {
+      setEndDate(val);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setStatusFilter('all');
+    setSearchTerm('');
+    setDatePreset('all');
+    setStartDate('');
+    setEndDate('');
+  };
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    statusFilter !== 'all' ||
+    datePreset !== 'all' ||
+    startDate ||
+    endDate
+  );
 
   const handleDuplicatePromotion = (promo: Promotion) => {
     const today = new Date();
@@ -1220,8 +1285,10 @@ export function PromotionManagement() {
     const formatDt = (d: Date, timeStr: string) =>
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${timeStr}`;
 
+    const cleanBaseName = promo.promo_name.replace(/\s*\((?:Rerun|Copy)(?:\s*\d+)?\)$/i, '').trim();
+
     setFormData({
-      promo_name: `${promo.promo_name} (Rerun)`,
+      promo_name: `${cleanBaseName} (Rerun)`,
       discount_type: promo.discount_type,
       discount_value: promo.discount_value,
       targetSalesGoal: promo.targetSalesGoal,
@@ -1231,7 +1298,7 @@ export function PromotionManagement() {
       status: 'Upcoming',
     });
     setIsAddDialogOpen(true);
-    toast.info(`Campaign settings cloned from "${promo.promo_name}". Ready for new dates.`);
+    toast.info(`Campaign "${cleanBaseName}" cloned! Choose your new promotional period.`);
   };
 
   const totalRevenue = promotions.reduce((sum, p) => sum + p.salesGenerated, 0);
@@ -1240,14 +1307,35 @@ export function PromotionManagement() {
   const upcomingPromotions = promotions.filter(p => p.status === 'Upcoming').length;
 
   const displayedPromotions = useMemo(() => {
-    if (statusFilter === 'active') {
-      return promotions.filter((p) => p.status === 'Active' || p.status === 'Upcoming' || p.status === 'Inactive');
-    }
-    if (statusFilter === 'ended') {
-      return promotions.filter((p) => p.status === 'Ended');
-    }
-    return promotions;
-  }, [promotions, statusFilter]);
+    return promotions.filter((p) => {
+      // 1. Status Filter
+      if (statusFilter === 'active') {
+        if (!(p.status === 'Active' || p.status === 'Upcoming' || p.status === 'Inactive')) return false;
+      } else if (statusFilter === 'ended') {
+        if (p.status !== 'Ended') return false;
+      }
+
+      // 2. Search Term Filter
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const matchesName = p.promo_name.toLowerCase().includes(q);
+        const matchesProducts = p.targetProducts.toLowerCase().includes(q);
+        const matchesType = p.discount_type.toLowerCase().includes(q);
+        if (!matchesName && !matchesProducts && !matchesType) return false;
+      }
+
+      // 3. Date Range Filter
+      if (startDate || endDate) {
+        const fStart = startDate || '1970-01-01';
+        const fEnd = endDate || '2099-12-31';
+        if (!rangesOverlap(p.start_date, p.end_date, fStart, fEnd)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [promotions, statusFilter, searchTerm, startDate, endDate]);
 
   const avgEffectiveness = promotions.filter(p => p.effectiveness > 0).reduce((sum, p) => sum + p.effectiveness, 0) / promotions.filter(p => p.effectiveness > 0).length || 0;
   const sentNotificationCount = lastNotificationBatch.filter(
@@ -1364,15 +1452,66 @@ export function PromotionManagement() {
 
       {/* Active Promotions Table */}
       <Card className="bg-[#15151D] border-[#24242F]">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-wrap">
+        <CardHeader className="pb-3 border-b border-[#24242F]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
               <CardTitle className="text-yellow-300 flex items-center gap-2">
                 <Tag className="w-5 h-5 text-yellow-400" />
                 Promotion Campaigns
               </CardTitle>
-              {/* Filter Tabs */}
-              <div className="flex items-center gap-1 bg-[#151622] p-1 rounded-xl border border-[#2b2d3e]">
+              <p className="text-xs text-zinc-400 mt-1">
+                Manage promotional discounts, scheduled periods, duplicate/rerun past campaigns, and monitor sales effectiveness.
+              </p>
+            </div>
+            <Dialog open={isAddDialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+              <DialogTrigger asChild>
+                <Button className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold text-xs sm:text-sm self-start sm:self-auto shadow-md">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Promotion
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-[#15161d] border-[#2a2c36] text-yellow-100 max-w-2xl max-h-[88vh] overflow-hidden p-0 shadow-2xl">
+                <DialogHeader className="border-b border-white/10 bg-[#171821] px-6 py-5">
+                  <DialogTitle className="text-white text-xl">Create New Promotion</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[calc(88vh-10rem)] overflow-y-auto px-6 py-5 pr-4 [scrollbar-width:thin] [scrollbar-color:#facc15_#20212a]">
+                  <PromotionForm
+                    formData={formData}
+                    setFormData={setFormData}
+                    categoryOptions={categoryOptions}
+                    productOptions={productOptions}
+                  />
+                </div>
+                <DialogFooter className="border-t border-white/10 bg-[#171821]/95 px-6 py-4">
+                  <Button
+                    onClick={handleAddPromotion}
+                    disabled={isSavingPromotion}
+                    className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold disabled:opacity-60"
+                  >
+                    {isSavingPromotion ? 'Creating...' : 'Create Promotion'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          {/* FILTER CONTROLS BAR: Search, Status Tabs, Date Presets (Daily, Weekly, Monthly, Quarterly, Annually), and Custom Date Pickers */}
+          <div className="space-y-3 bg-[#12121A] p-3.5 rounded-xl border border-[#24242F]">
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1 min-w-[220px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400 pointer-events-none" />
+                <Input
+                  placeholder="Search by promo name, products, discount type..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-[#181824] border-[#282836] text-white placeholder:text-zinc-500 text-sm focus-visible:ring-yellow-400/40 rounded-xl"
+                />
+              </div>
+
+              {/* Status Tabs */}
+              <div className="flex items-center gap-1 bg-[#181824] p-1 rounded-xl border border-[#282836] shrink-0">
                 <button
                   type="button"
                   onClick={() => setStatusFilter('all')}
@@ -1404,43 +1543,142 @@ export function PromotionManagement() {
                       : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  Ended / History ({endedPromotions})
+                  Ended ({endedPromotions})
                 </button>
               </div>
+
+              {/* Date Range Presets: All, Daily, Weekly, Monthly, Quarterly, Annually */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs flex-wrap">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("all")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "all"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    All Dates
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("daily")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "daily"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Daily
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("weekly")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "weekly"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Weekly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("monthly")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "monthly"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Monthly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("quarterly")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "quarterly"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Quarterly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("annually")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "annually"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Annually
+                  </Button>
+                </div>
+
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleResetFilters}
+                    className="h-7 px-2 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10 flex items-center gap-1 rounded-md"
+                    title="Reset all filters"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </Button>
+                )}
+              </div>
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={handleCreateDialogOpenChange}>
-              <DialogTrigger asChild>
-                <Button className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold text-xs sm:text-sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Promotion
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-[#15161d] border-[#2a2c36] text-yellow-100 max-w-2xl max-h-[88vh] overflow-hidden p-0 shadow-2xl">
-                <DialogHeader className="border-b border-white/10 bg-[#171821] px-6 py-5">
-                  <DialogTitle className="text-white text-xl">Create New Promotion</DialogTitle>
-                </DialogHeader>
-                <div className="max-h-[calc(88vh-10rem)] overflow-y-auto px-6 py-5 pr-4 [scrollbar-width:thin] [scrollbar-color:#facc15_#20212a]">
-                  <PromotionForm
-                    formData={formData}
-                    setFormData={setFormData}
-                    categoryOptions={categoryOptions}
-                    productOptions={productOptions}
+
+            {/* Custom Date Pickers Sub-Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-[#24242F] text-xs text-zinc-300">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 font-medium text-yellow-400">
+                  <Calendar className="w-4 h-4 text-yellow-400" />
+                  <span>Custom Date Range:</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">From</span>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => handleCustomDateChange("start", e.target.value)}
+                    className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
                   />
                 </div>
-                <DialogFooter className="border-t border-white/10 bg-[#171821]/95 px-6 py-4">
-                  <Button
-                    onClick={handleAddPromotion}
-                    disabled={isSavingPromotion}
-                    className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold disabled:opacity-60"
-                  >
-                    {isSavingPromotion ? 'Creating...' : 'Create Promotion'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">To</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => handleCustomDateChange("end", e.target.value)}
+                    className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-zinc-400">
+                Showing <strong className="text-yellow-400">{displayedPromotions.length}</strong> of {promotions.length} campaigns
+              </div>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
+
           <div className="border border-[#24242F] rounded-xl overflow-x-auto bg-[#111118]">
             <Table className="w-full min-w-[920px]">
               <TableHeader>
@@ -1540,7 +1778,19 @@ export function PromotionManagement() {
                             </DialogContent>
                           </Dialog>
 
-                          {/* Activate / Deactivate Toggle OR Duplicate / Rerun for Ended */}
+                          {/* Duplicate / Rerun Button (Available for all promotions so you can rerun with a new period) */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-yellow-300 hover:text-yellow-100 hover:bg-yellow-400/20 h-8 px-2.5 flex items-center gap-1.5 border border-yellow-500/40 hover:border-yellow-400 rounded-lg transition-colors shadow-sm"
+                            onClick={() => handleDuplicatePromotion(promotion)}
+                            title="Clone and rerun this campaign with a new promotional period (preserves past sales history)"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-yellow-400" />
+                            <span className="text-xs font-semibold">Rerun</span>
+                          </Button>
+
+                          {/* Activate / Deactivate Toggle for non-Ended promotions */}
                           {promotion.status === 'Active' ? (
                             <Button
                               size="sm"
@@ -1552,18 +1802,7 @@ export function PromotionManagement() {
                               <ToggleRight className="w-4 h-4 text-emerald-400" />
                               <span className="text-xs font-semibold">Active</span>
                             </Button>
-                          ) : promotion.status === 'Ended' ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-yellow-300 hover:text-yellow-100 hover:bg-yellow-400/20 h-8 px-2.5 flex items-center gap-1.5 border border-yellow-500/40 hover:border-yellow-400 rounded-lg transition-colors shadow-sm"
-                              onClick={() => handleDuplicatePromotion(promotion)}
-                              title="Clone and rerun this campaign with fresh analytics (preserves past sales history)"
-                            >
-                              <Copy className="w-3.5 h-3.5 text-yellow-400" />
-                              <span className="text-xs font-semibold">Rerun</span>
-                            </Button>
-                          ) : (
+                          ) : promotion.status !== 'Ended' ? (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1574,7 +1813,7 @@ export function PromotionManagement() {
                               <ToggleLeft className="w-4 h-4 text-zinc-400" />
                               <span className="text-xs font-semibold">Paused</span>
                             </Button>
-                          )}
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1582,7 +1821,7 @@ export function PromotionManagement() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-yellow-200/60 text-sm">
-                      No promotions found in &ldquo;{statusFilter}&rdquo; view.
+                      No promotions found matching the selected filters.
                     </TableCell>
                   </TableRow>
                 )}
