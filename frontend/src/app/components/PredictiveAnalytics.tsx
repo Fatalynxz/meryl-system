@@ -1328,10 +1328,24 @@ export function PredictiveAnalytics() {
     productSearchTerm || productCategoryFilter !== "all" || productDepartmentFilter !== "all" || productMovementFilter !== "all"
   );
 
-  const sizeCurveProducts = (isFilteringProducts ? filteredProductMovement : analytics.productMovement).slice(0, 60);
+  const isEuShoeSize = (sizeStr: unknown) => {
+    const trimmed = String(sizeStr ?? "").trim();
+    if (!trimmed || trimmed === "N/A" || trimmed === "10") return false;
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) {
+      return num >= 30 && num <= 52;
+    }
+    return false;
+  };
+
+  const sizeCurveProducts = (isFilteringProducts ? filteredProductMovement : analytics.productMovement)
+    .filter((product) => isEuShoeSize(product.size))
+    .slice(0, 60);
   const sizeCurveSizes = Array.from(
     new Set(sizeCurveProducts.map((product) => String(product.size ?? "N/A"))),
-  ).sort(sortSizeLabels);
+  )
+    .filter(isEuShoeSize)
+    .sort(sortSizeLabels);
   const sizeCurveRows = Array.from(
     sizeCurveProducts.reduce((map, product) => {
       const key = [product.brand, product.name, product.category].join("::");
