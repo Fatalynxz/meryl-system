@@ -532,19 +532,6 @@ export function PredictiveAnalytics() {
         segment.revenue += getSaleAmount(sale);
       }
 
-      const genderSegment = inCustomerPeriod
-        ? (genderSegments.get(gender) ?? {
-            label: gender,
-            customers: new Set<string>(),
-            orders: 0,
-            units: 0,
-            revenue: 0,
-            topCategories: new Map<string, number>(),
-            topBrands: new Map<string, number>(),
-            topSizes: new Map<string, number>(),
-            topProducts: new Map<string, number>(),
-          })
-        : null;
       const ageSegment = inCustomerPeriod
         ? (ageSegments.get(ageRange) ?? {
             label: ageRange,
@@ -559,18 +546,11 @@ export function PredictiveAnalytics() {
           })
         : null;
       if (inCustomerPeriod && customer?.customer_id) {
-        genderSegment?.customers.add(String(customer.customer_id));
         ageSegment?.customers.add(String(customer.customer_id));
       }
-      if (inCustomerPeriod) {
-        if (genderSegment) {
-          genderSegment.orders += 1;
-          genderSegment.revenue += getSaleAmount(sale);
-        }
-        if (ageSegment) {
-          ageSegment.orders += 1;
-          ageSegment.revenue += getSaleAmount(sale);
-        }
+      if (inCustomerPeriod && ageSegment) {
+        ageSegment.orders += 1;
+        ageSegment.revenue += getSaleAmount(sale);
       }
 
       const dayKey = date.toISOString().slice(0, 10);
@@ -611,8 +591,22 @@ export function PredictiveAnalytics() {
           };
 
           const customerKey = customer?.customer_id ? String(customer.customer_id) : sale.sales_id ? `walkin-${sale.sales_id}` : "";
-          if (customerKey) genderSegment.customers.add(customerKey);
-          if (sale.sales_id) genderSegment.orders.add(String(sale.sales_id));
+          if (customerKey) {
+            if (genderSegment.customers instanceof Set) {
+              genderSegment.customers.add(customerKey);
+            } else {
+              genderSegment.customers = new Set<string>(genderSegment.customers ? [String(genderSegment.customers)] : []);
+              genderSegment.customers.add(customerKey);
+            }
+          }
+          if (sale.sales_id) {
+            if (genderSegment.orders instanceof Set) {
+              genderSegment.orders.add(String(sale.sales_id));
+            } else {
+              genderSegment.orders = new Set<string>(genderSegment.orders ? [String(genderSegment.orders)] : []);
+              genderSegment.orders.add(String(sale.sales_id));
+            }
+          }
           genderSegment.units += qty;
           genderSegment.revenue += revenue;
           genderSegment.topCategories.set(category, (genderSegment.topCategories.get(category) ?? 0) + qty);
@@ -681,7 +675,6 @@ export function PredictiveAnalytics() {
 
       dailySales.set(dayKey, day);
       if (inCustomerPeriod && segment) customerSegments.set(segmentKey, segment);
-      if (inCustomerPeriod && genderSegment) genderSegments.set(gender, genderSegment);
       if (inCustomerPeriod && ageSegment) ageSegments.set(ageRange, ageSegment);
     });
 
