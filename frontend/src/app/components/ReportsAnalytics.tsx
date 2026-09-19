@@ -286,18 +286,26 @@ export function ReportsAnalytics() {
       const customers = new Set<string>();
       let revenue = 0;
       let units = 0;
+      let totalCost = 0;
       rows.forEach((sale) => {
         revenue += Number(sale.total_amount ?? 0);
         if (sale.customer_id) customers.add(String(sale.customer_id));
         const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
         details.forEach((detail: any) => {
-          units += Number(detail.quantity ?? 0);
+          const qty = Number(detail.quantity ?? 0);
+          units += qty;
+          const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+          const cost = Number(prod?.cost_price ?? detail.cost_price ?? 0);
+          totalCost += cost * qty;
         });
       });
-      return { revenue, units, customers: customers.size, transactions: rows.length };
+      const grossProfit = Math.max(0, revenue - totalCost);
+      const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+      const aov = rows.length > 0 ? revenue / rows.length : 0;
+      return { revenue, units, customers: customers.size, transactions: rows.length, grossProfit, margin, aov };
     };
     return { current: summarize(current), previous: summarize(previous) };
-  }, [customEndDate, customStartDate, salesRows, timeRange]);
+  }, [customEndDate, customStartDate, productLookup, salesRows, timeRange]);
 
   const filteredSalesTrends = useMemo(() => {
     const { end, mode, start } = salesTrendFrame(timeRange, customStartDate, customEndDate);
@@ -580,7 +588,10 @@ export function ReportsAnalytics() {
       const date = saleDate(sale);
       if (!date || date < start || date > now) return;
 
-      const saleId = String(sale.sale_id ?? sale.id ?? 'TXN').slice(0, 10);
+      const rawId = String(sale.receipt_number ?? sale.display_sales_id ?? sale.sales_id ?? sale.id ?? '').trim();
+      const dateDigits = date ? date.toISOString().slice(0, 10).replace(/-/g, '') : '20260920';
+      const cleanSuffix = rawId ? rawId.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() : '0001';
+      const saleId = sale.receipt_number || (rawId && (rawId.startsWith('RCP-') || rawId.startsWith('SLS-') || rawId.startsWith('TXN-')) ? rawId : `RCP-${dateDigits}-${cleanSuffix || '0001'}`);
       const customer = String(sale.customer_name ?? sale.customer?.name ?? 'Walk-in Customer');
       const payment = Array.isArray(sale.payment) ? sale.payment[0] : sale.payment;
       const rawPay = String(payment?.payment_method ?? sale.payment_method ?? 'Cash').toLowerCase();
@@ -1678,6 +1689,8 @@ export function ReportsAnalytics() {
 
   const revenueChange = percentChange(currentMetrics.current.revenue, currentMetrics.previous.revenue);
   const unitsChange = percentChange(currentMetrics.current.units, currentMetrics.previous.units);
+  const profitChange = percentChange(currentMetrics.current.grossProfit, currentMetrics.previous.grossProfit);
+  const aovChange = percentChange(currentMetrics.current.aov, currentMetrics.previous.aov);
   const selectedWindow = rangeWindow(timeRange, customStartDate, customEndDate);
   const latestTurnover = inventoryPeriodMetrics.current.turnover;
   const previousTurnover = inventoryPeriodMetrics.previous.turnover;
@@ -2174,13 +2187,17 @@ export function ReportsAnalytics() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-white/70">Inventory Turnover</p>
-                <p className="text-2xl text-white">{latestTurnover.toFixed(2)}x</p>
-                {showComparison && <p className={`text-xs mt-1 ${turnoverChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
-                  {turnoverChange >= 0 ? '+' : ''}{turnoverChange.toFixed(1)}% vs last month
-                </p>}
+                <p className="text-sm text-white/70">Gross Profit</p>
+                <p className="text-2xl text-green-400 font-bold">{money(currentMetrics.current.grossProfit)}</p>
+                {showComparison ? (
+                  <p className={`text-xs mt-1 ${profitChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
+                    {profitChange >= 0 ? '+' : ''}{profitChange.toFixed(1)}% • {currentMetrics.current.margin.toFixed(1)}% margin
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.margin.toFixed(1)}% gross profit margin</p>
+                )}
               </div>
-              <TrendingUp className="h-8 w-8 text-yellow-400" />
+              <TrendingUp className="h-8 w-8 text-green-400" />
             </div>
           </CardContent>
         </Card>
@@ -2188,13 +2205,17 @@ export function ReportsAnalytics() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-white/70">Avg Days to Sell</p>
-                <p className="text-2xl text-white">{latestAvgDays || 0}</p>
-                {showComparison && <p className={`text-xs mt-1 ${avgDaysChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
-                  {avgDaysChange >= 0 ? `${avgDaysChange} days faster` : `${Math.abs(avgDaysChange)} days slower`}
-                </p>}
+                <p className="text-sm text-white/70">Avg Order Value (AOV)</p>
+                <p className="text-2xl text-white">{money(currentMetrics.current.aov)}</p>
+                {showComparison ? (
+                  <p className={`text-xs mt-1 ${aovChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
+                    {aovChange >= 0 ? '+' : ''}{aovChange.toFixed(1)}% vs last period
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.transactions.toLocaleString()} completed orders</p>
+                )}
               </div>
-              <Calendar className="h-8 w-8 text-yellow-400" />
+              <ShoppingBag className="h-8 w-8 text-yellow-400" />
             </div>
           </CardContent>
         </Card>
@@ -3085,6 +3106,30 @@ export function ReportsAnalytics() {
                     </div>
                   </div>
 
+                  {brandDetailReport.allBrandsList.length > 0 && (
+                    <div className="rounded-xl border border-[#222232] bg-[#101018] p-4">
+                      <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold mb-3 flex items-center gap-1.5">
+                        <BarChart3 className="w-4 h-4 text-yellow-400" />
+                        Brand Market Share & Volume Comparison
+                      </h4>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={brandDetailReport.allBrandsList} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
+                          <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} />
+                          <YAxis yAxisId="left" stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
+                          <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" fontSize={11} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                            formatter={(val: any, name: string) => [name === 'Revenue (PHP)' ? money(Number(val)) : `${val} pairs`, name]}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '11px', color: '#facc15' }} />
+                          <Bar yAxisId="left" dataKey="revenue" fill="#facc15" name="Revenue (PHP)" radius={[4, 4, 0, 0]} />
+                          <Bar yAxisId="right" dataKey="sales" fill="#38bdf8" name="Pairs Sold" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
                   <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
                     <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
                       <Tag className="w-4 h-4 text-yellow-400" />
@@ -3173,7 +3218,27 @@ export function ReportsAnalytics() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-5">
+            <CardContent className="p-5 space-y-4">
+              {categoryDetailReport.allCategoriesList.length > 0 && (
+                <div className="rounded-xl border border-[#222232] bg-[#101018] p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold mb-2 flex items-center gap-1.5">
+                    <BarChart3 className="w-4 h-4 text-yellow-400" />
+                    Category Revenue Comparison
+                  </h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={categoryDetailReport.allCategoriesList} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
+                      <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} />
+                      <YAxis stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        formatter={(val: any) => [money(Number(val)), 'Revenue']}
+                      />
+                      <Bar dataKey="revenue" fill="#facc15" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
                 <Table>
                   <TableHeader className="bg-[#161622]">
@@ -3239,7 +3304,49 @@ export function ReportsAnalytics() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-5">
+            <CardContent className="p-5 space-y-4">
+              {departmentDetailReport.allDeptsList.length > 0 && (
+                <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 flex flex-col items-center">
+                  <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold mb-1 w-full text-left flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-yellow-400" />
+                    Department Revenue Share
+                  </h4>
+                  <ResponsiveContainer width="100%" height={170}>
+                    <PieChart>
+                      <Pie
+                        data={departmentDetailReport.allDeptsList}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={70}
+                        paddingAngle={3}
+                        dataKey="revenue"
+                        nameKey="name"
+                      >
+                        {departmentDetailReport.allDeptsList.map((entry, idx) => {
+                          const colors = ['#3b82f6', '#ec4899', '#eab308', '#10b981', '#8b5cf6'];
+                          return <Cell key={entry.name} fill={colors[idx % colors.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        formatter={(val: any, name: string) => [money(Number(val)), name]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-zinc-300 mt-1">
+                    {departmentDetailReport.allDeptsList.map((entry, idx) => {
+                      const colors = ['#3b82f6', '#ec4899', '#eab308', '#10b981', '#8b5cf6'];
+                      return (
+                        <span key={entry.name} className="inline-flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }} />
+                          {entry.name} ({entry.share}%)
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
                 <Table>
                   <TableHeader className="bg-[#161622]">
@@ -3295,7 +3402,27 @@ export function ReportsAnalytics() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-5">
+            <CardContent className="p-5 space-y-4">
+              {sizeDetailReport.allSizesList.length > 0 && (
+                <div className="rounded-xl border border-[#222232] bg-[#101018] p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold mb-2 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-yellow-400" />
+                    Footwear Sizing Demand Curve (EU Sizes)
+                  </h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={[...sizeDetailReport.allSizesList].sort((a, b) => Number(a.name) - Number(b.name))} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
+                      <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} label={{ value: 'Size (EU)', position: 'insideBottom', offset: -2, fill: '#71717a', fontSize: 10 }} />
+                      <YAxis stroke="#facc15" fontSize={11} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        formatter={(val: any) => [`${val} pairs sold`, 'Volume']}
+                      />
+                      <Bar dataKey="sales" fill="#facc15" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
                 <Table>
                   <TableHeader className="bg-[#161622]">
@@ -3346,7 +3473,27 @@ export function ReportsAnalytics() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-5">
+            <CardContent className="p-5 space-y-4">
+              {variantDetailReport.allVariantsList.length > 0 && (
+                <div className="rounded-xl border border-[#222232] bg-[#101018] p-4">
+                  <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-yellow-400" />
+                    Colorway Popularity (Units Sold)
+                  </h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={variantDetailReport.allVariantsList.slice(0, 8)} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
+                      <XAxis dataKey="name" stroke="#a1a1aa" fontSize={10} />
+                      <YAxis stroke="#a855f7" fontSize={11} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        formatter={(val: any) => [`${val} pairs sold`, 'Volume']}
+                      />
+                      <Bar dataKey="sales" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
                 <Table>
                   <TableHeader className="bg-[#161622]">
@@ -3423,6 +3570,57 @@ export function ReportsAnalytics() {
                   <p className="mt-1 text-xs text-zinc-400">Per payment transaction</p>
                 </div>
               </div>
+
+              {paymentDetailReport.allPaymentsList.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl border border-[#222232] bg-[#101018] p-4 items-center">
+                  <div>
+                    <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold mb-2 flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4 text-yellow-400" />
+                      Payment Method Share (Revenue)
+                    </h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie
+                          data={paymentDetailReport.allPaymentsList}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={70}
+                          paddingAngle={4}
+                          dataKey="revenue"
+                          nameKey="name"
+                        >
+                          {paymentDetailReport.allPaymentsList.map((entry) => {
+                            const payColor = entry.name.toLowerCase().includes('gcash') ? '#0ea5e9' : entry.name.toLowerCase().includes('card') ? '#f59e0b' : '#10b981';
+                            return <Cell key={entry.name} fill={payColor} />;
+                          })}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                          formatter={(val: any, name: string) => [money(Number(val)), name]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2">
+                    {paymentDetailReport.allPaymentsList.map((entry) => {
+                      const payColor = entry.name.toLowerCase().includes('gcash') ? '#0ea5e9' : entry.name.toLowerCase().includes('card') ? '#f59e0b' : '#10b981';
+                      return (
+                        <div key={entry.name} className="p-2.5 rounded-lg border border-[#222230] bg-[#141420] flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: payColor }} />
+                            <span className="text-xs font-semibold text-white">{entry.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs text-yellow-300 font-bold">{money(entry.revenue)}</span>
+                            <span className="text-[10px] text-zinc-400 block">{entry.share}% • {entry.count} txns</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
                 <Table>
