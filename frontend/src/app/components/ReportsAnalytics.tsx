@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Trophy, Medal, Sparkles, Layers, Tag, UserCheck, CreditCard, Grid, FileSpreadsheet } from 'lucide-react';
+import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Trophy, Medal, Sparkles, Layers, Tag, UserCheck, CreditCard, Grid, FileSpreadsheet, Search, ShoppingBag, ArrowUpRight } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
 import { useProducts, useSales } from '../../lib/hooks';
@@ -42,13 +42,7 @@ type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually' | 
 
 function rangeWindow(timeRange: ReportPeriod, customStartDate?: string, customEndDate?: string) {
   const now = new Date();
-  const rangeDaysMap: Record<Exclude<ReportPeriod, 'custom'>, number> = {
-    daily: 7,
-    weekly: 56,
-    monthly: 30,
-    quarterly: 90,
-    annually: 365,
-  };
+
   if (timeRange === 'custom') {
     const parsedStart = customStartDate ? new Date(customStartDate) : null;
     const parsedEnd = customEndDate ? new Date(customEndDate) : null;
@@ -63,7 +57,54 @@ function rangeWindow(timeRange: ReportPeriod, customStartDate?: string, customEn
     previousStart.setDate(safeStart.getDate() - days);
     return { now: safeEnd, start: safeStart, previousStart, days };
   }
-  const days = rangeDaysMap[timeRange] ?? 30;
+
+  if (timeRange === 'daily') {
+    // Within this day (today)
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const previousStart = new Date(start);
+    previousStart.setDate(previousStart.getDate() - 1);
+    return { now: end, start, previousStart, days: 1 };
+  }
+
+  if (timeRange === 'weekly') {
+    // Within this week (last 7 days ending today)
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const previousStart = new Date(start);
+    previousStart.setDate(previousStart.getDate() - 7);
+    return { now: end, start, previousStart, days: 7 };
+  }
+
+  if (timeRange === 'monthly') {
+    // Within this month (1st of month to end of month)
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
+    return { now: end, start, previousStart, days };
+  }
+
+  if (timeRange === 'quarterly') {
+    // Within this quarter
+    const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+    const start = new Date(now.getFullYear(), quarterMonth, 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), quarterMonth + 3, 0, 23, 59, 59, 999);
+    const previousStart = new Date(now.getFullYear(), quarterMonth - 3, 1, 0, 0, 0, 0);
+    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
+    return { now: end, start, previousStart, days };
+  }
+
+  if (timeRange === 'annually') {
+    // Within this calendar year (Jan 1 to Dec 31)
+    const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    const previousStart = new Date(now.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
+    return { now: end, start, previousStart, days };
+  }
+
+  const days = 30;
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   start.setDate(now.getDate() - (days - 1));
@@ -74,6 +115,13 @@ function rangeWindow(timeRange: ReportPeriod, customStartDate?: string, customEn
 
 function formatDateRange(start: Date, end: Date) {
   const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  if (start.toDateString() === end.toDateString()) {
+    const today = new Date();
+    if (start.toDateString() === today.toDateString()) {
+      return `${start.toLocaleDateString('en-US', options)} (Today)`;
+    }
+    return start.toLocaleDateString('en-US', options);
+  }
   return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
 }
 
@@ -160,30 +208,19 @@ function salesTrendFrame(timeRange: ReportPeriod, customStartDate?: string, cust
   }
 
   if (timeRange === 'weekly') {
-    const currentWeekStart = weekStartSunday(baseEnd);
-    const start = new Date(currentWeekStart);
-    start.setDate(start.getDate() - (7 * 7));
-    const end = endOfDay(new Date(currentWeekStart));
-    end.setDate(end.getDate() + 6);
-    return { start, end, mode: 'weekly' as TrendBucketMode };
+    return { start: window.start, end: window.now, mode: 'daily' as TrendBucketMode };
   }
 
   if (timeRange === 'monthly') {
-    const start = new Date(baseEnd.getFullYear(), 0, 1);
-    const end = endOfDay(new Date(baseEnd.getFullYear(), 11, 31));
-    return { start, end, mode: 'monthly' as TrendBucketMode };
+    return { start: window.start, end: window.now, mode: 'daily' as TrendBucketMode };
   }
 
   if (timeRange === 'quarterly') {
-    const start = new Date(baseEnd.getFullYear(), 0, 1);
-    const end = endOfDay(new Date(baseEnd.getFullYear(), 11, 31));
-    return { start, end, mode: 'quarterly' as TrendBucketMode };
+    return { start: window.start, end: window.now, mode: 'monthly' as TrendBucketMode };
   }
 
   if (timeRange === 'annually') {
-    const start = new Date(baseEnd.getFullYear() - 4, 0, 1);
-    const end = endOfDay(new Date(baseEnd.getFullYear(), 11, 31));
-    return { start, end, mode: 'annually' as TrendBucketMode };
+    return { start: window.start, end: window.now, mode: 'monthly' as TrendBucketMode };
   }
 
   return {
@@ -201,6 +238,14 @@ export function ReportsAnalytics() {
   const [showComparison, setShowComparison] = useState(true);
   const [topDimensionTab, setTopDimensionTab] = useState<'products' | 'brand' | 'size' | 'variant' | 'category' | 'gender' | 'payment' | 'grid'>('products');
   const [topSortBy, setTopSortBy] = useState<'units' | 'revenue'>('units');
+  const [shoeSearchQuery, setShoeSearchQuery] = useState('');
+  const [selectedShoeName, setSelectedShoeName] = useState('');
+  const [brandFilter, setBrandFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [sizeFilter, setSizeFilter] = useState('all');
+  const [variantFilter, setVariantFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const salesQuery = useSales();
   const productsQuery = useProducts();
 
@@ -436,6 +481,579 @@ export function ReportsAnalytics() {
       revenue: s.revenue,
     }));
   }, [topRankings]);
+
+  const allShoeModels = useMemo(() => {
+    const names = new Set<string>();
+    productRows.forEach((p: any) => {
+      const name = String(p.product_name ?? '').trim();
+      if (name) names.add(name);
+    });
+    salesRows.forEach((s: any) => {
+      const details = Array.isArray(s.sales_details) ? s.sales_details : [];
+      details.forEach((d: any) => {
+        const prod = productLookup.get(String(d.product_id ?? '')) ?? d.product;
+        const name = String(prod?.product_name ?? d.product_name ?? '').trim();
+        if (name) names.add(name);
+      });
+    });
+    return Array.from(names).sort();
+  }, [productLookup, productRows, salesRows]);
+
+  const allBrands = useMemo(() => {
+    const brands = new Set<string>();
+    productRows.forEach((p: any) => {
+      const b = String(p.brand ?? '').trim();
+      if (b) brands.add(b);
+    });
+    return Array.from(brands).sort();
+  }, [productRows]);
+
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>();
+    productRows.forEach((p: any) => {
+      const c = String(p.category?.[0]?.category_name ?? p.category?.category_name ?? p.category_name ?? '').trim();
+      if (c) cats.add(c);
+    });
+    return Array.from(cats).sort();
+  }, [productRows]);
+
+  const activeShoeName = useMemo(() => {
+    if (selectedShoeName) return selectedShoeName;
+    if (shoeSearchQuery.trim()) {
+      const q = shoeSearchQuery.trim().toLowerCase();
+      const found = allShoeModels.find((name) => name.toLowerCase().includes(q));
+      if (found) return found;
+    }
+    if (topRankings.products.byRevenue[0]?.name) {
+      return topRankings.products.byRevenue[0].name;
+    }
+    return allShoeModels[0] ?? '';
+  }, [allShoeModels, selectedShoeName, shoeSearchQuery, topRankings.products.byRevenue]);
+
+  const shoeDetailReport = useMemo(() => {
+    if (!activeShoeName) return null;
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+
+    const matchingProducts = productRows.filter((p: any) => {
+      const name = String(p.product_name ?? '').trim().toLowerCase();
+      return name === activeShoeName.toLowerCase() || name.includes(activeShoeName.toLowerCase());
+    });
+
+    const sampleProduct = matchingProducts[0];
+    const brand = String(sampleProduct?.brand ?? 'Meryl Shoes').trim();
+    const category = String(sampleProduct?.category?.[0]?.category_name ?? sampleProduct?.category?.category_name ?? 'Footwear').trim();
+    const department = String(sampleProduct?.gender ?? 'Unisex').trim();
+    const basePrice = Number(sampleProduct?.price ?? 0);
+    const costPrice = Number(sampleProduct?.cost_price ?? 0);
+
+    let totalStock = 0;
+    const stockBySize = new Map<string, number>();
+    matchingProducts.forEach((p: any) => {
+      const inv = Array.isArray(p.inventory) ? p.inventory[0] : p.inventory;
+      const onHand = Number(inv?.stock_quantity ?? p.stock ?? 0);
+      const reserved = Number(inv?.reserved_quantity ?? inv?.held_stock ?? p.reserved_stock ?? 0);
+      const available = Math.max(0, onHand - reserved);
+      totalStock += available;
+      const sizeStr = String(p.size ?? 'Standard').trim();
+      stockBySize.set(sizeStr, (stockBySize.get(sizeStr) ?? 0) + available);
+    });
+
+    let totalPairs = 0;
+    let totalRevenue = 0;
+    let totalCost = 0;
+    const sizesSold = new Map<string, { size: string; pairs: number; revenue: number }>();
+    const variantsSold = new Map<string, { color: string; pairs: number; revenue: number }>();
+    const transactions: Array<{
+      date: Date;
+      saleId: string;
+      customer: string;
+      size: string;
+      color: string;
+      qty: number;
+      price: number;
+      subtotal: number;
+      payment: string;
+    }> = [];
+
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const saleId = String(sale.sale_id ?? sale.id ?? 'TXN').slice(0, 10);
+      const customer = String(sale.customer_name ?? sale.customer?.name ?? 'Walk-in Customer');
+      const payment = Array.isArray(sale.payment) ? sale.payment[0] : sale.payment;
+      const rawPay = String(payment?.payment_method ?? sale.payment_method ?? 'Cash').toLowerCase();
+      const payLabel = rawPay.includes('gcash') ? 'GCash' : rawPay.includes('card') ? 'Card' : 'Cash';
+
+      const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
+      details.forEach((detail: any) => {
+        const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+        const prodName = String(prod?.product_name ?? detail.product_name ?? '').trim().toLowerCase();
+        if (prodName !== activeShoeName.toLowerCase() && !prodName.includes(activeShoeName.toLowerCase())) return;
+
+        const qty = Number(detail.quantity ?? 0);
+        const price = Number(detail.price ?? basePrice);
+        const subtotal = Number(detail.subtotal ?? price * qty);
+        const cost = Number(prod?.cost_price ?? costPrice) * qty;
+        const sizeStr = String(prod?.size ?? detail.size ?? 'Standard').trim();
+        const colorStr = String(prod?.color ?? detail.color ?? 'Standard Color').trim();
+
+        totalPairs += qty;
+        totalRevenue += subtotal;
+        totalCost += cost;
+
+        const prevSize = sizesSold.get(sizeStr) ?? { size: sizeStr, pairs: 0, revenue: 0 };
+        prevSize.pairs += qty;
+        prevSize.revenue += subtotal;
+        sizesSold.set(sizeStr, prevSize);
+
+        const prevVar = variantsSold.get(colorStr) ?? { color: colorStr, pairs: 0, revenue: 0 };
+        prevVar.pairs += qty;
+        prevVar.revenue += subtotal;
+        variantsSold.set(colorStr, prevVar);
+
+        transactions.push({
+          date,
+          saleId,
+          customer,
+          size: sizeStr,
+          color: colorStr,
+          qty,
+          price,
+          subtotal,
+          payment: payLabel,
+        });
+      });
+    });
+
+    const profit = Math.max(0, totalRevenue - totalCost);
+    const margin = totalRevenue > 0 ? Math.round((profit / totalRevenue) * 100) : (basePrice > 0 && costPrice > 0 ? Math.round(((basePrice - costPrice) / basePrice) * 100) : 0);
+    const avgPrice = totalPairs > 0 ? Math.round(totalRevenue / totalPairs) : basePrice;
+
+    const allSizesSet = new Set([...Array.from(stockBySize.keys()), ...Array.from(sizesSold.keys())]);
+    const sizeBreakdown = Array.from(allSizesSet).sort().map((sz) => {
+      const sold = sizesSold.get(sz) ?? { pairs: 0, revenue: 0 };
+      const stock = stockBySize.get(sz) ?? 0;
+      return {
+        size: sz,
+        pairs: sold.pairs,
+        revenue: sold.revenue,
+        stock,
+        status: stock === 0 ? 'Out of Stock' : stock <= 3 ? 'Low Stock' : 'In Stock',
+      };
+    });
+
+    const variantBreakdown = Array.from(variantsSold.values()).sort((a, b) => b.pairs - a.pairs);
+
+    return {
+      name: activeShoeName,
+      brand,
+      category,
+      department,
+      basePrice,
+      costPrice,
+      totalPairs,
+      totalRevenue,
+      profit,
+      margin,
+      avgPrice,
+      totalStock,
+      sizeBreakdown,
+      variantBreakdown,
+      transactions: transactions.sort((a, b) => b.date.getTime() - a.date.getTime()),
+    };
+  }, [activeShoeName, customEndDate, customStartDate, productLookup, productRows, salesRows, timeRange]);
+
+  const brandDetailReport = useMemo(() => {
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+    const activeBrand = brandFilter;
+
+    const brandMap = new Map<string, {
+      name: string;
+      sales: number;
+      revenue: number;
+      cost: number;
+      models: Map<string, { name: string; sales: number; revenue: number; stock: number; category: string; department: string }>;
+      sizes: Map<string, number>;
+      departments: Map<string, number>;
+    }>();
+
+    const brandStock = new Map<string, number>();
+    productRows.forEach((p: any) => {
+      const b = String(p.brand ?? 'Meryl Shoes').trim();
+      const inv = Array.isArray(p.inventory) ? p.inventory[0] : p.inventory;
+      const onHand = Number(inv?.stock_quantity ?? p.stock ?? 0);
+      const reserved = Number(inv?.reserved_quantity ?? inv?.held_stock ?? p.reserved_stock ?? 0);
+      brandStock.set(b, (brandStock.get(b) ?? 0) + Math.max(0, onHand - reserved));
+    });
+
+    let storeTotalRev = 0;
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
+      details.forEach((detail: any) => {
+        const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+        const brand = String(prod?.brand ?? 'Meryl Shoes').trim();
+        const prodName = String(prod?.product_name ?? detail.product_name ?? 'Unknown Shoe').trim();
+        const cat = String(prod?.category?.[0]?.category_name ?? prod?.category?.category_name ?? 'Footwear').trim();
+        const rawGender = String(prod?.gender ?? '').trim();
+        const dept = !rawGender || rawGender.toLowerCase() === 'n/a' ? 'Unisex' : rawGender;
+        const sizeStr = String(prod?.size ?? detail.size ?? 'Standard').trim();
+
+        const qty = Number(detail.quantity ?? 0);
+        const subtotal = Number(detail.subtotal ?? (Number(detail.price ?? 0) * qty));
+        const cost = Number(prod?.cost_price ?? 0) * qty;
+        storeTotalRev += subtotal;
+
+        const br = brandMap.get(brand) ?? {
+          name: brand,
+          sales: 0,
+          revenue: 0,
+          cost: 0,
+          models: new Map(),
+          sizes: new Map(),
+          departments: new Map(),
+        };
+        br.sales += qty;
+        br.revenue += subtotal;
+        br.cost += cost;
+
+        const prevM = br.models.get(prodName) ?? {
+          name: prodName,
+          sales: 0,
+          revenue: 0,
+          stock: stockBySku.get(String(prod?.product_id ?? '')) ?? 0,
+          category: cat,
+          department: dept,
+        };
+        prevM.sales += qty;
+        prevM.revenue += subtotal;
+        br.models.set(prodName, prevM);
+
+        br.sizes.set(sizeStr, (br.sizes.get(sizeStr) ?? 0) + qty);
+        br.departments.set(dept, (br.departments.get(dept) ?? 0) + qty);
+        brandMap.set(brand, br);
+      });
+    });
+
+    const allBrandsList = Array.from(brandMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((b, idx) => ({
+        ...b,
+        rank: idx + 1,
+        share: storeTotalRev > 0 ? Number(((b.revenue / storeTotalRev) * 100).toFixed(1)) : 0,
+        margin: b.revenue > 0 ? Math.max(0, Math.round(((b.revenue - b.cost) / b.revenue) * 100)) : 0,
+        avgPrice: b.sales > 0 ? Math.round(b.revenue / b.sales) : 0,
+        stock: brandStock.get(b.name) ?? 0,
+      }));
+
+    const selectedBrandData = activeBrand !== 'all' ? brandMap.get(activeBrand) : null;
+    const selectedBrandModels = selectedBrandData
+      ? Array.from(selectedBrandData.models.values())
+          .sort((a, b) => b.revenue - a.revenue)
+          .map((m, idx) => ({
+            ...m,
+            rank: idx + 1,
+            share: selectedBrandData.revenue > 0 ? Number(((m.revenue / selectedBrandData.revenue) * 100).toFixed(1)) : 0,
+          }))
+      : [];
+
+    const selectedBrandSizes = selectedBrandData
+      ? Array.from(selectedBrandData.sizes.entries())
+          .map(([size, pairs]) => ({ size, pairs }))
+          .sort((a, b) => b.pairs - a.pairs)
+      : [];
+
+    const selectedBrandDepts = selectedBrandData
+      ? Array.from(selectedBrandData.departments.entries())
+          .map(([dept, pairs]) => ({ dept, pairs }))
+          .sort((a, b) => b.pairs - a.pairs)
+      : [];
+
+    return {
+      activeBrand,
+      allBrandsList,
+      selectedBrandData: selectedBrandData
+        ? {
+            ...selectedBrandData,
+            stock: brandStock.get(activeBrand) ?? 0,
+            storeShare: storeTotalRev > 0 ? Number(((selectedBrandData.revenue / storeTotalRev) * 100).toFixed(1)) : 0,
+            margin: selectedBrandData.revenue > 0 ? Math.max(0, Math.round(((selectedBrandData.revenue - selectedBrandData.cost) / selectedBrandData.revenue) * 100)) : 0,
+          }
+        : null,
+      selectedBrandModels,
+      selectedBrandSizes,
+      selectedBrandDepts,
+    };
+  }, [brandFilter, customEndDate, customStartDate, productLookup, productRows, salesRows, stockBySku, timeRange]);
+
+  const categoryDetailReport = useMemo(() => {
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+    const catMap = new Map<string, { name: string; sales: number; revenue: number; models: Map<string, number>; brands: Map<string, number> }>();
+    let totalRev = 0;
+
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
+      details.forEach((detail: any) => {
+        const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+        const cat = String(prod?.category?.[0]?.category_name ?? prod?.category?.category_name ?? 'Footwear').trim();
+        const brand = String(prod?.brand ?? 'Meryl Shoes').trim();
+        const prodName = String(prod?.product_name ?? detail.product_name ?? 'Unknown Shoe').trim();
+        const qty = Number(detail.quantity ?? 0);
+        const subtotal = Number(detail.subtotal ?? (Number(detail.price ?? 0) * qty));
+        totalRev += subtotal;
+
+        const c = catMap.get(cat) ?? { name: cat, sales: 0, revenue: 0, models: new Map(), brands: new Map() };
+        c.sales += qty;
+        c.revenue += subtotal;
+        c.models.set(prodName, (c.models.get(prodName) ?? 0) + qty);
+        c.brands.set(brand, (c.brands.get(brand) ?? 0) + qty);
+        catMap.set(cat, c);
+      });
+    });
+
+    const allCategoriesList = Array.from(catMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((c, idx) => ({
+        ...c,
+        rank: idx + 1,
+        share: totalRev > 0 ? Number(((c.revenue / totalRev) * 100).toFixed(1)) : 0,
+        avgPrice: c.sales > 0 ? Math.round(c.revenue / c.sales) : 0,
+      }));
+
+    const selectedCat = categoryFilter !== 'all' ? catMap.get(categoryFilter) : null;
+    const selectedCatModels = selectedCat
+      ? Array.from(selectedCat.models.entries()).map(([name, pairs]) => ({ name, pairs })).sort((a, b) => b.pairs - a.pairs)
+      : [];
+    const selectedCatBrands = selectedCat
+      ? Array.from(selectedCat.brands.entries()).map(([name, pairs]) => ({ name, pairs })).sort((a, b) => b.pairs - a.pairs)
+      : [];
+
+    return {
+      allCategoriesList,
+      selectedCat: selectedCat ? {
+        ...selectedCat,
+        storeShare: totalRev > 0 ? Number(((selectedCat.revenue / totalRev) * 100).toFixed(1)) : 0,
+      } : null,
+      selectedCatModels,
+      selectedCatBrands,
+    };
+  }, [categoryFilter, customEndDate, customStartDate, productLookup, salesRows, timeRange]);
+
+  const departmentDetailReport = useMemo(() => {
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+    const deptMap = new Map<string, { name: string; sales: number; revenue: number; models: Map<string, number>; brands: Map<string, number> }>();
+    let totalRev = 0;
+
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
+      details.forEach((detail: any) => {
+        const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+        const rawGender = String(prod?.gender ?? '').trim();
+        const dept = !rawGender || rawGender.toLowerCase() === 'n/a' ? 'Unisex' : rawGender;
+        const brand = String(prod?.brand ?? 'Meryl Shoes').trim();
+        const prodName = String(prod?.product_name ?? detail.product_name ?? 'Unknown Shoe').trim();
+        const qty = Number(detail.quantity ?? 0);
+        const subtotal = Number(detail.subtotal ?? (Number(detail.price ?? 0) * qty));
+        totalRev += subtotal;
+
+        const d = deptMap.get(dept) ?? { name: dept, sales: 0, revenue: 0, models: new Map(), brands: new Map() };
+        d.sales += qty;
+        d.revenue += subtotal;
+        d.models.set(prodName, (d.models.get(prodName) ?? 0) + qty);
+        d.brands.set(brand, (d.brands.get(brand) ?? 0) + qty);
+        deptMap.set(dept, d);
+      });
+    });
+
+    const allDeptsList = Array.from(deptMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((d, idx) => ({
+        ...d,
+        rank: idx + 1,
+        share: totalRev > 0 ? Number(((d.revenue / totalRev) * 100).toFixed(1)) : 0,
+        avgPrice: d.sales > 0 ? Math.round(d.revenue / d.sales) : 0,
+      }));
+
+    const selectedDept = departmentFilter !== 'all' ? deptMap.get(departmentFilter) : null;
+    const selectedDeptModels = selectedDept
+      ? Array.from(selectedDept.models.entries()).map(([name, pairs]) => ({ name, pairs })).sort((a, b) => b.pairs - a.pairs)
+      : [];
+    const selectedDeptBrands = selectedDept
+      ? Array.from(selectedDept.brands.entries()).map(([name, pairs]) => ({ name, pairs })).sort((a, b) => b.pairs - a.pairs)
+      : [];
+
+    return {
+      allDeptsList,
+      selectedDept: selectedDept ? {
+        ...selectedDept,
+        storeShare: totalRev > 0 ? Number(((selectedDept.revenue / totalRev) * 100).toFixed(1)) : 0,
+      } : null,
+      selectedDeptModels,
+      selectedDeptBrands,
+    };
+  }, [customEndDate, customStartDate, departmentFilter, productLookup, salesRows, timeRange]);
+
+  const sizeDetailReport = useMemo(() => {
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+    const sizeMap = new Map<string, { name: string; sales: number; revenue: number; models: Map<string, number>; brands: Map<string, number> }>();
+    let totalRev = 0;
+    let totalUnits = 0;
+
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
+      details.forEach((detail: any) => {
+        const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+        const rawSize = String(prod?.size ?? detail.size ?? '').trim();
+        const size = rawSize ? `Size ${rawSize}` : 'Standard';
+        const brand = String(prod?.brand ?? 'Meryl Shoes').trim();
+        const prodName = String(prod?.product_name ?? detail.product_name ?? 'Unknown Shoe').trim();
+        const qty = Number(detail.quantity ?? 0);
+        const subtotal = Number(detail.subtotal ?? (Number(detail.price ?? 0) * qty));
+        totalRev += subtotal;
+        totalUnits += qty;
+
+        const s = sizeMap.get(size) ?? { name: size, sales: 0, revenue: 0, models: new Map(), brands: new Map() };
+        s.sales += qty;
+        s.revenue += subtotal;
+        s.models.set(prodName, (s.models.get(prodName) ?? 0) + qty);
+        s.brands.set(brand, (s.brands.get(brand) ?? 0) + qty);
+        sizeMap.set(size, s);
+      });
+    });
+
+    const allSizesList = Array.from(sizeMap.values())
+      .sort((a, b) => b.sales - a.sales || b.revenue - a.revenue)
+      .map((s, idx) => ({
+        ...s,
+        rank: idx + 1,
+        share: totalRev > 0 ? Number(((s.revenue / totalRev) * 100).toFixed(1)) : 0,
+        unitShare: totalUnits > 0 ? Number(((s.sales / totalUnits) * 100).toFixed(1)) : 0,
+        avgPrice: s.sales > 0 ? Math.round(s.revenue / s.sales) : 0,
+      }));
+
+    const selectedSz = sizeFilter !== 'all' ? sizeMap.get(sizeFilter) : null;
+    const selectedSzModels = selectedSz
+      ? Array.from(selectedSz.models.entries()).map(([name, pairs]) => ({ name, pairs })).sort((a, b) => b.pairs - a.pairs)
+      : [];
+
+    return {
+      allSizesList,
+      selectedSz: selectedSz ? {
+        ...selectedSz,
+        unitShare: totalUnits > 0 ? Number(((selectedSz.sales / totalUnits) * 100).toFixed(1)) : 0,
+      } : null,
+      selectedSzModels,
+    };
+  }, [customEndDate, customStartDate, productLookup, salesRows, sizeFilter, timeRange]);
+
+  const variantDetailReport = useMemo(() => {
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+    const varMap = new Map<string, { name: string; sales: number; revenue: number; models: Map<string, number> }>();
+    let totalRev = 0;
+    let totalUnits = 0;
+
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
+      details.forEach((detail: any) => {
+        const prod = productLookup.get(String(detail.product_id ?? '')) ?? detail.product;
+        const rawColor = String(prod?.color ?? detail.color ?? '').trim();
+        const color = rawColor || 'Standard Color';
+        const prodName = String(prod?.product_name ?? detail.product_name ?? 'Unknown Shoe').trim();
+        const qty = Number(detail.quantity ?? 0);
+        const subtotal = Number(detail.subtotal ?? (Number(detail.price ?? 0) * qty));
+        totalRev += subtotal;
+        totalUnits += qty;
+
+        const v = varMap.get(color) ?? { name: color, sales: 0, revenue: 0, models: new Map() };
+        v.sales += qty;
+        v.revenue += subtotal;
+        v.models.set(prodName, (v.models.get(prodName) ?? 0) + qty);
+        varMap.set(color, v);
+      });
+    });
+
+    const allVariantsList = Array.from(varMap.values())
+      .sort((a, b) => b.sales - a.sales || b.revenue - a.revenue)
+      .map((v, idx) => ({
+        ...v,
+        rank: idx + 1,
+        share: totalRev > 0 ? Number(((v.revenue / totalRev) * 100).toFixed(1)) : 0,
+        unitShare: totalUnits > 0 ? Number(((v.sales / totalUnits) * 100).toFixed(1)) : 0,
+        avgPrice: v.sales > 0 ? Math.round(v.revenue / v.sales) : 0,
+      }));
+
+    const selectedVr = variantFilter !== 'all' ? varMap.get(variantFilter) : null;
+    const selectedVrModels = selectedVr
+      ? Array.from(selectedVr.models.entries()).map(([name, pairs]) => ({ name, pairs })).sort((a, b) => b.pairs - a.pairs)
+      : [];
+
+    return {
+      allVariantsList,
+      selectedVr: selectedVr ? {
+        ...selectedVr,
+        unitShare: totalUnits > 0 ? Number(((selectedVr.sales / totalUnits) * 100).toFixed(1)) : 0,
+      } : null,
+      selectedVrModels,
+    };
+  }, [customEndDate, customStartDate, productLookup, salesRows, timeRange, variantFilter]);
+
+  const paymentDetailReport = useMemo(() => {
+    const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
+    const payMap = new Map<string, { name: string; count: number; revenue: number; transactions: Array<{ date: Date; saleId: string; customer: string; total: number }> }>();
+    let totalRev = 0;
+    let totalTx = 0;
+
+    salesRows.forEach((sale) => {
+      const date = saleDate(sale);
+      if (!date || date < start || date > now) return;
+
+      const saleId = String(sale.sale_id ?? sale.id ?? 'TXN').slice(0, 10);
+      const customer = String(sale.customer_name ?? sale.customer?.name ?? 'Walk-in Customer');
+      const payment = Array.isArray(sale.payment) ? sale.payment[0] : sale.payment;
+      const rawPay = String(payment?.payment_method ?? sale.payment_method ?? 'Cash').toLowerCase();
+      const payLabel = rawPay.includes('gcash') ? 'GCash' : rawPay.includes('card') ? 'Card' : 'Cash';
+      const totalAmount = Number(sale.total_amount ?? 0);
+      totalRev += totalAmount;
+      totalTx += 1;
+
+      const p = payMap.get(payLabel) ?? { name: payLabel, count: 0, revenue: 0, transactions: [] };
+      p.count += 1;
+      p.revenue += totalAmount;
+      p.transactions.push({ date, saleId, customer, total: totalAmount });
+      payMap.set(payLabel, p);
+    });
+
+    const allPaymentsList = Array.from(payMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((p, idx) => ({
+        ...p,
+        rank: idx + 1,
+        share: totalRev > 0 ? Number(((p.revenue / totalRev) * 100).toFixed(1)) : 0,
+        txnShare: totalTx > 0 ? Number(((p.count / totalTx) * 100).toFixed(1)) : 0,
+        avgTx: p.count > 0 ? Math.round(p.revenue / p.count) : 0,
+      }));
+
+    return {
+      allPaymentsList,
+      totalRevenue: totalRev,
+      totalTransactions: totalTx,
+    };
+  }, [customEndDate, customStartDate, salesRows, timeRange]);
 
   const revenueByCategory = useMemo(() => {
     const { now, start, previousStart } = rangeWindow(timeRange, customStartDate, customEndDate);
@@ -711,9 +1329,17 @@ export function ReportsAnalytics() {
   const handleExportReport = () => {
     const reportNames: Record<string, string> = {
       overview: 'Executive Overview Report',
-      sales: 'Sales Report',
-      revenue: 'Revenue Report',
-      inventory: 'Inventory Report',
+      sales: 'Sales Breakdown Report',
+      rankings: 'Top 5 Product Rankings',
+      products: `Shoe Model Report - ${shoeDetailReport?.name || 'All Models'}`,
+      brands: `Brand Performance Report - ${brandFilter === 'all' ? 'All Brands' : brandFilter}`,
+      categories: `Category Report - ${categoryFilter === 'all' ? 'All Categories' : categoryFilter}`,
+      departments: `Department Report - ${departmentFilter === 'all' ? 'All Departments' : departmentFilter}`,
+      sizes: `Size Distribution Report - ${sizeFilter === 'all' ? 'All Sizes' : sizeFilter}`,
+      variants: `Variant Color Report - ${variantFilter === 'all' ? 'All Colors' : variantFilter}`,
+      payments: 'Payment Method Report',
+      revenue: 'Revenue by Category Report',
+      inventory: 'Inventory & Stock Report',
     };
     const generatedAt = new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
     const sanitize = (value: unknown) => String(value ?? '')
@@ -870,6 +1496,7 @@ export function ReportsAnalytics() {
     } else if (reportType === 'sales') {
       drawTitle('Sales Breakdown');
       drawTable(['Period', 'Pairs Sold', 'Gross Revenue', 'Discount Applied', 'Net Sales'], salesBreakdownRows.map((row) => [row.date, row.pairs, money(row.gross), money(row.discount), money(row.net)]));
+    } else if (reportType === 'rankings') {
       drawTitle('Top 5 Shoe Models');
       drawTable(['Rank', 'Shoe Model', 'Pairs', 'Revenue'], topRankings.products.byRevenue.map((row) => [`#${row.rank}`, row.name, `${row.sales}`, money(row.revenue)]), [40, 240, 65, 170]);
       drawTitle('Top 5 Brands');
@@ -878,6 +1505,60 @@ export function ReportsAnalytics() {
       drawTable(['Rank', 'Size', 'Pairs', 'Revenue'], topRankings.size.byUnits.map((row) => [`#${row.rank}`, row.name, `${row.sales}`, money(row.revenue)]), [40, 240, 65, 170]);
       drawTitle('Top 5 Variants (Colors)');
       drawTable(['Rank', 'Variant / Color', 'Pairs', 'Revenue'], topRankings.variant.byRevenue.map((row) => [`#${row.rank}`, row.name, `${row.sales}`, money(row.revenue)]), [40, 240, 65, 170]);
+      drawTitle('Top 5 Departments');
+      drawTable(['Rank', 'Department', 'Pairs', 'Revenue'], topRankings.gender.byRevenue.map((row) => [`#${row.rank}`, row.name, `${row.sales}`, money(row.revenue)]), [40, 240, 65, 170]);
+      drawTitle('Top 5 Payment Methods');
+      drawTable(['Rank', 'Payment Method', 'Transactions', 'Revenue'], topRankings.payment.byRevenue.map((row) => [`#${row.rank}`, row.name, `${row.sales}`, money(row.revenue)]), [40, 240, 65, 170]);
+    } else if (reportType === 'products') {
+      if (shoeDetailReport) {
+        drawTitle(`Shoe Model: ${shoeDetailReport.name}`);
+        drawTable(['Property', 'Details'], [
+          ['Brand', shoeDetailReport.brand],
+          ['Category', shoeDetailReport.category],
+          ['Department', shoeDetailReport.department],
+          ['Selling Price', money(shoeDetailReport.basePrice)],
+          ['Pairs Sold (in period)', `${shoeDetailReport.totalPairs} pairs`],
+          ['Gross Revenue', money(shoeDetailReport.totalRevenue)],
+          ['Estimated Profit', `${money(shoeDetailReport.profit)} (${shoeDetailReport.margin}% margin)`],
+          ['Total Available Stock', `${shoeDetailReport.totalStock} pairs on hand`],
+        ], [200, 315]);
+        drawTitle('Size Performance for this Model');
+        drawTable(['Size', 'Pairs Sold', 'Revenue', 'Available Stock', 'Stock Status'], shoeDetailReport.sizeBreakdown.map((s) => [s.size, String(s.pairs), money(s.revenue), String(s.stock), s.status]), [70, 90, 140, 110, 105]);
+        if (shoeDetailReport.variantBreakdown.length > 0) {
+          drawTitle('Colorways / Variants for this Model');
+          drawTable(['Colorway / Style', 'Pairs Sold', 'Revenue'], shoeDetailReport.variantBreakdown.map((v) => [v.color, String(v.pairs), money(v.revenue)]), [220, 145, 150]);
+        }
+      }
+    } else if (reportType === 'brands') {
+      if (brandDetailReport.activeBrand !== 'all' && brandDetailReport.selectedBrandData) {
+        drawTitle(`Brand Performance: ${brandDetailReport.activeBrand}`);
+        drawTable(['Metric', 'Value'], [
+          ['Total Pairs Sold', `${brandDetailReport.selectedBrandData.sales} pairs`],
+          ['Total Revenue', money(brandDetailReport.selectedBrandData.revenue)],
+          ['Share of Store Revenue', `${brandDetailReport.selectedBrandData.storeShare}%`],
+          ['Available Stock on Hand', `${brandDetailReport.selectedBrandData.stock} pairs`],
+        ], [250, 265]);
+        drawTitle('Shoe Models Under This Brand');
+        drawTable(['Rank', 'Shoe Model', 'Category', 'Pairs Sold', 'Revenue', 'Share'], brandDetailReport.selectedBrandModels.map((m) => [`#${m.rank}`, m.name, m.category, String(m.sales), money(m.revenue), `${m.share}%`]), [40, 180, 100, 65, 80, 50]);
+      } else {
+        drawTitle('All Brand Performance Comparison');
+        drawTable(['Rank', 'Brand', 'Pairs Sold', 'Total Revenue', 'Revenue Share', 'Stock'], brandDetailReport.allBrandsList.map((b) => [`#${b.rank}`, b.name, String(b.sales), money(b.revenue), `${b.share}%`, String(b.stock)]), [40, 160, 75, 95, 75, 70]);
+      }
+    } else if (reportType === 'categories') {
+      drawTitle('Category Performance');
+      drawTable(['Rank', 'Category', 'Pairs Sold', 'Revenue', 'Revenue Share', 'Avg Price'], categoryDetailReport.allCategoriesList.map((c) => [`#${c.rank}`, c.name, String(c.sales), money(c.revenue), `${c.share}%`, money(c.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+    } else if (reportType === 'departments') {
+      drawTitle('Department Performance');
+      drawTable(['Rank', 'Department', 'Pairs Sold', 'Revenue', 'Revenue Share', 'Avg Price'], departmentDetailReport.allDeptsList.map((d) => [`#${d.rank}`, d.name, String(d.sales), money(d.revenue), `${d.share}%`, money(d.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+    } else if (reportType === 'sizes') {
+      drawTitle('Size Distribution Performance');
+      drawTable(['Rank', 'Shoe Size', 'Pairs Sold', 'Revenue', 'Volume Share', 'Avg Price'], sizeDetailReport.allSizesList.map((s) => [`#${s.rank}`, s.name, String(s.sales), money(s.revenue), `${s.unitShare}%`, money(s.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+    } else if (reportType === 'variants') {
+      drawTitle('Variant & Colorway Performance');
+      drawTable(['Rank', 'Variant / Color', 'Pairs Sold', 'Revenue', 'Revenue Share', 'Avg Price'], variantDetailReport.allVariantsList.map((v) => [`#${v.rank}`, v.name, String(v.sales), money(v.revenue), `${v.share}%`, money(v.avgPrice)]), [40, 160, 75, 95, 75, 70]);
+    } else if (reportType === 'payments') {
+      drawTitle('Payment Method Performance');
+      drawTable(['Rank', 'Payment Method', 'Transactions', 'Total Collected', 'Txn Share', 'Revenue Share'], paymentDetailReport.allPaymentsList.map((p) => [`#${p.rank}`, p.name, String(p.count), money(p.revenue), `${p.txnShare}%`, `${p.share}%`]), [40, 150, 80, 95, 75, 75]);
     } else if (reportType === 'revenue') {
       drawTitle('Revenue by Category');
       drawTable(['Category', 'Revenue', 'Share', 'Growth'], revenueByCategory.map((row) => [row.category, money(row.revenue), `${row.percentage}%`, `${row.growth}%`]));
@@ -971,9 +1652,17 @@ export function ReportsAnalytics() {
     try {
       const reportNames: Record<string, string> = {
         overview: 'Executive Overview Report',
-        sales: 'Sales Report',
-        revenue: 'Revenue Report',
-        inventory: 'Inventory Report',
+        sales: 'Sales Breakdown Report',
+        rankings: 'Top 5 Product Rankings',
+        products: `Shoe Model Report - ${shoeDetailReport?.name || 'All Models'}`,
+        brands: `Brand Performance Report - ${brandFilter === 'all' ? 'All Brands' : brandFilter}`,
+        categories: `Category Report - ${categoryFilter === 'all' ? 'All Categories' : categoryFilter}`,
+        departments: `Department Report - ${departmentFilter === 'all' ? 'All Departments' : departmentFilter}`,
+        sizes: `Size Distribution Report - ${sizeFilter === 'all' ? 'All Sizes' : sizeFilter}`,
+        variants: `Variant Color Report - ${variantFilter === 'all' ? 'All Colors' : variantFilter}`,
+        payments: 'Payment Method Report',
+        revenue: 'Revenue by Category Report',
+        inventory: 'Inventory & Stock Report',
       };
 
       const csvEscape = (val: unknown) => {
@@ -1021,7 +1710,16 @@ export function ReportsAnalytics() {
       lines.push('');
 
       // Section 2: Report-Specific Data
-      if (reportType === 'overview' || reportType === 'sales') {
+      if (reportType === 'sales') {
+        lines.push(formatRow(['=== SALES BREAKDOWN BY PERIOD ===']));
+        lines.push(formatRow(['Period', 'Pairs Sold', 'Gross Revenue (PHP)', 'Discount Applied (PHP)', 'Net Sales (PHP)']));
+        salesBreakdownRows.forEach((r) => {
+          lines.push(formatRow([r.date, r.pairs, r.gross.toFixed(2), r.discount.toFixed(2), r.net.toFixed(2)]));
+        });
+        lines.push('');
+      }
+
+      if (reportType === 'overview' || reportType === 'rankings') {
         lines.push(formatRow(['=== TOP SELLING BRANDS ===']));
         lines.push(formatRow(['Rank', 'Brand Name', 'Pairs Sold', 'Gross Revenue (PHP)']));
         const brandRankings = topRankings.brand?.byRevenue ?? [];
@@ -1038,11 +1736,139 @@ export function ReportsAnalytics() {
         });
         lines.push('');
 
+        lines.push(formatRow(['=== TOP SIZES ===']));
+        lines.push(formatRow(['Rank', 'Size', 'Pairs Sold', 'Gross Revenue (PHP)']));
+        (topRankings.size?.byUnits ?? []).forEach((s: any) => {
+          lines.push(formatRow([`#${s.rank ?? 1}`, s.name ?? 'N/A', s.sales ?? 0, Number(s.revenue ?? 0).toFixed(2)]));
+        });
+        lines.push('');
+
         lines.push(formatRow(['=== TOP PRODUCT VARIANTS / COLORWAYS ===']));
         lines.push(formatRow(['Rank', 'Variant / Color', 'Pairs Sold', 'Gross Revenue (PHP)']));
         const variantRankings = topRankings.variant?.byRevenue ?? [];
         variantRankings.forEach((v: any) => {
           lines.push(formatRow([`#${v.rank ?? 1}`, v.name ?? 'N/A', v.sales ?? 0, Number(v.revenue ?? 0).toFixed(2)]));
+        });
+        lines.push('');
+      }
+
+      if (reportType === 'products' && shoeDetailReport) {
+        lines.push(formatRow([`=== SPECIFIC SHOE MODEL REPORT: ${shoeDetailReport.name.toUpperCase()} ===`]));
+        lines.push(formatRow(['Property', 'Value']));
+        lines.push(formatRow(['Brand', shoeDetailReport.brand]));
+        lines.push(formatRow(['Category', shoeDetailReport.category]));
+        lines.push(formatRow(['Department', shoeDetailReport.department]));
+        lines.push(formatRow(['Base Price (PHP)', shoeDetailReport.basePrice.toFixed(2)]));
+        lines.push(formatRow(['Cost Price (PHP)', shoeDetailReport.costPrice.toFixed(2)]));
+        lines.push(formatRow(['Total Pairs Sold', shoeDetailReport.totalPairs]));
+        lines.push(formatRow(['Total Revenue (PHP)', shoeDetailReport.totalRevenue.toFixed(2)]));
+        lines.push(formatRow(['Estimated Profit (PHP)', shoeDetailReport.profit.toFixed(2)]));
+        lines.push(formatRow(['Profit Margin (%)', `${shoeDetailReport.margin}%`]));
+        lines.push(formatRow(['Total Stock on Hand', shoeDetailReport.totalStock]));
+        lines.push('');
+
+        lines.push(formatRow(['=== SIZE BREAKDOWN FOR THIS MODEL ===']));
+        lines.push(formatRow(['Size', 'Pairs Sold', 'Revenue (PHP)', 'Available Stock', 'Stock Status']));
+        shoeDetailReport.sizeBreakdown.forEach((s) => {
+          lines.push(formatRow([s.size, s.pairs, s.revenue.toFixed(2), s.stock, s.status]));
+        });
+        lines.push('');
+
+        if (shoeDetailReport.variantBreakdown.length > 0) {
+          lines.push(formatRow(['=== VARIANT / COLOR BREAKDOWN FOR THIS MODEL ===']));
+          lines.push(formatRow(['Color / Style', 'Pairs Sold', 'Revenue (PHP)']));
+          shoeDetailReport.variantBreakdown.forEach((v) => {
+            lines.push(formatRow([v.color, v.pairs, v.revenue.toFixed(2)]));
+          });
+          lines.push('');
+        }
+
+        if (shoeDetailReport.transactions.length > 0) {
+          lines.push(formatRow(['=== RECENT SALES TRANSACTIONS ===']));
+          lines.push(formatRow(['Date', 'Sale ID', 'Customer', 'Size', 'Color', 'Quantity', 'Unit Price (PHP)', 'Subtotal (PHP)', 'Payment Method']));
+          shoeDetailReport.transactions.forEach((tx) => {
+            lines.push(formatRow([
+              tx.date.toISOString().slice(0, 10),
+              tx.saleId,
+              tx.customer,
+              tx.size,
+              tx.color,
+              tx.qty,
+              tx.price.toFixed(2),
+              tx.subtotal.toFixed(2),
+              tx.payment,
+            ]));
+          });
+          lines.push('');
+        }
+      }
+
+      if (reportType === 'brands') {
+        if (brandDetailReport.activeBrand !== 'all' && brandDetailReport.selectedBrandData) {
+          lines.push(formatRow([`=== BRAND PERFORMANCE: ${brandDetailReport.activeBrand.toUpperCase()} ===`]));
+          lines.push(formatRow(['Total Pairs Sold', brandDetailReport.selectedBrandData.sales]));
+          lines.push(formatRow(['Total Revenue (PHP)', brandDetailReport.selectedBrandData.revenue.toFixed(2)]));
+          lines.push(formatRow(['Store Revenue Share (%)', `${brandDetailReport.selectedBrandData.storeShare}%`]));
+          lines.push(formatRow(['Stock on Hand', brandDetailReport.selectedBrandData.stock]));
+          lines.push('');
+
+          lines.push(formatRow(['=== SHOE MODELS UNDER THIS BRAND ===']));
+          lines.push(formatRow(['Rank', 'Shoe Model', 'Category', 'Department', 'Pairs Sold', 'Revenue (PHP)', 'Brand Share (%)', 'Stock on Hand']));
+          brandDetailReport.selectedBrandModels.forEach((m) => {
+            lines.push(formatRow([`#${m.rank}`, m.name, m.category, m.department, m.sales, m.revenue.toFixed(2), `${m.share}%`, m.stock]));
+          });
+          lines.push('');
+        } else {
+          lines.push(formatRow(['=== ALL BRANDS PERFORMANCE ===']));
+          lines.push(formatRow(['Rank', 'Brand Name', 'Pairs Sold', 'Gross Revenue (PHP)', 'Revenue Share (%)', 'Profit Margin (%)', 'Avg Price (PHP)', 'Stock on Hand']));
+          brandDetailReport.allBrandsList.forEach((b) => {
+            lines.push(formatRow([`#${b.rank}`, b.name, b.sales, b.revenue.toFixed(2), `${b.share}%`, `${b.margin}%`, b.avgPrice.toFixed(2), b.stock]));
+          });
+          lines.push('');
+        }
+      }
+
+      if (reportType === 'categories') {
+        lines.push(formatRow(['=== CATEGORY PERFORMANCE REPORT ===']));
+        lines.push(formatRow(['Rank', 'Category', 'Pairs Sold', 'Revenue (PHP)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        categoryDetailReport.allCategoriesList.forEach((c) => {
+          lines.push(formatRow([`#${c.rank}`, c.name, c.sales, c.revenue.toFixed(2), `${c.share}%`, c.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+      }
+
+      if (reportType === 'departments') {
+        lines.push(formatRow(['=== DEPARTMENT PERFORMANCE REPORT ===']));
+        lines.push(formatRow(['Rank', 'Department', 'Pairs Sold', 'Revenue (PHP)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        departmentDetailReport.allDeptsList.forEach((d) => {
+          lines.push(formatRow([`#${d.rank}`, d.name, d.sales, d.revenue.toFixed(2), `${d.share}%`, d.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+      }
+
+      if (reportType === 'sizes') {
+        lines.push(formatRow(['=== SIZE DISTRIBUTION REPORT ===']));
+        lines.push(formatRow(['Rank', 'Shoe Size', 'Pairs Sold', 'Revenue (PHP)', 'Volume Share (%)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        sizeDetailReport.allSizesList.forEach((s) => {
+          lines.push(formatRow([`#${s.rank}`, s.name, s.sales, s.revenue.toFixed(2), `${s.unitShare}%`, `${s.share}%`, s.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+      }
+
+      if (reportType === 'variants') {
+        lines.push(formatRow(['=== VARIANT & COLORWAY REPORT ===']));
+        lines.push(formatRow(['Rank', 'Variant / Color', 'Pairs Sold', 'Revenue (PHP)', 'Volume Share (%)', 'Revenue Share (%)', 'Average Price (PHP)']));
+        variantDetailReport.allVariantsList.forEach((v) => {
+          lines.push(formatRow([`#${v.rank}`, v.name, v.sales, v.revenue.toFixed(2), `${v.unitShare}%`, `${v.share}%`, v.avgPrice.toFixed(2)]));
+        });
+        lines.push('');
+      }
+
+      if (reportType === 'payments') {
+        lines.push(formatRow(['=== PAYMENT METHOD REPORT ===']));
+        lines.push(formatRow(['Rank', 'Payment Method', 'Transaction Count', 'Total Collected (PHP)', 'Transaction Share (%)', 'Volume Share (%)', 'Average Ticket (PHP)']));
+        paymentDetailReport.allPaymentsList.forEach((p) => {
+          lines.push(formatRow([`#${p.rank}`, p.name, p.count, p.revenue.toFixed(2), `${p.txnShare}%`, `${p.share}%`, p.avgTx.toFixed(2)]));
         });
         lines.push('');
       }
@@ -1149,14 +1975,22 @@ export function ReportsAnalytics() {
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-yellow-200/70">Report Type</span>
             <Select value={reportType} onValueChange={setReportType}>
-              <SelectTrigger className="w-48 bg-[#0b0b0f] border-[#24242d] text-white">
+              <SelectTrigger className="w-56 bg-[#0b0b0f] border-[#24242d] text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#0b0b0f] border-[#24242d] text-white">
-                <SelectItem value="overview">Overview Report</SelectItem>
-                <SelectItem value="sales">Sales Report</SelectItem>
-                <SelectItem value="revenue">Revenue Report</SelectItem>
-                <SelectItem value="inventory">Inventory Report</SelectItem>
+                <SelectItem value="overview">Executive Overview</SelectItem>
+                <SelectItem value="sales">Sales Breakdown Report</SelectItem>
+                <SelectItem value="rankings">Top 5 Product Rankings</SelectItem>
+                <SelectItem value="products">Shoe Model Report</SelectItem>
+                <SelectItem value="brands">Brand Performance Report</SelectItem>
+                <SelectItem value="categories">Category Report</SelectItem>
+                <SelectItem value="departments">Department Report</SelectItem>
+                <SelectItem value="sizes">Size Distribution Report</SelectItem>
+                <SelectItem value="variants">Variant (Color) Report</SelectItem>
+                <SelectItem value="payments">Payment Method Report</SelectItem>
+                <SelectItem value="revenue">Revenue by Category Report</SelectItem>
+                <SelectItem value="inventory">Inventory & Stock Report</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1456,7 +2290,11 @@ export function ReportsAnalytics() {
               </Table>
             </CardContent>
           </Card>
+        </div>
+      )}
 
+      {reportType === 'rankings' && (
+        <div className="space-y-4">
           {/* TOP 5 PRODUCT RANKINGS */}
           <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl overflow-hidden">
             <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
@@ -1669,6 +2507,774 @@ export function ReportsAnalytics() {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'products' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <Package className="w-5 h-5 text-yellow-400" />
+                    Specific Shoe Model Performance Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Deep performance analytics, sizes sold, and stock metrics for any shoe model • {selectedRangeLabel}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="relative w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-400" />
+                    <input
+                      type="text"
+                      value={shoeSearchQuery}
+                      onChange={(e) => {
+                        setShoeSearchQuery(e.target.value);
+                        setSelectedShoeName('');
+                      }}
+                      placeholder="Search shoe (e.g. LeBron 20)..."
+                      className="h-9 w-full rounded-lg border border-[#2b2b3b] bg-[#151520] pl-9 pr-3 text-xs text-white placeholder:text-zinc-500 focus:border-yellow-400 focus:outline-none"
+                    />
+                  </div>
+                  <Select
+                    value={activeShoeName}
+                    onValueChange={(val) => {
+                      setSelectedShoeName(val);
+                      setShoeSearchQuery('');
+                    }}
+                  >
+                    <SelectTrigger className="w-56 h-9 bg-[#151520] border-[#2b2b3b] text-white text-xs">
+                      <SelectValue placeholder="Select shoe model" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#12121a] border-[#2b2b3b] text-white max-h-60">
+                      {allShoeModels.map((shoe) => (
+                        <SelectItem key={shoe} value={shoe} className="text-xs">
+                          {shoe}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              {shoeDetailReport ? (
+                <div className="space-y-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-xl border bg-[#101017] border-[#222230]">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-yellow-400 text-black font-semibold text-xs">
+                          {shoeDetailReport.brand}
+                        </Badge>
+                        <Badge variant="outline" className="border-zinc-700 text-zinc-300 text-xs">
+                          {shoeDetailReport.category}
+                        </Badge>
+                        <Badge variant="outline" className="border-zinc-700 text-zinc-300 text-xs">
+                          {shoeDetailReport.department}
+                        </Badge>
+                      </div>
+                      <h3 className="text-xl font-bold text-white mt-2">{shoeDetailReport.name}</h3>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Retail Price: <span className="text-yellow-300 font-semibold">{money(shoeDetailReport.basePrice)}</span> • Cost Price: <span className="text-zinc-300">{money(shoeDetailReport.costPrice)}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider">Gross Margin</p>
+                        <p className="text-lg font-bold text-green-400">{shoeDetailReport.margin}%</p>
+                      </div>
+                      <div className="text-right border-l border-zinc-800 pl-6">
+                        <p className="text-xs text-zinc-400 uppercase tracking-wider">Total Stock on Hand</p>
+                        <p className="text-lg font-bold text-yellow-300">{shoeDetailReport.totalStock} pairs</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Pairs Sold ({selectedRangeLabel})</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{shoeDetailReport.totalPairs.toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-zinc-400">Total units transferred</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Gross Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-yellow-300">{money(shoeDetailReport.totalRevenue)}</p>
+                      <p className="mt-1 text-xs text-zinc-400">Avg ticket {money(shoeDetailReport.avgPrice)}</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Estimated Profit</p>
+                      <p className="mt-2 text-2xl font-bold text-green-400">{money(shoeDetailReport.profit)}</p>
+                      <p className="mt-1 text-xs text-zinc-400">{shoeDetailReport.margin}% profit margin</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Stock Availability</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{shoeDetailReport.totalStock} pairs</p>
+                      <p className="mt-1 text-xs text-zinc-400">Across {shoeDetailReport.sizeBreakdown.length} size variants</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                      <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                        <Layers className="w-4 h-4 text-yellow-400" />
+                        Size Distribution & Availability
+                      </h4>
+                      <Table>
+                        <TableHeader className="bg-[#161622]">
+                          <TableRow className="border-[#222232]">
+                            <TableHead className="text-yellow-300 text-xs">Size (EU)</TableHead>
+                            <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                            <TableHead className="text-yellow-300 text-xs text-center">Revenue</TableHead>
+                            <TableHead className="text-yellow-300 text-xs text-center">In Stock</TableHead>
+                            <TableHead className="text-yellow-300 text-xs text-right">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {shoeDetailReport.sizeBreakdown.map((row) => (
+                            <TableRow key={row.size} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                              <TableCell className="text-white font-medium text-xs">{row.size}</TableCell>
+                              <TableCell className="text-zinc-300 text-xs text-center font-semibold">{row.pairs}</TableCell>
+                              <TableCell className="text-yellow-300 text-xs text-center">{money(row.revenue)}</TableCell>
+                              <TableCell className="text-zinc-300 text-xs text-center">{row.stock}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge className={row.status === 'Out of Stock' ? 'bg-red-950 text-red-300 text-[10px]' : row.status === 'Low Stock' ? 'bg-amber-950 text-amber-300 text-[10px]' : 'bg-green-950 text-green-300 text-[10px]'}>
+                                  {row.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {!shoeDetailReport.sizeBreakdown.length && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-zinc-500 py-4 text-xs">No size data available.</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                      <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                        <Sparkles className="w-4 h-4 text-yellow-400" />
+                        Colorway / Variant Sales
+                      </h4>
+                      <Table>
+                        <TableHeader className="bg-[#161622]">
+                          <TableRow className="border-[#222232]">
+                            <TableHead className="text-yellow-300 text-xs">Variant / Color</TableHead>
+                            <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                            <TableHead className="text-yellow-300 text-xs text-right">Revenue</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {shoeDetailReport.variantBreakdown.map((v) => (
+                            <TableRow key={v.color} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                              <TableCell className="text-white font-medium text-xs">{v.color}</TableCell>
+                              <TableCell className="text-zinc-300 text-xs text-center font-semibold">{v.pairs}</TableCell>
+                              <TableCell className="text-yellow-300 text-xs text-right font-semibold">{money(v.revenue)}</TableCell>
+                            </TableRow>
+                          ))}
+                          {!shoeDetailReport.variantBreakdown.length && (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center text-zinc-500 py-4 text-xs">No variant sales recorded in this period.</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                    <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                      <ShoppingBag className="w-4 h-4 text-yellow-400" />
+                      Recent Sales Transactions for this Shoe
+                    </h4>
+                    <Table>
+                      <TableHeader className="bg-[#161622]">
+                        <TableRow className="border-[#222232]">
+                          <TableHead className="text-yellow-300 text-xs">Date</TableHead>
+                          <TableHead className="text-yellow-300 text-xs">Receipt / Sale ID</TableHead>
+                          <TableHead className="text-yellow-300 text-xs">Customer</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Size</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Color</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Qty</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Total Paid</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-right">Payment</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {shoeDetailReport.transactions.slice(0, 15).map((tx, idx) => (
+                          <TableRow key={`${tx.saleId}-${idx}`} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                            <TableCell className="text-zinc-300 text-xs">{tx.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
+                            <TableCell className="text-yellow-200 font-mono text-xs">{tx.saleId}</TableCell>
+                            <TableCell className="text-white text-xs">{tx.customer}</TableCell>
+                            <TableCell className="text-zinc-300 text-xs text-center">{tx.size}</TableCell>
+                            <TableCell className="text-zinc-400 text-xs text-center">{tx.color}</TableCell>
+                            <TableCell className="text-zinc-200 text-xs text-center font-bold">{tx.qty}</TableCell>
+                            <TableCell className="text-yellow-300 text-xs text-center font-semibold">{money(tx.subtotal)}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="border-yellow-400/30 text-yellow-300 text-[10px]">
+                                {tx.payment}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {!shoeDetailReport.transactions.length && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center text-zinc-500 py-6 text-xs">No transactions recorded for this shoe in {selectedRangeLabel}.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-zinc-400 text-sm">
+                  No shoe model selected or matching search. Try searching &quot;LeBron 20&quot; or selecting from the dropdown.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'brands' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <Tag className="w-5 h-5 text-yellow-400" />
+                    Brand Performance Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Comprehensive brand analytics, shoe models sold, and market share • {selectedRangeLabel}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs text-zinc-400">Filter Brand:</span>
+                  <Select value={brandFilter} onValueChange={setBrandFilter}>
+                    <SelectTrigger className="w-48 h-9 bg-[#151520] border-[#2b2b3b] text-white text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#12121a] border-[#2b2b3b] text-white max-h-60">
+                      <SelectItem value="all" className="text-xs font-semibold text-yellow-300">
+                        All Brands (Overview)
+                      </SelectItem>
+                      {allBrands.map((b) => (
+                        <SelectItem key={b} value={b} className="text-xs">
+                          {b}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              {brandFilter !== 'all' && brandDetailReport.selectedBrandData ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Total Pairs Sold</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{brandDetailReport.selectedBrandData.sales.toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-zinc-400">Across all {brandDetailReport.selectedBrandModels.length} models</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Gross Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-yellow-300">{money(brandDetailReport.selectedBrandData.revenue)}</p>
+                      <p className="mt-1 text-xs text-zinc-400">{brandDetailReport.selectedBrandData.storeShare}% of total store revenue</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Profit Margin</p>
+                      <p className="mt-2 text-2xl font-bold text-green-400">{brandDetailReport.selectedBrandData.margin}%</p>
+                      <p className="mt-1 text-xs text-zinc-400">Gross profit margin</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Stock on Hand</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{brandDetailReport.selectedBrandData.stock} pairs</p>
+                      <p className="mt-1 text-xs text-zinc-400">Available inventory</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                    <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                      <Package className="w-4 h-4 text-yellow-400" />
+                      Shoe Models Under {brandDetailReport.activeBrand}
+                    </h4>
+                    <Table>
+                      <TableHeader className="bg-[#161622]">
+                        <TableRow className="border-[#222232]">
+                          <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                          <TableHead className="text-yellow-300 text-xs">Shoe Model</TableHead>
+                          <TableHead className="text-yellow-300 text-xs">Category</TableHead>
+                          <TableHead className="text-yellow-300 text-xs">Department</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Revenue</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Brand Share</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-right">In Stock</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {brandDetailReport.selectedBrandModels.map((m) => (
+                          <TableRow key={m.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                            <TableCell className="text-zinc-400 font-bold text-xs">#{m.rank}</TableCell>
+                            <TableCell className="text-white font-medium text-xs">{m.name}</TableCell>
+                            <TableCell className="text-zinc-300 text-xs">{m.category}</TableCell>
+                            <TableCell className="text-zinc-400 text-xs">{m.department}</TableCell>
+                            <TableCell className="text-zinc-200 font-bold text-xs text-center">{m.sales}</TableCell>
+                            <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(m.revenue)}</TableCell>
+                            <TableCell className="text-zinc-300 text-xs text-center">{m.share}%</TableCell>
+                            <TableCell className="text-zinc-300 text-xs text-right">{m.stock} pairs</TableCell>
+                          </TableRow>
+                        ))}
+                        {!brandDetailReport.selectedBrandModels.length && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center text-zinc-500 py-6 text-xs">No models sold for {brandDetailReport.activeBrand} in this date range.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                      <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                        <Layers className="w-4 h-4 text-yellow-400" />
+                        Sizes Sold for {brandDetailReport.activeBrand}
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {brandDetailReport.selectedBrandSizes.map((s) => (
+                          <div key={s.size} className="rounded-lg border border-[#28283a] bg-[#141420] px-3 py-1.5 text-xs">
+                            <span className="text-zinc-400 mr-2">{s.size}:</span>
+                            <span className="text-yellow-300 font-bold">{s.pairs} pairs</span>
+                          </div>
+                        ))}
+                        {!brandDetailReport.selectedBrandSizes.length && (
+                          <p className="text-xs text-zinc-500">No size sales recorded.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                      <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                        <UserCheck className="w-4 h-4 text-yellow-400" />
+                        Department Split for {brandDetailReport.activeBrand}
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {brandDetailReport.selectedBrandDepts.map((d) => (
+                          <div key={d.dept} className="rounded-lg border border-[#28283a] bg-[#141420] px-3 py-1.5 text-xs">
+                            <span className="text-zinc-400 mr-2">{d.dept}:</span>
+                            <span className="text-yellow-300 font-bold">{d.pairs} pairs</span>
+                          </div>
+                        ))}
+                        {!brandDetailReport.selectedBrandDepts.length && (
+                          <p className="text-xs text-zinc-500">No department sales recorded.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Active Brands</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{brandDetailReport.allBrandsList.length}</p>
+                      <p className="mt-1 text-xs text-zinc-400">Brands with sales in period</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Top Brand by Volume</p>
+                      <p className="mt-2 text-2xl font-bold text-yellow-300">{brandDetailReport.allBrandsList[0]?.name ?? 'N/A'}</p>
+                      <p className="mt-1 text-xs text-zinc-400">{brandDetailReport.allBrandsList[0]?.sales ?? 0} pairs sold</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Top Brand Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-green-400">{money(brandDetailReport.allBrandsList[0]?.revenue ?? 0)}</p>
+                      <p className="mt-1 text-xs text-zinc-400">{brandDetailReport.allBrandsList[0]?.share ?? 0}% market share</p>
+                    </div>
+                    <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                      <p className="text-xs uppercase tracking-wide text-yellow-200/70">Total Brand Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{money(brandDetailReport.allBrandsList.reduce((sum, b) => sum + b.revenue, 0))}</p>
+                      <p className="mt-1 text-xs text-zinc-400">All brands combined</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                    <h4 className="text-xs uppercase tracking-wider text-yellow-300 font-semibold flex items-center gap-1.5 border-b border-[#1f1f2e] pb-2">
+                      <Tag className="w-4 h-4 text-yellow-400" />
+                      All Brands Ranking & Performance (Click any brand to view drilldown)
+                    </h4>
+                    <Table>
+                      <TableHeader className="bg-[#161622]">
+                        <TableRow className="border-[#222232]">
+                          <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                          <TableHead className="text-yellow-300 text-xs">Brand Name</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Gross Revenue</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Revenue Share</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Profit Margin</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-center">Avg Price</TableHead>
+                          <TableHead className="text-yellow-300 text-xs text-right">In Stock</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {brandDetailReport.allBrandsList.map((b) => (
+                          <TableRow
+                            key={b.name}
+                            onClick={() => setBrandFilter(b.name)}
+                            className="border-[#1e1e2c] hover:bg-yellow-400/5 cursor-pointer transition-colors"
+                          >
+                            <TableCell className="text-zinc-400 font-bold text-xs">#{b.rank}</TableCell>
+                            <TableCell className="text-yellow-100 font-semibold text-xs flex items-center gap-1.5">
+                              {b.name}
+                              <ArrowUpRight className="w-3 h-3 text-yellow-400 opacity-60" />
+                            </TableCell>
+                            <TableCell className="text-zinc-200 font-bold text-xs text-center">{b.sales}</TableCell>
+                            <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(b.revenue)}</TableCell>
+                            <TableCell className="text-zinc-300 text-xs text-center font-medium">{b.share}%</TableCell>
+                            <TableCell className="text-green-400 text-xs text-center font-medium">{b.margin}%</TableCell>
+                            <TableCell className="text-zinc-300 text-xs text-center">{money(b.avgPrice)}</TableCell>
+                            <TableCell className="text-zinc-300 text-xs text-right">{b.stock} pairs</TableCell>
+                          </TableRow>
+                        ))}
+                        {!brandDetailReport.allBrandsList.length && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center text-zinc-500 py-6 text-xs">No brand sales recorded for this date range.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'categories' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <BarChart3 className="w-5 h-5 text-yellow-400" />
+                    Category Performance Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Category demand, shoe models, and revenue breakdown • {selectedRangeLabel}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs text-zinc-400">Filter Category:</span>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-48 h-9 bg-[#151520] border-[#2b2b3b] text-white text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#12121a] border-[#2b2b3b] text-white max-h-60">
+                      <SelectItem value="all" className="text-xs font-semibold text-yellow-300">
+                        All Categories
+                      </SelectItem>
+                      {allCategories.map((c) => (
+                        <SelectItem key={c} value={c} className="text-xs">
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                <Table>
+                  <TableHeader className="bg-[#161622]">
+                    <TableRow className="border-[#222232]">
+                      <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                      <TableHead className="text-yellow-300 text-xs">Category</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Gross Revenue</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Revenue Share</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Avg Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {categoryDetailReport.allCategoriesList.map((c) => (
+                      <TableRow key={c.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                        <TableCell className="text-zinc-400 font-bold text-xs">#{c.rank}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">{c.name}</TableCell>
+                        <TableCell className="text-zinc-200 font-bold text-xs text-center">{c.sales}</TableCell>
+                        <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(c.revenue)}</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-center">{c.share}%</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-right">{money(c.avgPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!categoryDetailReport.allCategoriesList.length && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-zinc-500 py-6 text-xs">No category sales recorded for this date range.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'departments' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <UserCheck className="w-5 h-5 text-yellow-400" />
+                    Department Performance Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Men&apos;s, Women&apos;s, Unisex, and Kids footwear department analytics • {selectedRangeLabel}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs text-zinc-400">Department:</span>
+                  <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                    <SelectTrigger className="w-48 h-9 bg-[#151520] border-[#2b2b3b] text-white text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#12121a] border-[#2b2b3b] text-white">
+                      <SelectItem value="all" className="text-xs font-semibold text-yellow-300">All Departments</SelectItem>
+                      <SelectItem value="Men" className="text-xs">Men</SelectItem>
+                      <SelectItem value="Women" className="text-xs">Women</SelectItem>
+                      <SelectItem value="Unisex" className="text-xs">Unisex</SelectItem>
+                      <SelectItem value="Kids" className="text-xs">Kids</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                <Table>
+                  <TableHeader className="bg-[#161622]">
+                    <TableRow className="border-[#222232]">
+                      <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                      <TableHead className="text-yellow-300 text-xs">Department</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Gross Revenue</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Revenue Share</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Avg Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {departmentDetailReport.allDeptsList.map((d) => (
+                      <TableRow key={d.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                        <TableCell className="text-zinc-400 font-bold text-xs">#{d.rank}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">{d.name}</TableCell>
+                        <TableCell className="text-zinc-200 font-bold text-xs text-center">{d.sales}</TableCell>
+                        <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(d.revenue)}</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-center">{d.share}%</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-right">{money(d.avgPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!departmentDetailReport.allDeptsList.length && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-zinc-500 py-6 text-xs">No department sales recorded for this date range.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'sizes' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <Layers className="w-5 h-5 text-yellow-400" />
+                    Size Distribution Performance Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Footwear sizing distribution, volume curve, and customer demand • {selectedRangeLabel}
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                <Table>
+                  <TableHeader className="bg-[#161622]">
+                    <TableRow className="border-[#222232]">
+                      <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                      <TableHead className="text-yellow-300 text-xs">Shoe Size (EU)</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Gross Revenue</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Volume Share</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Avg Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sizeDetailReport.allSizesList.map((s) => (
+                      <TableRow key={s.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                        <TableCell className="text-zinc-400 font-bold text-xs">#{s.rank}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">{s.name}</TableCell>
+                        <TableCell className="text-zinc-200 font-bold text-xs text-center">{s.sales}</TableCell>
+                        <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(s.revenue)}</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-center">{s.unitShare}%</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-right">{money(s.avgPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!sizeDetailReport.allSizesList.length && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-zinc-500 py-6 text-xs">No size sales recorded for this date range.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'variants' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <Sparkles className="w-5 h-5 text-yellow-400" />
+                    Variant & Colorway Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Product colorway styles, visual finishes, and demand breakdown • {selectedRangeLabel}
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                <Table>
+                  <TableHeader className="bg-[#161622]">
+                    <TableRow className="border-[#222232]">
+                      <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                      <TableHead className="text-yellow-300 text-xs">Variant / Colorway</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Pairs Sold</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Gross Revenue</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Volume Share</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Avg Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {variantDetailReport.allVariantsList.map((v) => (
+                      <TableRow key={v.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                        <TableCell className="text-zinc-400 font-bold text-xs">#{v.rank}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">{v.name}</TableCell>
+                        <TableCell className="text-zinc-200 font-bold text-xs text-center">{v.sales}</TableCell>
+                        <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(v.revenue)}</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-center">{v.unitShare}%</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-right">{money(v.avgPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!variantDetailReport.allVariantsList.length && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-zinc-500 py-6 text-xs">No variant sales recorded for this date range.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {reportType === 'payments' && (
+        <div className="space-y-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2.5 text-lg font-bold">
+                    <CreditCard className="w-5 h-5 text-yellow-400" />
+                    Payment Method Performance Report
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Payment channel breakdown, Cash vs GCash volume, and transaction velocity • {selectedRangeLabel}
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                  <p className="text-xs uppercase tracking-wide text-yellow-200/70">Total Transactions</p>
+                  <p className="mt-2 text-2xl font-bold text-white">{paymentDetailReport.totalTransactions.toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-zinc-400">Completed payments</p>
+                </div>
+                <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                  <p className="text-xs uppercase tracking-wide text-yellow-200/70">Total Collected</p>
+                  <p className="mt-2 text-2xl font-bold text-yellow-300">{money(paymentDetailReport.totalRevenue)}</p>
+                  <p className="mt-1 text-xs text-zinc-400">Gross funds captured</p>
+                </div>
+                <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                  <p className="text-xs uppercase tracking-wide text-yellow-200/70">Primary Channel</p>
+                  <p className="mt-2 text-2xl font-bold text-green-400">{paymentDetailReport.allPaymentsList[0]?.name ?? 'N/A'}</p>
+                  <p className="mt-1 text-xs text-zinc-400">{paymentDetailReport.allPaymentsList[0]?.share ?? 0}% of revenue</p>
+                </div>
+                <div className="rounded-xl border border-[#24242d] bg-[#07070a] p-4">
+                  <p className="text-xs uppercase tracking-wide text-yellow-200/70">Average Ticket</p>
+                  <p className="mt-2 text-2xl font-bold text-white">{money(paymentDetailReport.totalTransactions > 0 ? paymentDetailReport.totalRevenue / paymentDetailReport.totalTransactions : 0)}</p>
+                  <p className="mt-1 text-xs text-zinc-400">Per payment transaction</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#222232] bg-[#101018] p-4 space-y-3">
+                <Table>
+                  <TableHeader className="bg-[#161622]">
+                    <TableRow className="border-[#222232]">
+                      <TableHead className="text-yellow-300 text-xs w-16">Rank</TableHead>
+                      <TableHead className="text-yellow-300 text-xs">Payment Method</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Transactions</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Total Volume</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Transaction Share</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Revenue Share</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Avg Ticket Size</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentDetailReport.allPaymentsList.map((p) => (
+                      <TableRow key={p.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                        <TableCell className="text-zinc-400 font-bold text-xs">#{p.rank}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">{p.name}</TableCell>
+                        <TableCell className="text-zinc-200 font-bold text-xs text-center">{p.count}</TableCell>
+                        <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(p.revenue)}</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-center">{p.txnShare}%</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-center font-semibold">{p.share}%</TableCell>
+                        <TableCell className="text-zinc-300 text-xs text-right">{money(p.avgTx)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!paymentDetailReport.allPaymentsList.length && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-zinc-500 py-6 text-xs">No payment transactions found for this date range.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
