@@ -125,6 +125,39 @@ function formatDateRange(start: Date, end: Date) {
   return `${start.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
 }
 
+function getDepartmentColor(deptName: string): string {
+  const lower = String(deptName ?? '').trim().toLowerCase();
+  // Check women first since 'women' contains 'men'
+  if (lower.includes('women') || lower === "women's" || lower === 'female') return '#ef4444'; // Red
+  if (lower.includes('men') || lower === "men's" || lower === 'male') return '#3b82f6'; // Blue
+  if (lower.includes('unisex')) return '#a855f7'; // Vibrant Purple (perfect blend of Blue & Red)
+  if (lower.includes('kid') || lower.includes('child') || lower.includes('youth') || lower.includes('infant')) return '#f59e0b'; // Amber Gold
+  return '#10b981'; // Emerald
+}
+
+function getPaymentMethodColor(methodName: string): string {
+  const lower = String(methodName ?? '').trim().toLowerCase();
+  if (lower.includes('gcash')) return '#0066ff'; // Iconic Electric GCash Blue
+  if (lower.includes('cash')) return '#10b981'; // Vibrant Cash Emerald Green
+  if (lower.includes('card') || lower.includes('credit') || lower.includes('debit')) return '#f59e0b'; // Warm Amber Gold
+  if (lower.includes('maya') || lower.includes('paymaya')) return '#8b5cf6'; // Vivid Maya Purple
+  if (lower.includes('bank') || lower.includes('transfer')) return '#ec4899'; // Hot Pink / Rose
+  return '#06b6d4'; // Fallback Cyan
+}
+
+const darkChartTooltipProps = {
+  contentStyle: {
+    backgroundColor: '#16161C',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '10px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+    padding: '8px 12px',
+    color: '#FFFFFF',
+  },
+  labelStyle: { color: '#FFFFFF', fontWeight: 600, fontSize: 12, marginBottom: 2 },
+  itemStyle: { color: '#FFFFFF', fontSize: 12, fontWeight: 500 },
+};
+
 type TrendBucketMode = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
 
 function startOfDay(date: Date) {
@@ -3119,7 +3152,7 @@ export function ReportsAnalytics() {
                           <YAxis yAxisId="left" stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
                           <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" fontSize={11} />
                           <Tooltip
-                            contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                            {...darkChartTooltipProps}
                             formatter={(val: any, name: string) => [name === 'Revenue (PHP)' ? money(Number(val)) : `${val} pairs`, name]}
                           />
                           <Legend wrapperStyle={{ fontSize: '11px', color: '#facc15' }} />
@@ -3231,7 +3264,7 @@ export function ReportsAnalytics() {
                       <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} />
                       <YAxis stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        {...darkChartTooltipProps}
                         formatter={(val: any) => [money(Number(val)), 'Revenue']}
                       />
                       <Bar dataKey="revenue" fill="#facc15" radius={[4, 4, 0, 0]} />
@@ -3323,24 +3356,27 @@ export function ReportsAnalytics() {
                         dataKey="revenue"
                         nameKey="name"
                       >
-                        {departmentDetailReport.allDeptsList.map((entry, idx) => {
-                          const colors = ['#3b82f6', '#ec4899', '#eab308', '#10b981', '#8b5cf6'];
-                          return <Cell key={entry.name} fill={colors[idx % colors.length]} />;
-                        })}
+                        {departmentDetailReport.allDeptsList.map((entry) => (
+                          <Cell key={entry.name} fill={getDepartmentColor(entry.name)} />
+                        ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        {...darkChartTooltipProps}
                         formatter={(val: any, name: string) => [money(Number(val)), name]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-zinc-300 mt-1">
-                    {departmentDetailReport.allDeptsList.map((entry, idx) => {
-                      const colors = ['#3b82f6', '#ec4899', '#eab308', '#10b981', '#8b5cf6'];
+                  <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs text-zinc-300 mt-2">
+                    {departmentDetailReport.allDeptsList.map((entry) => {
+                      const color = getDepartmentColor(entry.name);
                       return (
-                        <span key={entry.name} className="inline-flex items-center gap-1.5">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }} />
-                          {entry.name} ({entry.share}%)
+                        <span
+                          key={entry.name}
+                          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#161622] border border-[#2b2b3d] shadow-sm"
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                          <span className="text-white font-medium">{entry.name}</span>
+                          <span className="text-yellow-300 font-semibold">({entry.share}%)</span>
                         </span>
                       );
                     })}
@@ -3363,7 +3399,12 @@ export function ReportsAnalytics() {
                     {departmentDetailReport.allDeptsList.map((d) => (
                       <TableRow key={d.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
                         <TableCell className="text-zinc-400 font-bold text-xs">#{d.rank}</TableCell>
-                        <TableCell className="text-white font-medium text-xs">{d.name}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getDepartmentColor(d.name) }} />
+                            {d.name}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-zinc-200 font-bold text-xs text-center">{d.sales}</TableCell>
                         <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(d.revenue)}</TableCell>
                         <TableCell className="text-zinc-300 text-xs text-center">{d.share}%</TableCell>
@@ -3415,7 +3456,7 @@ export function ReportsAnalytics() {
                       <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} label={{ value: 'Size (EU)', position: 'insideBottom', offset: -2, fill: '#71717a', fontSize: 10 }} />
                       <YAxis stroke="#facc15" fontSize={11} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        {...darkChartTooltipProps}
                         formatter={(val: any) => [`${val} pairs sold`, 'Volume']}
                       />
                       <Bar dataKey="sales" fill="#facc15" radius={[4, 4, 0, 0]} />
@@ -3486,7 +3527,7 @@ export function ReportsAnalytics() {
                       <XAxis dataKey="name" stroke="#a1a1aa" fontSize={10} />
                       <YAxis stroke="#a855f7" fontSize={11} allowDecimals={false} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                        {...darkChartTooltipProps}
                         formatter={(val: any) => [`${val} pairs sold`, 'Volume']}
                       />
                       <Bar dataKey="sales" fill="#a855f7" radius={[4, 4, 0, 0]} />
@@ -3590,30 +3631,36 @@ export function ReportsAnalytics() {
                           dataKey="revenue"
                           nameKey="name"
                         >
-                          {paymentDetailReport.allPaymentsList.map((entry) => {
-                            const payColor = entry.name.toLowerCase().includes('gcash') ? '#0ea5e9' : entry.name.toLowerCase().includes('card') ? '#f59e0b' : '#10b981';
-                            return <Cell key={entry.name} fill={payColor} />;
-                          })}
+                          {paymentDetailReport.allPaymentsList.map((entry) => (
+                            <Cell key={entry.name} fill={getPaymentMethodColor(entry.name)} />
+                          ))}
                         </Pie>
                         <Tooltip
-                          contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', padding: '8px 12px', color: '#FFFFFF' }}
+                          {...darkChartTooltipProps}
                           formatter={(val: any, name: string) => [money(Number(val)), name]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {paymentDetailReport.allPaymentsList.map((entry) => {
-                      const payColor = entry.name.toLowerCase().includes('gcash') ? '#0ea5e9' : entry.name.toLowerCase().includes('card') ? '#f59e0b' : '#10b981';
+                      const payColor = getPaymentMethodColor(entry.name);
                       return (
-                        <div key={entry.name} className="p-2.5 rounded-lg border border-[#222230] bg-[#141420] flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: payColor }} />
-                            <span className="text-xs font-semibold text-white">{entry.name}</span>
+                        <div
+                          key={entry.name}
+                          className="p-3 rounded-xl border border-[#242436] bg-[#13131e] flex items-center justify-between shadow-sm transition-all hover:border-[#383852]"
+                          style={{ borderLeft: `5px solid ${payColor}` }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-3.5 h-3.5 rounded-full shrink-0 shadow-md ring-2 ring-white/10" style={{ backgroundColor: payColor }} />
+                            <div>
+                              <span className="text-xs font-bold text-white block">{entry.name}</span>
+                              <span className="text-[11px] text-zinc-400 block">{entry.share}% revenue share</span>
+                            </div>
                           </div>
                           <div className="text-right">
                             <span className="text-xs text-yellow-300 font-bold">{money(entry.revenue)}</span>
-                            <span className="text-[10px] text-zinc-400 block">{entry.share}% • {entry.count} txns</span>
+                            <span className="text-[10px] text-zinc-400 block">{entry.count} transactions • {entry.txnShare}% volume</span>
                           </div>
                         </div>
                       );
@@ -3639,7 +3686,12 @@ export function ReportsAnalytics() {
                     {paymentDetailReport.allPaymentsList.map((p) => (
                       <TableRow key={p.name} className="border-[#1e1e2c] hover:bg-white/[0.03]">
                         <TableCell className="text-zinc-400 font-bold text-xs">#{p.rank}</TableCell>
-                        <TableCell className="text-white font-medium text-xs">{p.name}</TableCell>
+                        <TableCell className="text-white font-medium text-xs">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getPaymentMethodColor(p.name) }} />
+                            {p.name}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-zinc-200 font-bold text-xs text-center">{p.count}</TableCell>
                         <TableCell className="text-yellow-300 font-semibold text-xs text-center">{money(p.revenue)}</TableCell>
                         <TableCell className="text-zinc-300 text-xs text-center">{p.txnShare}%</TableCell>
@@ -3734,7 +3786,7 @@ export function ReportsAnalytics() {
                   <XAxis dataKey="month" stroke="#fef08a" />
                   <YAxis yAxisId="left" stroke="#fef08a" />
                   <YAxis yAxisId="right" orientation="right" stroke="#facc15" />
-                  <Tooltip contentStyle={{ backgroundColor: '#111118', border: '1px solid #24242d', color: '#fef08a' }} />
+                  <Tooltip {...darkChartTooltipProps} />
                   <Legend wrapperStyle={{ color: '#fef08a' }} />
                   <Line yAxisId="left" type="monotone" dataKey="turnover" stroke="#fef08a" strokeWidth={2} name="Turnover Rate" />
                   <Line yAxisId="right" type="monotone" dataKey="avgDays" stroke="#facc15" strokeWidth={2} name="Avg Days to Sell" />

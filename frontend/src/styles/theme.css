@@ -347,4 +347,21 @@
   input:-webkit-autofill::first-line {
     color: #F5F5F7;
   }
+
+  /* Recharts dark tooltip text styling */
+  .recharts-default-tooltip {
+    background-color: #14141c !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 10px !important;
+    color: #ffffff !important;
+  }
+
+  .recharts-tooltip-item,
+  .recharts-tooltip-item-name,
+  .recharts-tooltip-item-separator,
+  .recharts-tooltip-item-value,
+  .recharts-tooltip-label {
+    color: #ffffff !important;
+  }
 }
+
