@@ -2201,8 +2201,8 @@ function formatReceiptNumber(salesId?: string) {
               {/* ── QR CODE ── */}
               <div className="flex justify-center pt-2 pb-1">
                 <QRCodeSVG
-                  value={receiptData.rawSalesId || receiptData.receiptNumber}
-                  size={80}
+                  value={receiptData.receiptNumber || receiptData.rawSalesId}
+                  size={96}
                   level="M"
                   bgColor="#ffffff"
                   fgColor="#000000"

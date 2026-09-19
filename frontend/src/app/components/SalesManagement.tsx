@@ -1228,8 +1228,8 @@ export function SalesManagement() {
               {/* ── QR CODE ── */}
               <div className="flex justify-center pt-2 pb-1">
                 <QRCodeSVG
-                  value={viewingReceipt.rawSalesId || viewingReceipt.receiptNumber}
-                  size={80}
+                  value={viewingReceipt.receiptNumber || viewingReceipt.rawSalesId}
+                  size={96}
                   level="M"
                   bgColor="#ffffff"
                   fgColor="#000000"

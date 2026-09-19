@@ -228,8 +228,27 @@ type ProductManagementProps = {
 export function ProductManagement({ view, onViewChange }: ProductManagementProps = {}) {
   const queryClient = useQueryClient();
   const [internalActiveTab, setInternalActiveTab] = useState<ProductTab>(view ?? "inventory");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const activeTab = view ?? internalActiveTab;
+
+  const [searchTermByTab, setSearchTermByTab] = useState<Record<string, string>>({ list: "", settings: "", inventory: "" });
+  const [selectedCategoryByTab, setSelectedCategoryByTab] = useState<Record<string, string>>({ list: "all", settings: "all", inventory: "all" });
+  
+  const searchTerm = searchTermByTab[activeTab] ?? "";
+  const setSearchTerm = (val: string | ((prev: string) => string)) => {
+    setSearchTermByTab((prev) => ({
+      ...prev,
+      [activeTab]: typeof val === 'function' ? val(prev[activeTab] || "") : val
+    }));
+  };
+
+  const selectedCategory = selectedCategoryByTab[activeTab] ?? "all";
+  const setSelectedCategory = (val: string | ((prev: string) => string)) => {
+    setSelectedCategoryByTab((prev) => ({
+      ...prev,
+      [activeTab]: typeof val === 'function' ? val(prev[activeTab] || "all") : val
+    }));
+  };
+
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<UiProduct | null>(null);
   const [deleteTargetProductId, setDeleteTargetProductId] = useState<string>("");
@@ -243,7 +262,6 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
   const inventoryQuery = useInventory();
   const categoriesQuery = useCategories();
   const productMutations = useProductsMutations();
-  const activeTab = view ?? internalActiveTab;
 
   useEffect(() => {
     if (view) setInternalActiveTab(view);

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
-import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera, Calendar, Package, TrendingUp, Users } from "lucide-react";
+import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera, Calendar, Package, TrendingUp, Users, ZoomIn, ZoomOut, Zap, Info } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import jsQR from "jsqr";
 import { toast } from "sonner";
@@ -211,6 +211,41 @@ function formatReceiptNumber(salesId?: string, transactionDate?: string) {
   return `RCP-${dateStr}-${cleanSuffix}`;
 }
 
+function enhanceFrameForQr(srcData: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+  const len = w * h;
+  let min = 255;
+  let max = 0;
+  const luma = new Uint8Array(len);
+
+  for (let i = 0; i < len; i++) {
+    const idx = i * 4;
+    // Fast integer luminance approximation
+    const l = (srcData[idx] * 77 + srcData[idx + 1] * 150 + srcData[idx + 2] * 29) >> 8;
+    luma[i] = l;
+    if (l < min) min = l;
+    if (l > max) max = l;
+  }
+
+  const range = max - min || 1;
+  const out = new Uint8ClampedArray(len * 4);
+
+  // If already high contrast, return original
+  if (range > 190 && min < 30 && max > 225) {
+    return srcData;
+  }
+
+  // Stretch contrast across full dynamic range [0, 255]
+  for (let i = 0; i < len; i++) {
+    const idx = i * 4;
+    const val = Math.min(255, Math.max(0, Math.round(((luma[i] - min) * 255) / range)));
+    out[idx] = val;
+    out[idx + 1] = val;
+    out[idx + 2] = val;
+    out[idx + 3] = 255;
+  }
+  return out;
+}
+
 async function decodeQrFromImageFile(file: File): Promise<string | null> {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -249,6 +284,11 @@ async function decodeQrFromImageFile(file: File): Promise<string | null> {
             code = jsQR(bottomData.data, w, cropH, { inversionAttempts: "attemptBoth" });
             if (code?.data) return resolve(code.data.trim());
 
+            // Pass 2B: Contrast-enhanced bottom half
+            const enhancedBottom = enhanceFrameForQr(bottomData.data, w, cropH);
+            code = jsQR(enhancedBottom, w, cropH, { inversionAttempts: "attemptBoth" });
+            if (code?.data) return resolve(code.data.trim());
+
             // Pass 3: Bottom 30% crop (tight zoom on footer)
             const bottom30Y = Math.floor(h * 0.7);
             const crop30H = h - bottom30Y;
@@ -260,6 +300,11 @@ async function decodeQrFromImageFile(file: File): Promise<string | null> {
               crop30Ctx.drawImage(canvas, 0, bottom30Y, w, crop30H, 0, 0, w, crop30H);
               const data30 = crop30Ctx.getImageData(0, 0, w, crop30H);
               code = jsQR(data30.data, w, crop30H, { inversionAttempts: "attemptBoth" });
+              if (code?.data) return resolve(code.data.trim());
+
+              // Pass 3B: Contrast-enhanced tight crop
+              const enhanced30 = enhanceFrameForQr(data30.data, w, crop30H);
+              code = jsQR(enhanced30, w, crop30H, { inversionAttempts: "attemptBoth" });
               if (code?.data) return resolve(code.data.trim());
             }
           }
@@ -381,6 +426,12 @@ export function ReturnManagement() {
   const [validatedViaQr, setValidatedViaQr] = useState(false);
   const [qrScanError, setQrScanError] = useState<string | null>(null);
   const [cameraLoading, setCameraLoading] = useState(false);
+  const [cameraZoom, setCameraZoom] = useState<number>(1);
+  const [availableCameras, setAvailableCameras] = useState<any[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [scannerManualInput, setScannerManualInput] = useState("");
 
   useEffect(() => {
     getAllReceiptProofs().then((map) => {
@@ -781,13 +832,161 @@ export function ReturnManagement() {
     }
   };
 
+  // Apply digital zoom and hardware zoom whenever cameraZoom changes
+  useEffect(() => {
+    const video = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
+    if (video) {
+      video.style.transform = `scale(${cameraZoom})`;
+      video.style.transformOrigin = "center center";
+      video.style.transition = "transform 0.2s ease-out";
+      const track = (video.srcObject as MediaStream)?.getVideoTracks()?.[0];
+      if (track) {
+        try {
+          const caps: any = track.getCapabilities ? track.getCapabilities() : {};
+          if (caps.zoom) {
+            track.applyConstraints({ advanced: [{ zoom: cameraZoom } as any] }).catch(() => {});
+          }
+        } catch {}
+      }
+    }
+  }, [cameraZoom]);
+
+  const toggleTorch = async () => {
+    const video = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
+    if (video) {
+      const track = (video.srcObject as MediaStream)?.getVideoTracks()?.[0];
+      if (track) {
+        try {
+          const nextTorch = !torchOn;
+          await track.applyConstraints({ advanced: [{ torch: nextTorch } as any] });
+          setTorchOn(nextTorch);
+        } catch {}
+      }
+    }
+  };
+
+  const handleManualInputInScanner = (text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    setIsQrScannerOpen(false);
+    setReceiptNumberInput(clean);
+    setValidatedViaQr(true);
+    validateReceiptNumber(clean);
+    setScannerManualInput("");
+  };
+
   useEffect(() => {
     let qrScanner: Html5Qrcode | null = null;
+    let scanInterval: any = null;
     let isMounted = true;
+    let scanningActive = true;
+    let isProcessing = false;
 
     if (isQrScannerOpen) {
       setQrScanError(null);
       setCameraLoading(true);
+      setTorchOn(false);
+      setTorchSupported(false);
+
+      const offscreenCanvas = document.createElement("canvas");
+      const offscreenCtx = offscreenCanvas.getContext("2d", { willReadFrequently: true });
+
+      let nativeDetector: any = null;
+      if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+        try {
+          nativeDetector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+        } catch {
+          nativeDetector = null;
+        }
+      }
+
+      const handleDetectedQr = (decodedText: string) => {
+        if (!isMounted || !scanningActive) return;
+        scanningActive = false;
+        if (scanInterval) {
+          clearInterval(scanInterval);
+          scanInterval = null;
+        }
+        const clean = decodedText.trim();
+        setIsQrScannerOpen(false);
+        setReceiptNumberInput(clean);
+        setValidatedViaQr(true);
+        validateReceiptNumber(clean);
+        toast.success(`Receipt QR Code scanned successfully!`);
+      };
+
+      const startFrameScanLoop = () => {
+        if (scanInterval) clearInterval(scanInterval);
+        scanInterval = setInterval(async () => {
+          if (!scanningActive || isProcessing || !isMounted) return;
+          const currentVideo = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
+          if (!currentVideo || currentVideo.readyState < 2 || currentVideo.videoWidth === 0) return;
+
+          isProcessing = true;
+          try {
+            // 1. Primary Engine: Native BarcodeDetector (Chrome, Edge, Android)
+            // Ultra fast, ML-assisted C++ pipeline, highly tolerant of blur & tilt
+            if (nativeDetector) {
+              try {
+                const barcodes = await nativeDetector.detect(currentVideo);
+                if (barcodes && barcodes.length > 0 && barcodes[0]?.rawValue) {
+                  handleDetectedQr(barcodes[0].rawValue);
+                  return;
+                }
+              } catch {}
+            }
+
+            // 2. Secondary Engine: Canvas-based jsQR with Multi-Pass Processing
+            if (offscreenCtx) {
+              const vw = currentVideo.videoWidth;
+              const vh = currentVideo.videoHeight;
+
+              // Pass 2A: Full frame scan
+              const targetW = Math.min(vw, 1024);
+              const scale = targetW / vw;
+              const targetH = Math.floor(vh * scale);
+
+              offscreenCanvas.width = targetW;
+              offscreenCanvas.height = targetH;
+              offscreenCtx.drawImage(currentVideo, 0, 0, targetW, targetH);
+
+              const fullImg = offscreenCtx.getImageData(0, 0, targetW, targetH);
+              let res = jsQR(fullImg.data, targetW, targetH, { inversionAttempts: "dontInvert" });
+              if (res?.data) {
+                handleDetectedQr(res.data);
+                return;
+              }
+
+              // Pass 2B: Center Crop (50% central window)
+              // Mimics optical zoom for receipts held ~25-30cm away in sharp focal zone
+              const cropSize = Math.floor(Math.min(vw, vh) * 0.55);
+              const cropX = Math.floor((vw - cropSize) / 2);
+              const cropY = Math.floor((vh - cropSize) / 2);
+
+              offscreenCanvas.width = cropSize;
+              offscreenCanvas.height = cropSize;
+              offscreenCtx.drawImage(currentVideo, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+
+              const centerImg = offscreenCtx.getImageData(0, 0, cropSize, cropSize);
+              res = jsQR(centerImg.data, cropSize, cropSize, { inversionAttempts: "attemptBoth" });
+              if (res?.data) {
+                handleDetectedQr(res.data);
+                return;
+              }
+
+              // Pass 2C: Contrast-Enhanced Center Crop (for faint thermal paper dots)
+              const enhancedData = enhanceFrameForQr(centerImg.data, cropSize, cropSize);
+              res = jsQR(enhancedData, cropSize, cropSize, { inversionAttempts: "attemptBoth" });
+              if (res?.data) {
+                handleDetectedQr(res.data);
+                return;
+              }
+            }
+          } catch {} finally {
+            isProcessing = false;
+          }
+        }, 75);
+      };
 
       const initScanner = async () => {
         try {
@@ -798,60 +997,77 @@ export function ReturnManagement() {
           try {
             const cameras = await Html5Qrcode.getCameras();
             if (cameras && cameras.length > 0) {
-              const rearCamera = cameras.find((c) => /back|rear|environment|world/i.test(c.label));
-              cameraConfig = rearCamera ? rearCamera.id : cameras[0].id;
+              setAvailableCameras(cameras);
+              if (selectedCameraId && cameras.some((c) => c.id === selectedCameraId)) {
+                cameraConfig = selectedCameraId;
+              } else {
+                const rearCamera = cameras.find((c) => /back|rear|environment|world/i.test(c.label));
+                cameraConfig = rearCamera ? rearCamera.id : cameras[0].id;
+              }
             }
           } catch {
             cameraConfig = { facingMode: { ideal: "environment" } };
           }
 
-          const qrBoxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * 0.85);
-            return {
-              width: Math.max(180, qrboxSize),
-              height: Math.max(180, qrboxSize),
-            };
+          const scanConfig = {
+            fps: 20,
+            videoConstraints: {
+              width: { ideal: 1920, min: 640 },
+              height: { ideal: 1080, min: 480 },
+            },
+          };
+
+          const handleTrackCaps = () => {
+            const video = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
+            if (video) {
+              video.style.transform = `scale(${cameraZoom})`;
+              video.style.transformOrigin = "center center";
+              const track = (video.srcObject as MediaStream)?.getVideoTracks()?.[0];
+              if (track) {
+                try {
+                  const caps: any = track.getCapabilities ? track.getCapabilities() : {};
+                  if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+                    track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }).catch(() => {});
+                  }
+                  if (caps.torch) {
+                    setTorchSupported(true);
+                  }
+                } catch {}
+              }
+            }
           };
 
           try {
             await qrScanner.start(
               cameraConfig,
-              { fps: 15, qrbox: qrBoxFunction },
+              scanConfig,
               (decodedText) => {
-                if (isMounted) {
-                  const clean = decodedText.trim();
-                  setIsQrScannerOpen(false);
-                  setReceiptNumberInput(clean);
-                  setValidatedViaQr(true);
-                  validateReceiptNumber(clean);
-                  toast.success(`Receipt QR Code scanned successfully!`);
-                }
+                handleDetectedQr(decodedText);
               },
               () => {}
             );
-            if (isMounted) setCameraLoading(false);
+            if (isMounted) {
+              setCameraLoading(false);
+              handleTrackCaps();
+              startFrameScanLoop();
+            }
             return;
           } catch (primaryStartErr) {
-            // Fallback for laptops/desktops where environment constraint throws OverconstrainedError
             console.warn("Primary camera start failed, trying front webcam fallback:", primaryStartErr);
             if (isMounted && qrScanner) {
               await qrScanner.start(
                 { facingMode: "user" },
-                { fps: 15, qrbox: qrBoxFunction },
+                scanConfig,
                 (decodedText) => {
-                  if (isMounted) {
-                    const clean = decodedText.trim();
-                    setIsQrScannerOpen(false);
-                    setReceiptNumberInput(clean);
-                    setValidatedViaQr(true);
-                    validateReceiptNumber(clean);
-                    toast.success(`Receipt QR Code scanned successfully!`);
-                  }
+                  handleDetectedQr(decodedText);
                 },
                 () => {}
               );
-              if (isMounted) setCameraLoading(false);
+              if (isMounted) {
+                setCameraLoading(false);
+                handleTrackCaps();
+                startFrameScanLoop();
+              }
               return;
             }
           }
@@ -868,10 +1084,15 @@ export function ReturnManagement() {
         }
       };
 
-      const timer = setTimeout(initScanner, 200);
+      const timer = setTimeout(initScanner, 150);
       return () => {
         isMounted = false;
+        scanningActive = false;
         clearTimeout(timer);
+        if (scanInterval) {
+          clearInterval(scanInterval);
+          scanInterval = null;
+        }
         if (qrScanner) {
           qrScanner.stop().catch(() => {}).finally(() => {
             try { qrScanner?.clear(); } catch {}
@@ -879,7 +1100,7 @@ export function ReturnManagement() {
         }
       };
     }
-  }, [isQrScannerOpen]);
+  }, [isQrScannerOpen, selectedCameraId]);
 
   const handleScanQrFromFile = async (file: File) => {
     try {
@@ -3179,16 +3400,37 @@ export function ReturnManagement() {
               <QrCode className="w-5 h-5 text-yellow-400" />
               Scan Receipt QR Code
             </DialogTitle>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs text-zinc-400 mt-0.5">
               Point your camera at the QR code on the customer&apos;s thermal receipt to instantly verify purchase validity.
             </p>
           </DialogHeader>
 
-          <div className="space-y-4 py-3">
+          <div className="space-y-3 py-2">
+            {/* Focus distance guidance tip */}
+            <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 p-2.5 text-xs text-amber-200">
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-semibold text-amber-300">Webcam Focus Tip:</p>
+                <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                  Hold receipt <strong>20–30 cm (8–12 inches)</strong> away so it stays in sharp focus. If the QR code looks small, use the <strong>1.5x / 2x Zoom</strong> buttons below.
+                </p>
+              </div>
+            </div>
+
             {/* Viewfinder Area */}
-            <div className="relative w-full aspect-square max-w-[320px] mx-auto rounded-2xl overflow-hidden bg-black border border-zinc-700 shadow-2xl flex items-center justify-center [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover [&_video]:!rounded-xl [&_img]:hidden">
+            <div className="relative w-full aspect-square max-w-[300px] mx-auto rounded-2xl overflow-hidden bg-black border-2 border-yellow-400/40 shadow-2xl flex items-center justify-center [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover [&_video]:!rounded-xl [&_img]:hidden">
               <div id="receipt-qr-reader" className="w-full h-full" />
               <div id="receipt-file-qr-temp" className="hidden" />
+
+              {/* Viewfinder Corner Overlays */}
+              <div className="pointer-events-none absolute inset-6 border border-dashed border-yellow-400/30 rounded-xl" />
+              <div className="pointer-events-none absolute top-6 left-6 w-6 h-6 border-t-2 border-l-2 border-yellow-400 rounded-tl-lg" />
+              <div className="pointer-events-none absolute top-6 right-6 w-6 h-6 border-t-2 border-r-2 border-yellow-400 rounded-tr-lg" />
+              <div className="pointer-events-none absolute bottom-6 left-6 w-6 h-6 border-b-2 border-l-2 border-yellow-400 rounded-bl-lg" />
+              <div className="pointer-events-none absolute bottom-6 right-6 w-6 h-6 border-b-2 border-r-2 border-yellow-400 rounded-br-lg" />
+
+              {/* Laser Scanning Animation Line */}
+              <div className="pointer-events-none absolute inset-x-6 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-transparent via-yellow-400 to-transparent shadow-[0_0_12px_#facc15] animate-pulse" />
 
               {cameraLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 z-10 gap-2">
@@ -3205,12 +3447,107 @@ export function ReturnManagement() {
               )}
             </div>
 
+            {/* Zoom Controls & Camera Options */}
+            <div className="flex items-center justify-between gap-2 px-1">
+              {/* Zoom Buttons */}
+              <div className="flex items-center gap-1 bg-[#181826] p-1 rounded-xl border border-zinc-800">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 px-1.5 flex items-center gap-1">
+                  <ZoomIn className="w-3 h-3 text-yellow-400" />
+                  Zoom:
+                </span>
+                {[1, 1.5, 2].map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => setCameraZoom(z)}
+                    className={`px-2.5 py-0.5 text-xs font-bold rounded-lg transition ${
+                      cameraZoom === z
+                        ? "bg-yellow-400 text-black shadow"
+                        : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {z}x
+                  </button>
+                ))}
+              </div>
+
+              {/* Extra Tools: Flip Camera & Flashlight */}
+              <div className="flex items-center gap-1.5">
+                {torchSupported && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={toggleTorch}
+                    className={`h-8 px-2.5 rounded-xl border text-xs flex items-center gap-1.5 ${
+                      torchOn
+                        ? "bg-yellow-400 text-black border-yellow-400"
+                        : "bg-[#181826] text-zinc-300 border-zinc-800 hover:text-white"
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Flash</span>
+                  </Button>
+                )}
+
+                {availableCameras.length > 1 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const curIdx = availableCameras.findIndex((c) => c.id === selectedCameraId);
+                      const nextCamera = availableCameras[(curIdx + 1) % availableCameras.length];
+                      setSelectedCameraId(nextCamera.id);
+                    }}
+                    className="h-8 px-2.5 rounded-xl bg-[#181826] border border-zinc-800 text-zinc-300 hover:text-white text-xs flex items-center gap-1.5"
+                    title="Switch Camera"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-yellow-400" />
+                    <span>Switch</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Manual Entry Fallback inside Modal */}
+            <div className="pt-2 border-t border-[#252536] space-y-1.5">
+              <p className="text-[11px] text-zinc-400">
+                Or enter Receipt # printed below the QR code (e.g. <code>*RCP-...*</code>):
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Receipt className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-yellow-400/70" />
+                  <Input
+                    value={scannerManualInput}
+                    onChange={(e) => setScannerManualInput(e.target.value)}
+                    placeholder="e.g. RCP-20260918-9374 or 9374"
+                    className="h-9 pl-8 text-xs bg-[#1a1a27] border-[#2e2e42] text-yellow-100 placeholder:text-zinc-500 rounded-xl"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && scannerManualInput.trim()) {
+                        e.preventDefault();
+                        handleManualInputInScanner(scannerManualInput);
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!scannerManualInput.trim()}
+                  onClick={() => handleManualInputInScanner(scannerManualInput)}
+                  className="h-9 px-4 text-xs bg-yellow-400 text-black font-bold hover:bg-yellow-300 rounded-xl shrink-0"
+                >
+                  Verify
+                </Button>
+              </div>
+            </div>
+
             {/* Upload alternative */}
-            <div className="text-center pt-2 border-t border-[#252536]">
-              <p className="text-[11px] text-zinc-400 mb-2">Or upload a photo of the receipt QR code:</p>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 px-4 py-2 text-xs font-semibold text-yellow-200 transition">
+            <div className="text-center pt-1">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 px-4 py-1.5 text-xs font-semibold text-yellow-200 transition">
                 <Upload className="w-3.5 h-3.5 text-yellow-400" />
-                Upload Receipt Photo
+                Upload Receipt Photo Instead
                 <input
                   type="file"
                   accept="image/*"
