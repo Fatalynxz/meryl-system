@@ -86,6 +86,7 @@ export function SalesManagement() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCashier, setSelectedCashier] = useState("all");
+  const [replacementFilter, setReplacementFilter] = useState<"all" | "replaced" | "not_replaced" | "fully_replaced" | "partially_replaced">("all");
   const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "quarter" | "year" | "custom">("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -397,6 +398,7 @@ export function SalesManagement() {
   const handleResetFilters = () => {
     setSearchTerm("");
     setSelectedCashier("all");
+    setReplacementFilter("all");
     setDatePreset("all");
     setStartDate("");
     setEndDate("");
@@ -405,6 +407,7 @@ export function SalesManagement() {
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
     selectedCashier !== "all" ||
+    replacementFilter !== "all" ||
     startDate ||
     endDate ||
     datePreset !== "all"
@@ -433,6 +436,14 @@ export function SalesManagement() {
         if (!matchesCashier) return false;
       }
 
+      if (replacementFilter !== "all") {
+        const repStatus = replacementLabelBySaleId.get(s.sales_id) ?? "Not Replaced";
+        if (replacementFilter === "replaced" && repStatus === "Not Replaced") return false;
+        if (replacementFilter === "not_replaced" && repStatus !== "Not Replaced") return false;
+        if (replacementFilter === "fully_replaced" && repStatus !== "Fully Replaced") return false;
+        if (replacementFilter === "partially_replaced" && repStatus !== "Partially Replaced") return false;
+      }
+
       if (startDate && s.transaction_date !== "N/A" && s.transaction_date < startDate) {
         return false;
       }
@@ -442,7 +453,7 @@ export function SalesManagement() {
 
       return true;
     });
-  }, [visibleSales, searchTerm, selectedCashier, startDate, endDate]);
+  }, [visibleSales, searchTerm, selectedCashier, replacementFilter, replacementLabelBySaleId, startDate, endDate]);
 
   const filteredCompletedSales = useMemo(
     () => filteredSales.filter((s) => s.status === "Completed"),
@@ -463,28 +474,6 @@ export function SalesManagement() {
     return filteredRevenue / filteredCompletedSales.length;
   }, [filteredRevenue, filteredCompletedSales.length]);
 
-  const periodBadgeText = useMemo(() => {
-    switch (datePreset) {
-      case "today":
-        return "Daily (Today)";
-      case "week":
-        return "Weekly (7 Days)";
-      case "month":
-        return "Monthly (This Month)";
-      case "quarter":
-        return "Quarterly (This Qtr)";
-      case "year":
-        return "Annually (This Year)";
-      case "custom":
-        if (startDate && endDate) return `${startDate} to ${endDate}`;
-        if (startDate) return `From ${startDate}`;
-        if (endDate) return `Until ${endDate}`;
-        return "Custom Range";
-      case "all":
-      default:
-        return "All Time";
-    }
-  }, [datePreset, startDate, endDate]);
 
   const replacementLabelBySaleId = useMemo(() => {
     const map = new Map<string, "Fully Replaced" | "Partially Replaced" | "Not Replaced">();
@@ -551,12 +540,7 @@ export function SalesManagement() {
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Revenue</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
-                    {periodBadgeText}
-                  </span>
-                </div>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Revenue</p>
                 <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
                   ₱{filteredRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
@@ -576,12 +560,7 @@ export function SalesManagement() {
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Orders</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
-                    {periodBadgeText}
-                  </span>
-                </div>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Orders</p>
                 <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
                   {filteredSales.length}
                 </p>
@@ -601,12 +580,7 @@ export function SalesManagement() {
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Avg Order Value</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
-                    {periodBadgeText}
-                  </span>
-                </div>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Avg Order Value</p>
                 <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
                   ₱{filteredAverageOrderValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
@@ -624,12 +598,7 @@ export function SalesManagement() {
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Items Sold</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium">
-                    {periodBadgeText}
-                  </span>
-                </div>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Items Sold</p>
                 <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
                   {filteredTotalItemsSold}
                 </p>
@@ -663,11 +632,11 @@ export function SalesManagement() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
-          {/* FILTER CONTROLS BAR: Search, Cashier Filter, Date Range Presets & Pickers */}
+          {/* FILTER CONTROLS BAR: Search, Cashier Filter, Replacement Filter, Date Range Presets & Pickers */}
           <div className="space-y-3 bg-[#12121A] p-3.5 rounded-xl border border-[#24242F]">
             <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
               {/* Box 1: Search Bar */}
-              <div className="relative flex-1 min-w-[240px]">
+              <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400 pointer-events-none" />
                 <Input
                   placeholder="Search by receipt #, customer, product..."
@@ -678,7 +647,7 @@ export function SalesManagement() {
               </div>
 
               {/* Box 2: Cashier & Staff Dropdown Filter */}
-              <div className="w-full xl:w-64 shrink-0">
+              <div className="w-full xl:w-56 shrink-0">
                 <Select value={selectedCashier} onValueChange={setSelectedCashier}>
                   <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
                     <div className="flex items-center gap-2 truncate">
@@ -693,6 +662,25 @@ export function SalesManagement() {
                         {c.name} ({c.code || c.roleName})
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Box 3: Replacement Status Dropdown Filter */}
+              <div className="w-full xl:w-52 shrink-0">
+                <Select value={replacementFilter} onValueChange={(val: any) => setReplacementFilter(val)}>
+                  <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
+                    <div className="flex items-center gap-2 truncate">
+                      <RotateCcw className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <SelectValue placeholder="All Replacements" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 shadow-2xl">
+                    <SelectItem value="all">All Replacements</SelectItem>
+                    <SelectItem value="replaced">With Replacement</SelectItem>
+                    <SelectItem value="not_replaced">No Replacement</SelectItem>
+                    <SelectItem value="fully_replaced">Fully Replaced</SelectItem>
+                    <SelectItem value="partially_replaced">Partially Replaced</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

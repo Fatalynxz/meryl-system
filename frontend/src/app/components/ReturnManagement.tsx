@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
-import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera } from "lucide-react";
+import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera, Calendar, Package, TrendingUp, Users } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { toast } from "sonner";
 import { useAuth } from "../../lib/auth-context";
-import { useInventory, useProducts, useReturns, useSales } from "../../lib/hooks";
+import { useInventory, useProducts, useReturns, useSales, useUsers } from "../../lib/hooks";
 import { supabase } from "../../lib/supabase";
 import { saveReceiptProof, getAllReceiptProofs, StoredReceiptProof } from "../../lib/receipt-proof-store";
 import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
@@ -259,8 +259,13 @@ export function ReturnManagement() {
   const salesQuery = useSales();
   const productsQuery = useProducts();
   const inventoryQuery = useInventory();
+  const usersQuery = useUsers();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStaff, setSelectedStaff] = useState("all");
+  const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "quarter" | "year" | "custom">("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [viewingReturn, setViewingReturn] = useState<ReturnRow | null>(null);
   const [formData, setFormData] = useState<ExchangeForm>(defaultForm);
@@ -1443,20 +1448,157 @@ export function ReturnManagement() {
     }
   };
 
-  const filteredReturns = visibleReturns.filter(
-    (returnItem) =>
-      returnItem.display_return_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      returnItem.display_sales_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      returnItem.customerName.toLowerCase().includes(searchTerm.toLowerCase()),
+  const applyDatePreset = (preset: "all" | "today" | "week" | "month" | "quarter" | "year" | "custom") => {
+    setDatePreset(preset);
+    const now = new Date();
+    const formatYMD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+    } else if (preset === "today") {
+      const todayStr = formatYMD(now);
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === "week") {
+      const weekAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      setStartDate(formatYMD(weekAgo));
+      setEndDate(formatYMD(now));
+    } else if (preset === "month") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(formatYMD(firstDay));
+      setEndDate(formatYMD(now));
+    } else if (preset === "quarter") {
+      const currentQuarterMonth = Math.floor(now.getMonth() / 3) * 3;
+      const firstDayOfQuarter = new Date(now.getFullYear(), currentQuarterMonth, 1);
+      setStartDate(formatYMD(firstDayOfQuarter));
+      setEndDate(formatYMD(now));
+    } else if (preset === "year") {
+      const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+      setStartDate(formatYMD(firstDayOfYear));
+      setEndDate(formatYMD(now));
+    }
+  };
+
+  const handleCustomDateChange = (type: "start" | "end", val: string) => {
+    setDatePreset("custom");
+    if (type === "start") {
+      setStartDate(val);
+    } else {
+      setEndDate(val);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedStaff("all");
+    setDatePreset("all");
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    selectedStaff !== "all" ||
+    startDate ||
+    endDate ||
+    datePreset !== "all"
   );
 
-  const completedReturns = visibleReturns.length;
-  const higherReplacementCount = visibleReturns.filter((item) =>
-    item.returnDetails.some((detail) => detail.reason.toLowerCase().includes("customer adds")),
-  ).length;
-  const evenExchangeCount = visibleReturns.filter((item) =>
-    item.returnDetails.some((detail) => detail.reason.toLowerCase().includes("even exchange")),
-  ).length;
+  const staffOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; code: string }>();
+    const allUsers = (usersQuery.data as any[]) ?? [];
+    for (const u of allUsers) {
+      const uId = String(u.user_id ?? "");
+      if (uId) {
+        map.set(uId, {
+          id: uId,
+          name: String(u.name || u.username || "Staff").trim(),
+          code: String(u.staff_code || "").trim(),
+        });
+      }
+    }
+    for (const r of visibleReturns) {
+      const uId = String(r.user_id ?? "");
+      if (uId && !map.has(uId)) {
+        map.set(uId, {
+          id: uId,
+          name: r.processedBy || "Staff",
+          code: r.staffCode || "",
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [usersQuery.data, visibleReturns]);
+
+  const filteredReturns = useMemo(() => {
+    return visibleReturns.filter((returnItem) => {
+      if (searchTerm.trim()) {
+        const query = searchTerm.toLowerCase();
+        const matchesSearch =
+          returnItem.display_return_id.toLowerCase().includes(query) ||
+          returnItem.display_sales_id.toLowerCase().includes(query) ||
+          returnItem.customerName.toLowerCase().includes(query) ||
+          returnItem.processedBy.toLowerCase().includes(query) ||
+          returnItem.staffCode.toLowerCase().includes(query) ||
+          returnItem.returnDetails.some(
+            (d) =>
+              d.productName.toLowerCase().includes(query) ||
+              d.replacementProductName.toLowerCase().includes(query),
+          );
+        if (!matchesSearch) return false;
+      }
+
+      if (selectedStaff !== "all") {
+        const matchesStaff =
+          returnItem.user_id === selectedStaff ||
+          returnItem.processedBy === selectedStaff ||
+          returnItem.staffCode === selectedStaff;
+        if (!matchesStaff) return false;
+      }
+
+      if (startDate && returnItem.return_date !== "N/A" && returnItem.return_date < startDate) {
+        return false;
+      }
+      if (endDate && returnItem.return_date !== "N/A" && returnItem.return_date > endDate) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [visibleReturns, searchTerm, selectedStaff, startDate, endDate]);
+
+  const completedReturns = filteredReturns.length;
+  const higherReplacementCount = useMemo(
+    () =>
+      filteredReturns.filter((item) =>
+        item.returnDetails.some((detail) => detail.reason.toLowerCase().includes("customer adds") || detail.price_difference > 0),
+      ).length,
+    [filteredReturns],
+  );
+  const filteredAdditionalPayment = useMemo(
+    () => filteredReturns.reduce((sum, item) => sum + Number(item.additional_payment ?? 0), 0),
+    [filteredReturns],
+  );
+  const evenExchangeCount = useMemo(
+    () =>
+      filteredReturns.filter((item) =>
+        item.returnDetails.some((detail) => detail.reason.toLowerCase().includes("even exchange") || detail.price_difference === 0),
+      ).length,
+    [filteredReturns],
+  );
+  const totalItemsReplaced = useMemo(
+    () =>
+      filteredReturns.reduce((sum, item) => {
+        return sum + item.returnDetails.reduce((dSum, d) => dSum + Number(d.quantity_returned ?? 0), 0);
+      }, 0),
+    [filteredReturns],
+  );
 
   const setReplacementDialogOpen = (open: boolean) => {
     setIsAddDialogOpen(open);
@@ -1475,56 +1617,102 @@ export function ReturnManagement() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-red-700 border-red-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+      {/* DYNAMIC METRIC KEYCARDS: Dynamically recalculated based on active period & filters (no badges) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1: Completed Replacements */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-yellow-200">Completed Exchanges</p>
-                <p className="text-2xl text-yellow-300">{completedReturns}</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Completed Exchanges</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{completedReturns}</p>
+                <p className="text-xs text-zinc-400 mt-1">Processed exchange records</p>
               </div>
-              <ArrowRightLeft className="h-8 w-8 text-yellow-400" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <RotateCcw className="h-5 w-5" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-red-700 border-red-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+
+        {/* Card 2: Customer Adds */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-yellow-200">Customer Adds</p>
-                <p className="text-2xl text-yellow-300">{higherReplacementCount}</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Customer Adds</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
+                  ₱{filteredAdditionalPayment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {higherReplacementCount} upgraded shoe{higherReplacementCount === 1 ? "" : "s"}
+                </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-yellow-400" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-red-700 border-red-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+
+        {/* Card 3: Even Exchanges */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-yellow-200">Even Exchanges</p>
-                <p className="text-2xl text-yellow-300">{evenExchangeCount}</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Even Exchanges</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{evenExchangeCount}</p>
+                <p className="text-xs text-zinc-400 mt-1">1:1 size or defect swaps</p>
               </div>
-              <RotateCcw className="h-8 w-8 text-yellow-400" />
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <ArrowRightLeft className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Items Replaced */}
+        <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+          <CardContent className="pt-5 pb-5 px-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Items Replaced</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{totalItemsReplaced}</p>
+                <p className="text-xs text-zinc-400 mt-1">Total units exchanged</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
+                <Package className="h-5 w-5" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="bg-red-700 border-red-800">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-yellow-300 flex items-center gap-2">
-              <RotateCcw className="w-5 h-5" />
+      <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
+        <CardHeader className="border-b border-[#24242F] pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-white flex items-center gap-2 text-lg font-bold">
+              <RotateCcw className="w-5 h-5 text-yellow-400" />
               Replacement Management
             </CardTitle>
-            <Dialog open={isAddDialogOpen} onOpenChange={setReplacementDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-yellow-400 text-red-900 hover:bg-yellow-500">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Process Replacement
-                </Button>
-              </DialogTrigger>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-xs text-zinc-300">
+                <span className="bg-[#181824] px-2.5 py-1 rounded-full border border-[#282836] text-zinc-300">
+                  Total: <strong className="text-yellow-400">{visibleReturns.length}</strong> replacements
+                </span>
+                {hasActiveFilters && (
+                  <span className="bg-yellow-400/10 text-yellow-300 px-2.5 py-1 rounded-full border border-yellow-400/30">
+                    Filtered: <strong>{filteredReturns.length}</strong>
+                  </span>
+                )}
+              </div>
+              <Dialog open={isAddDialogOpen} onOpenChange={setReplacementDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-yellow-400 text-[#15151B] hover:bg-yellow-500 font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-1.5">
+                    <Plus className="w-4 h-4" />
+                    Process Replacement
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 !w-[94vw] !max-w-[1050px] max-h-[88vh] overflow-hidden p-0 shadow-2xl flex flex-col">
                 <div className="border-b border-zinc-800 p-5 bg-zinc-900">
                   <DialogHeader>
@@ -2249,57 +2437,227 @@ export function ReturnManagement() {
               </DialogContent>
             </Dialog>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400" />
-            <Input
-              placeholder="Search by replacement ID, sales ID, or customer..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-yellow-300/50"
-            />
+        </div>
+      </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          {/* FILTER CONTROLS BAR: Search, Staff Filter, Date Range Presets & Pickers */}
+          <div className="space-y-3 bg-[#12121A] p-3.5 rounded-xl border border-[#24242F]">
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+              {/* Box 1: Search Bar */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400 pointer-events-none" />
+                <Input
+                  placeholder="Search by replacement ID, receipt #, customer, shoe..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-[#181824] border-[#282836] text-white placeholder:text-zinc-500 text-sm focus-visible:ring-yellow-400/40 rounded-xl"
+                />
+              </div>
+
+              {/* Box 2: Staff Dropdown Filter */}
+              <div className="w-full xl:w-64 shrink-0">
+                <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                  <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
+                    <div className="flex items-center gap-2 truncate">
+                      <Users className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <SelectValue placeholder="All Staff" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 max-h-64 shadow-2xl">
+                    <SelectItem value="all">All Staff</SelectItem>
+                    {staffOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {c.code ? `(${c.code})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Presets: All, Daily, Weekly, Monthly, Quarterly, Annually */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs flex-wrap">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("all")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "all"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("today")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "today"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Daily
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("week")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "week"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Weekly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("month")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "month"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Monthly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("quarter")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "quarter"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Quarterly
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => applyDatePreset("year")}
+                    className={`h-7 px-2.5 text-xs rounded-md transition-all ${
+                      datePreset === "year"
+                        ? "bg-yellow-400 text-black font-bold"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Annually
+                  </Button>
+                </div>
+
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleResetFilters}
+                    className="h-7 px-2 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10 flex items-center gap-1 rounded-md"
+                    title="Reset all filters"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Custom Date Pickers Sub-Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-[#24242F] text-xs text-zinc-300">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 font-medium text-yellow-400">
+                  <Calendar className="w-4 h-4 text-yellow-400" />
+                  <span>Date Range:</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">From</span>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => handleCustomDateChange("start", e.target.value)}
+                    className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-400">To</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => handleCustomDateChange("end", e.target.value)}
+                    className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-zinc-400">
+                Showing <strong className="text-yellow-400">{filteredReturns.length}</strong> of {visibleReturns.length} replacements
+              </div>
+            </div>
           </div>
 
-          <div className="border border-red-800 rounded-lg overflow-x-auto scrollbar-hide">
+          <div className="border border-[#24242F] rounded-xl overflow-x-auto bg-[#121218] scrollbar-hide">
             <Table className="w-full min-w-[980px]">
               <TableHeader>
-                <TableRow className="bg-red-800 hover:bg-red-800 border-red-900">
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Replacement ID</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Sales ID</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Customer</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Staff Code</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Processed By</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Replacement Status</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Replacement Date</TableHead>
-                  <TableHead className="text-yellow-300 whitespace-nowrap text-center">Actions</TableHead>
+                <TableRow className="bg-[#181824] hover:bg-[#181824] border-b border-[#24242F]">
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Replacement ID</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Receipt #</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Customer</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Staff Code</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Processed By</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Replacement Status</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Replacement Date</TableHead>
+                  <TableHead className="text-zinc-300 whitespace-nowrap text-center font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredReturns.map((returnItem) => {
-                  return (
-                  <TableRow key={returnItem.return_id} className="border-red-800">
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{returnItem.display_return_id}</TableCell>
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{returnItem.display_sales_id}</TableCell>
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{returnItem.customerName}</TableCell>
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{returnItem.staffCode}</TableCell>
-                    <TableCell className="text-yellow-200 whitespace-nowrap text-center">{returnItem.processedBy}</TableCell>
-                    <TableCell className="whitespace-nowrap text-center">
-                      <Badge className="bg-green-600 text-white">{returnItem.return_status}</Badge>
+                {filteredReturns.length === 0 ? (
+                  <TableRow className="border-b border-[#24242F]">
+                    <TableCell colSpan={8} className="h-32 text-center text-zinc-300">
+                      <div className="flex flex-col items-center justify-center gap-1.5 py-6">
+                        <RotateCcw className="w-8 h-8 text-yellow-400/40 mb-1" />
+                        <p className="font-semibold text-white">No replacement records found</p>
+                        <p className="text-xs text-zinc-400">
+                          {hasActiveFilters ? "Try adjusting your search keywords, staff, or date range." : "No replacements processed yet."}
+                        </p>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-yellow-200 text-sm whitespace-nowrap text-center">{returnItem.return_date}</TableCell>
-                    <TableCell className="text-center">
-                      <Dialog open={viewingReturn?.return_id === returnItem.return_id} onOpenChange={(open) => !open && setViewingReturn(null)}>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-yellow-400 hover:text-yellow-300 hover:bg-red-600"
-                            onClick={() => setViewingReturn(returnItem)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
+                  </TableRow>
+                ) : (
+                  filteredReturns.map((returnItem) => {
+                    return (
+                    <TableRow key={returnItem.return_id} className="border-b border-[#20202C] hover:bg-[#1A1A26]/70 transition-colors">
+                      <TableCell className="text-yellow-400 font-mono font-medium whitespace-nowrap text-center">{returnItem.display_return_id}</TableCell>
+                      <TableCell className="text-zinc-300 font-mono whitespace-nowrap text-center">{returnItem.display_sales_id}</TableCell>
+                      <TableCell className="text-zinc-200 whitespace-nowrap text-center">{returnItem.customerName}</TableCell>
+                      <TableCell className="text-zinc-400 text-xs whitespace-nowrap text-center">{returnItem.staffCode}</TableCell>
+                      <TableCell className="text-zinc-200 whitespace-nowrap text-center">{returnItem.processedBy}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center">
+                        <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">{returnItem.return_status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-zinc-400 text-sm whitespace-nowrap text-center">{returnItem.return_date}</TableCell>
+                      <TableCell className="text-center">
+                        <Dialog open={viewingReturn?.return_id === returnItem.return_id} onOpenChange={(open) => !open && setViewingReturn(null)}>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-yellow-400 hover:text-white hover:bg-yellow-400/10 rounded-lg"
+                              onClick={() => setViewingReturn(returnItem)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </DialogTrigger>
                         <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 max-w-3xl max-h-[85vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle className="text-zinc-100">Replacement Details - {returnItem.display_return_id}</DialogTitle>
@@ -2483,7 +2841,7 @@ export function ReturnManagement() {
                     </TableCell>
                   </TableRow>
                   );
-                })}
+                }))}
               </TableBody>
             </Table>
           </div>
