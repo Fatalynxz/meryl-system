@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Award, BarChart3, Package, RefreshCw, Sparkles, TrendingUp, Users } from "lucide-react";
+import { Award, BarChart3, ChevronLeft, ChevronRight, Filter, Package, RefreshCw, Search, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -311,6 +311,12 @@ export function PredictiveAnalytics() {
   const [topRankingMetric, setTopRankingMetric] = useState<RankingMetric>("units");
   const [isRefreshingSnapshots, setIsRefreshingSnapshots] = useState(false);
   const [snapshotRefreshNote, setSnapshotRefreshNote] = useState<string | null>(null);
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("all");
+  const [productDepartmentFilter, setProductDepartmentFilter] = useState("all");
+  const [productMovementFilter, setProductMovementFilter] = useState("all");
+  const [productPageSize, setProductPageSize] = useState<number>(10);
+  const [productCurrentPage, setProductCurrentPage] = useState<number>(1);
   const salesQuery = useSales();
   const productsQuery = useProducts();
   const customersQuery = useCustomers();
@@ -1268,7 +1274,61 @@ export function PredictiveAnalytics() {
   const showPromotion = analyticsView === "promotion";
   const hasActivePromotionPerformance = analytics.activePromotionChart.some((promo) => promo.revenue > 0 || promo.units > 0);
   const categoryUnitsTotal = analytics.categoryChart.reduce((sum, row) => sum + Number(row.units ?? 0), 0);
-  const sizeCurveProducts = analytics.productMovement.slice(0, 40);
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    analytics.productMovement.forEach((p) => {
+      const cat = String(p.category ?? "").trim();
+      if (cat && cat !== "N/A" && cat !== "Unknown") set.add(cat);
+    });
+    return Array.from(set).sort();
+  }, [analytics.productMovement]);
+
+  const availableDepartments = useMemo(() => {
+    const set = new Set<string>();
+    analytics.productMovement.forEach((p) => {
+      const dept = String(p.gender ?? "").trim();
+      if (dept && dept !== "N/A" && dept !== "Unknown") set.add(dept);
+    });
+    return Array.from(set).sort();
+  }, [analytics.productMovement]);
+
+  const filteredProductMovement = useMemo(() => {
+    const query = productSearchTerm.trim().toLowerCase();
+    return analytics.productMovement.filter((p) => {
+      if (query) {
+        const nameMatch = String(p.name ?? "").toLowerCase().includes(query);
+        const brandMatch = String(p.brand ?? "").toLowerCase().includes(query);
+        const catMatch = String(p.category ?? "").toLowerCase().includes(query);
+        const sizeMatch = String(p.size ?? "").toLowerCase().includes(query);
+        const idMatch = String(p.id ?? "").toLowerCase().includes(query);
+        if (!nameMatch && !brandMatch && !catMatch && !sizeMatch && !idMatch) return false;
+      }
+      if (productCategoryFilter !== "all" && String(p.category ?? "").toLowerCase() !== productCategoryFilter.toLowerCase()) {
+        return false;
+      }
+      if (productDepartmentFilter !== "all" && String(p.gender ?? "").toLowerCase() !== productDepartmentFilter.toLowerCase()) {
+        return false;
+      }
+      if (productMovementFilter !== "all" && String(p.movement ?? "").toLowerCase() !== productMovementFilter.toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+  }, [analytics.productMovement, productSearchTerm, productCategoryFilter, productDepartmentFilter, productMovementFilter]);
+
+  const totalProductPages = Math.max(1, Math.ceil(filteredProductMovement.length / productPageSize));
+  const currentProductPage = Math.min(Math.max(1, productCurrentPage), totalProductPages);
+
+  const paginatedProductMovement = useMemo(() => {
+    const start = (currentProductPage - 1) * productPageSize;
+    return filteredProductMovement.slice(start, start + productPageSize);
+  }, [filteredProductMovement, currentProductPage, productPageSize]);
+
+  const isFilteringProducts = Boolean(
+    productSearchTerm || productCategoryFilter !== "all" || productDepartmentFilter !== "all" || productMovementFilter !== "all"
+  );
+
+  const sizeCurveProducts = (isFilteringProducts ? filteredProductMovement : analytics.productMovement).slice(0, 60);
   const sizeCurveSizes = Array.from(
     new Set(sizeCurveProducts.map((product) => String(product.size ?? "N/A"))),
   ).sort(sortSizeLabels);
@@ -1293,7 +1353,7 @@ export function PredictiveAnalytics() {
     }, new Map<string, any>()).values(),
   )
     .sort((a, b) => b.totalSold - a.totalSold || b.totalStock - a.totalStock)
-    .slice(0, 8);
+    .slice(0, 10);
   const maxSizeCurveSold = Math.max(1, ...sizeCurveProducts.map((product) => Number(product.unitsPeriod ?? 0)));
   const maxSizeCurveStock = Math.max(1, ...sizeCurveProducts.map((product) => Number(product.stock ?? 0)));
 
@@ -1921,6 +1981,154 @@ export function PredictiveAnalytics() {
             </div>
           </div>
 
+          {/* SEARCH & FILTER CONTROLS */}
+          <div className="space-y-3 rounded-2xl border border-[#2b2b36] bg-[#111118] p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-semibold text-white">Product Movement & Health Matrix</p>
+                <p className="text-xs text-white/50">Detailed inventory status, turnover, and velocity per product variant.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full border border-[#2b2b36] bg-[#181820] px-3 py-1 font-medium text-white/80">
+                  Total: <strong className="text-yellow-400">{analytics.productMovement.length}</strong> items
+                </span>
+                {isFilteringProducts && (
+                  <span className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 font-medium text-yellow-300">
+                    Filtered: <strong>{filteredProductMovement.length}</strong> items
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
+              {/* 1. Search Bar */}
+              <div className="relative xl:col-span-2">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-400" />
+                <input
+                  type="text"
+                  placeholder="Search product name, brand, SKU..."
+                  value={productSearchTerm}
+                  onChange={(e) => {
+                    setProductSearchTerm(e.target.value);
+                    setProductCurrentPage(1);
+                  }}
+                  className="h-9 w-full rounded-xl border border-[#2b2b36] bg-[#181820] pl-9 pr-8 text-xs text-white placeholder:text-white/40 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/40"
+                />
+                {productSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductSearchTerm("");
+                      setProductCurrentPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* 2. Category Filter */}
+              <div className="relative">
+                <select
+                  value={productCategoryFilter}
+                  onChange={(e) => {
+                    setProductCategoryFilter(e.target.value);
+                    setProductCurrentPage(1);
+                  }}
+                  className="h-9 w-full appearance-none rounded-xl border border-[#2b2b36] bg-[#181820] px-3 pr-8 text-xs font-medium text-white/90 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/40"
+                >
+                  <option value="all">All Categories</option>
+                  {availableCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/60">⌄</span>
+              </div>
+
+              {/* 3. Department (Gender) Filter */}
+              <div className="relative">
+                <select
+                  value={productDepartmentFilter}
+                  onChange={(e) => {
+                    setProductDepartmentFilter(e.target.value);
+                    setProductCurrentPage(1);
+                  }}
+                  className="h-9 w-full appearance-none rounded-xl border border-[#2b2b36] bg-[#181820] px-3 pr-8 text-xs font-medium text-white/90 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/40"
+                >
+                  <option value="all">All Departments</option>
+                  {availableDepartments.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/60">⌄</span>
+              </div>
+
+              {/* 4. Movement Status Filter */}
+              <div className="relative">
+                <select
+                  value={productMovementFilter}
+                  onChange={(e) => {
+                    setProductMovementFilter(e.target.value);
+                    setProductCurrentPage(1);
+                  }}
+                  className="h-9 w-full appearance-none rounded-xl border border-[#2b2b36] bg-[#181820] px-3 pr-8 text-xs font-medium text-white/90 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/40"
+                >
+                  <option value="all">All Movements</option>
+                  <option value="Fast">Fast Movers</option>
+                  <option value="Steady">Steady Movers</option>
+                  <option value="Slow">Slow Movers</option>
+                  <option value="Dead Stock">Dead Stock</option>
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/60">⌄</span>
+              </div>
+            </div>
+
+            {/* Active filter pills / clear all if active */}
+            {isFilteringProducts && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] text-white/45">Active Filters:</span>
+                {productSearchTerm && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 px-2 py-0.5 text-[11px] text-yellow-300">
+                    Search: "{productSearchTerm}"
+                    <button type="button" onClick={() => { setProductSearchTerm(""); setProductCurrentPage(1); }} className="hover:text-white">×</button>
+                  </span>
+                )}
+                {productCategoryFilter !== "all" && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 px-2 py-0.5 text-[11px] text-yellow-300">
+                    Category: {productCategoryFilter}
+                    <button type="button" onClick={() => { setProductCategoryFilter("all"); setProductCurrentPage(1); }} className="hover:text-white">×</button>
+                  </span>
+                )}
+                {productDepartmentFilter !== "all" && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 px-2 py-0.5 text-[11px] text-yellow-300">
+                    Department: {productDepartmentFilter}
+                    <button type="button" onClick={() => { setProductDepartmentFilter("all"); setProductCurrentPage(1); }} className="hover:text-white">×</button>
+                  </span>
+                )}
+                {productMovementFilter !== "all" && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 px-2 py-0.5 text-[11px] text-yellow-300">
+                    Movement: {productMovementFilter}
+                    <button type="button" onClick={() => { setProductMovementFilter("all"); setProductCurrentPage(1); }} className="hover:text-white">×</button>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductSearchTerm("");
+                    setProductCategoryFilter("all");
+                    setProductDepartmentFilter("all");
+                    setProductMovementFilter("all");
+                    setProductCurrentPage(1);
+                  }}
+                  className="ml-1 text-[11px] font-medium text-red-400 underline hover:text-red-300"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="overflow-hidden rounded-2xl border border-[#2b2b36]">
             <Table>
               <TableHeader className="bg-[#1f1f28]">
@@ -1928,6 +2136,7 @@ export function PredictiveAnalytics() {
                   <TableHead className="text-center text-white">Product</TableHead>
                   <TableHead className="text-center text-white">Brand</TableHead>
                   <TableHead className="text-center text-white">Category</TableHead>
+                  <TableHead className="text-center text-white">Department</TableHead>
                   <TableHead className="text-center text-white">Size</TableHead>
                   <TableHead className="text-center text-white">Sold ({analytics.productPeriodLabel})</TableHead>
                   <TableHead className="text-center text-white">Stock</TableHead>
@@ -1936,24 +2145,122 @@ export function PredictiveAnalytics() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {analytics.productMovement.slice(0, 8).map((product) => (
-                  <TableRow key={product.id} className="border-[#2b2b36] hover:bg-white/[0.03]">
-                    <TableCell className="text-center font-semibold text-white">{product.name}</TableCell>
-                    <TableCell className="text-center text-white/80">{product.brand}</TableCell>
-                    <TableCell className="text-center text-white/80">{product.category}</TableCell>
-                    <TableCell className="text-center text-white/80">{product.size}</TableCell>
-                    <TableCell className="text-center text-yellow-300">{product.unitsPeriod}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={stockBadgeClass(product.stock, product.reorder)}>{product.stock} units</Badge>
-                    </TableCell>
-                    <TableCell className="text-center text-white/80">{product.turnover.toFixed(2)}x</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={movementBadgeClass(product.movement)}>{product.movement}</Badge>
+                {paginatedProductMovement.length > 0 ? (
+                  paginatedProductMovement.map((product) => (
+                    <TableRow key={product.id} className="border-[#2b2b36] hover:bg-white/[0.03]">
+                      <TableCell className="text-center font-semibold text-white">{product.name}</TableCell>
+                      <TableCell className="text-center text-white/80">{product.brand}</TableCell>
+                      <TableCell className="text-center text-white/80">{product.category}</TableCell>
+                      <TableCell className="text-center text-white/80">{product.gender || "Unisex"}</TableCell>
+                      <TableCell className="text-center text-white/80">{product.size}</TableCell>
+                      <TableCell className="text-center text-yellow-300 font-semibold">{product.unitsPeriod}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={stockBadgeClass(product.stock, product.reorder)}>{product.stock} units</Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-white/80">{product.turnover.toFixed(2)}x</TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={movementBadgeClass(product.movement)}>{product.movement}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={9} className="py-10 text-center text-white/50">
+                      <Package className="mx-auto mb-2 h-7 w-7 text-white/20" />
+                      <p className="font-semibold text-white/70">No products found</p>
+                      <p className="mt-1 text-xs text-white/40">Try adjusting your search query or clearing the active filters.</p>
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* PAGINATION BAR */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-[#2b2b36] bg-[#111118] px-4 py-3">
+            {/* Left: Rows Per Page selector & Count indicator */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/50">Show:</span>
+                <select
+                  value={productPageSize}
+                  onChange={(e) => {
+                    setProductPageSize(Number(e.target.value));
+                    setProductCurrentPage(1);
+                  }}
+                  className="h-8 rounded-lg border border-[#2b2b36] bg-[#181820] px-2 text-xs font-semibold text-white outline-none focus:border-yellow-400"
+                >
+                  <option value={10}>10 products</option>
+                  <option value={15}>15 products</option>
+                  <option value={20}>20 products</option>
+                  <option value={25}>25 products</option>
+                  <option value={30}>30 products</option>
+                </select>
+              </div>
+              <span className="text-xs text-white/50">
+                Showing{" "}
+                <strong className="text-white">
+                  {filteredProductMovement.length > 0 ? (currentProductPage - 1) * productPageSize + 1 : 0}
+                </strong>{" "}
+                to{" "}
+                <strong className="text-white">
+                  {Math.min(currentProductPage * productPageSize, filteredProductMovement.length)}
+                </strong>{" "}
+                of <strong className="text-yellow-400">{filteredProductMovement.length}</strong> products
+              </span>
+            </div>
+
+            {/* Right: Page Navigation */}
+            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setProductCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentProductPage <= 1}
+                className="flex h-8 items-center gap-1 rounded-lg border border-[#2b2b36] bg-white/[0.03] px-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Prev</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalProductPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    if (totalProductPages <= 5) return true;
+                    if (page === 1 || page === totalProductPages) return true;
+                    return Math.abs(page - currentProductPage) <= 1;
+                  })
+                  .map((page, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    const hasGap = prev && page - prev > 1;
+                    return (
+                      <div key={page} className="flex items-center">
+                        {hasGap && <span className="px-1 text-xs text-white/30">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setProductCurrentPage(page)}
+                          className={`h-8 min-w-[32px] rounded-lg px-2 text-xs font-semibold transition ${
+                            currentProductPage === page
+                              ? "bg-yellow-400 text-red-950 font-bold"
+                              : "border border-[#2b2b36] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setProductCurrentPage((prev) => Math.min(totalProductPages, prev + 1))}
+                disabled={currentProductPage >= totalProductPages}
+                className="flex h-8 items-center gap-1 rounded-lg border border-[#2b2b36] bg-white/[0.03] px-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </CardContent>
       </Card>}
