@@ -356,7 +356,7 @@ export function Dashboard() {
                     color: "#fff",
                   }}
                   labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
-                  itemStyle={{ color: "#FFD60A", fontSize: 12, fontWeight: 500 }}
+                  itemStyle={{ color: "#FFFFFF", fontSize: 12, fontWeight: 500 }}
                 />
                 <Area type="monotone" dataKey="value" stroke="#FFD60A" strokeWidth={2.5} fill="url(#revFill)" />
               </AreaChart>

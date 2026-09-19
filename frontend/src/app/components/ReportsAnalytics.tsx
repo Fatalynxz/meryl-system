@@ -1379,13 +1379,15 @@ export function ReportsAnalytics() {
                   <Tooltip
                     cursor={{ stroke: '#facc15', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.35 }}
                     contentStyle={{
-                      backgroundColor: '#111118',
-                      border: '1px solid #24242d',
+                      backgroundColor: '#16161C',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
                       borderRadius: '12px',
-                      boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
-                      color: '#fef08a',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                      padding: '10px 14px',
+                      color: '#FFFFFF',
                     }}
-                    labelStyle={{ color: '#fef3c7', marginBottom: 8 }}
+                    labelStyle={{ color: '#FFFFFF', fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                    itemStyle={{ color: '#FFFFFF', fontSize: 12, fontWeight: 500 }}
                     formatter={(value, name) => (String(name).includes('Revenue') || String(name).includes('Period') ? [money(Number(value)), name] : [Number(value).toLocaleString(), name])}
                   />
                   <Line
@@ -1684,9 +1686,9 @@ export function ReportsAnalytics() {
                     <XAxis dataKey="category" stroke="#fef08a" />
                     <YAxis stroke="#fef08a" tickFormatter={(value) => Math.round(Number(value)).toLocaleString()} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#111118', border: '1px solid #24242d', color: '#fef08a' }}
-                      labelStyle={{ color: '#fef3c7', fontWeight: 700 }}
-                      itemStyle={{ color: '#fef08a' }}
+                      contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', padding: '10px 14px', color: '#FFFFFF' }}
+                      labelStyle={{ color: '#FFFFFF', fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                      itemStyle={{ color: '#FFFFFF', fontSize: 12, fontWeight: 500 }}
                       formatter={(value, name) => [moneyWhole(Number(value)), name]}
                     />
                     <Legend wrapperStyle={{ color: '#fef08a' }} />
@@ -1704,9 +1706,9 @@ export function ReportsAnalytics() {
                       {categoryDistribution.map((entry) => <Cell key={entry.id} fill={entry.color} />)}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#111118', border: '1px solid #24242d', color: '#fef08a' }}
-                      labelStyle={{ color: '#fef3c7', fontWeight: 700 }}
-                      itemStyle={{ color: '#fef08a' }}
+                      contentStyle={{ backgroundColor: '#16161C', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', padding: '10px 14px', color: '#FFFFFF' }}
+                      labelStyle={{ color: '#FFFFFF', fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                      itemStyle={{ color: '#FFFFFF', fontSize: 12, fontWeight: 500 }}
                       formatter={(value, name) => [`${Math.round(Number(value))}%`, name]}
                     />
                   </PieChart>

@@ -1449,9 +1449,9 @@ export function PredictiveAnalytics() {
                 <XAxis dataKey="date" stroke="#a3a3a3" fontSize={12} />
                 <YAxis stroke="#a3a3a3" fontSize={12} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#18181f", border: "1px solid #3a3a45", borderRadius: "12px", color: "#fff" }}
-                  labelStyle={{ color: "#facc15" }}
-                  itemStyle={{ color: "#facc15" }}
+                  contentStyle={{ backgroundColor: "#16161C", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.6)", padding: "10px 14px", color: "#FFFFFF" }}
+                  labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                  itemStyle={{ color: "#FFFFFF", fontSize: 12, fontWeight: 500 }}
                   formatter={(value: any) => [money(Number(value)), "Revenue"]}
                 />
                 <Bar dataKey="revenue" fill="#facc15" radius={[8, 8, 0, 0]} name="Revenue" />
@@ -1472,9 +1472,9 @@ export function PredictiveAnalytics() {
                   {analytics.categoryChart.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#18181f", border: "1px solid #3a3a45", borderRadius: "12px", color: "#fff" }}
-                  labelStyle={{ color: "#facc15" }}
-                  itemStyle={{ color: "#facc15" }}
+                  contentStyle={{ backgroundColor: "#16161C", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.6)", padding: "10px 14px", color: "#FFFFFF" }}
+                  labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                  itemStyle={{ color: "#FFFFFF", fontSize: 12, fontWeight: 500 }}
                   formatter={(value: any) => {
                     const units = Number(value ?? 0);
                     const pct = categoryUnitsTotal > 0 ? Math.round((units / categoryUnitsTotal) * 100) : 0;
@@ -1554,8 +1554,8 @@ export function PredictiveAnalytics() {
                         ].filter(Boolean) as Array<{ label: string; value: number; color: string }>;
 
                         return (
-                          <div className="min-w-[230px] rounded-xl border border-[#3a3a45] bg-[#18181f] p-3 shadow-2xl shadow-black/60">
-                            <p className="text-sm font-semibold text-yellow-300">{label}</p>
+                          <div className="min-w-[230px] rounded-xl border border-white/15 bg-[#16161C] p-3 shadow-2xl shadow-black/60">
+                            <p className="text-sm font-semibold text-white">{label}</p>
                             <div className="mt-2 space-y-1.5">
                               {rows.map((row) => (
                                 <p key={row.label} className="flex justify-between gap-4 text-sm">
@@ -1699,9 +1699,9 @@ export function PredictiveAnalytics() {
                     <YAxis yAxisId="left" stroke="#a3a3a3" fontSize={12} />
                     <YAxis yAxisId="right" orientation="right" stroke="#a3a3a3" fontSize={12} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "#18181f", border: "1px solid #3a3a45", borderRadius: "12px", color: "#fff" }}
-                      labelStyle={{ color: "#facc15" }}
-                      itemStyle={{ color: "#facc15" }}
+                      contentStyle={{ backgroundColor: "#16161C", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.6)", padding: "10px 14px", color: "#FFFFFF" }}
+                      labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                      itemStyle={{ color: "#FFFFFF", fontSize: 12, fontWeight: 500 }}
                       formatter={(value: any, name: string) => [
                         name === "revenue" ? money(Number(value)) : `${value} units`,
                         name === "revenue" ? "Revenue" : "Units",
@@ -2372,9 +2372,9 @@ export function PredictiveAnalytics() {
                         <XAxis dataKey="name" stroke="#a1a1aa" tick={{ fill: "#d4d4d8", fontSize: 12 }} />
                         <YAxis stroke="#a1a1aa" tick={{ fill: "#d4d4d8", fontSize: 12 }} />
                         <Tooltip
-                          contentStyle={{ background: "#101017", border: "1px solid #2b2b36", borderRadius: 12 }}
-                          labelStyle={{ color: "#facc15" }}
-                          itemStyle={{ color: "#facc15" }}
+                          contentStyle={{ background: "#16161C", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.6)", padding: "10px 14px", color: "#FFFFFF" }}
+                          labelStyle={{ color: "#FFFFFF", fontWeight: 600, fontSize: 13, marginBottom: 4 }}
+                          itemStyle={{ color: "#FFFFFF", fontSize: 12, fontWeight: 500 }}
                           formatter={(value: any, _name: string, item: any) => [
                             `${money(Number(value))} (${item?.payload?.units ?? 0} units)`,
                             "Revenue",
