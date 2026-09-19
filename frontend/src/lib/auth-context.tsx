@@ -584,20 +584,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (updateError) throw updateError;
 
     // Update public user table password
-    await supabase.rpc("reset_user_password_by_email", { p_new_password: clean }).catch(() => null);
-    await supabase.from("user").update({ password: clean }).eq("email", authUser.email).catch(() => null);
+    try {
+      await supabase.rpc("reset_user_password_by_email", { p_new_password: clean });
+    } catch {
+      // RPC not present or ignored
+    }
+    try {
+      await supabase.from("user").update({ password: clean }).eq("email", authUser.email);
+    } catch {
+      // Direct update fallback ignored
+    }
 
     // Sync to Python backend if available
-    await fetch("/api/auth/password-reset/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: authUser.email,
-        new_password: clean,
-      }),
-    }).catch(() => null);
+    try {
+      await fetch("/api/auth/password-reset/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: authUser.email,
+          new_password: clean,
+        }),
+      });
+    } catch {
+      // Backend sync fallback ignored
+    }
 
-    await supabase.auth.signOut();
+    await supabase.auth.signOut().catch(() => null);
   }, []);
 
   const verifyPasswordResetOtpAndUpdate = useCallback(async (
@@ -640,22 +652,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (verifiedWithSupabase) {
       // Update Supabase Auth user password
-      await supabase.auth.updateUser({ password: cleanPassword }).catch(() => null);
+      try {
+        await supabase.auth.updateUser({ password: cleanPassword });
+      } catch {
+        // Auth user update ignored if not supported
+      }
 
       // Update public "user" table password
-      await supabase.rpc("reset_user_password_by_email", { p_new_password: cleanPassword }).catch(() => null);
-      await supabase.from("user").update({ password: cleanPassword }).eq("email", normalizedEmail).catch(() => null);
+      try {
+        await supabase.rpc("reset_user_password_by_email", { p_new_password: cleanPassword });
+      } catch {
+        // RPC not present or ignored
+      }
+      try {
+        await supabase.from("user").update({ password: cleanPassword }).eq("email", normalizedEmail);
+      } catch {
+        // Direct table update fallback ignored
+      }
 
       // Also sync to backend if running
-      await fetch("/api/auth/password-reset/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: normalizedEmail,
-          otp: cleanOtp,
-          new_password: cleanPassword,
-        }),
-      }).catch(() => null);
+      try {
+        await fetch("/api/auth/password-reset/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            otp: cleanOtp,
+            new_password: cleanPassword,
+          }),
+        });
+      } catch {
+        // Backend sync ignored
+      }
 
       if (!options?.keepSession) {
         sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
@@ -699,13 +727,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     throw new Error("Invalid or expired OTP code. Please check your email or click the reset link.");
-
-    if (!options?.keepSession) {
-      sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-      clearGoogleOtpVerifiedEmail();
-      setUser(null);
-      await supabase.auth.signOut().catch(() => null);
-    }
   }, []);
 
   const markGoogleOtpVerified = useCallback((email: string) => {
