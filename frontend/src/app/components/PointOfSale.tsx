@@ -2096,7 +2096,6 @@ function formatReceiptNumber(salesId?: string) {
                   className="h-9 mx-auto mb-1 object-contain"
                   style={{ filter: "brightness(0)" }}
                 />
-                <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>
                 <p className="text-[10px]">Official Retailer &amp; Shoe Center</p>
                 <p className="text-[10px]">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
                 <p className="text-[10px]">TIN: 432-891-002-000 VAT REGISTERED</p>
