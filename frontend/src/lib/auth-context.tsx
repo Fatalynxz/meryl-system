@@ -498,55 +498,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Your account is not authorized to reset a password. Please contact the administrator.");
     }
 
-    await supabase.auth.signOut().catch(() => null);
+    // Perform sign out without blocking password reset flow
+    supabase.auth.signOut().catch(() => null);
 
     const resetRedirect = typeof window !== "undefined"
       ? `${window.location.origin}/auth/reset-password`
       : undefined;
 
-    // 1. Primary: Use Supabase Auth (same infrastructure as Google sign-in)
+    // Helper to request OTP from Python backend with a 6s timeout so an unresponsive SMTP server doesn't freeze the client
+    const requestBackendOtp = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      try {
+        const response = await fetch("/api/auth/password-reset/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          return await response.json();
+        }
+        const errJson = await response.json().catch(() => null);
+        return { ok: false, error: errJson?.error || "Backend reset request failed" };
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        return { ok: false, error: err?.name === "AbortError" ? "Backend request timed out" : "Backend unavailable" };
+      }
+    };
+
+    // Run Supabase Auth reset and Python Backend OTP in parallel
+    const [supabaseOutcome, backendOutcome] = await Promise.allSettled([
+      supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: resetRedirect,
+      }),
+      requestBackendOtp(),
+    ]);
+
     let supabaseSucceeded = false;
     let supabaseError: any = null;
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: resetRedirect,
-      });
-      if (error) {
-        supabaseError = error;
+    if (supabaseOutcome.status === "fulfilled") {
+      if (supabaseOutcome.value.error) {
+        supabaseError = supabaseOutcome.value.error;
       } else {
         supabaseSucceeded = true;
       }
-    } catch (err: any) {
-      supabaseError = err;
+    } else {
+      supabaseError = supabaseOutcome.reason;
     }
 
-    // Also attempt sending an OTP via Supabase Auth so users can type the 6-digit code on page if preferred
-    try {
-      await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: resetRedirect,
-        },
-      });
-    } catch {
-      // Ignored if rate limited or not enabled
-    }
-
-    // 2. Optional: Parallel sync with Python backend if available
     let backendResult: any = null;
-    try {
-      const response = await fetch("/api/auth/password-reset/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
-      });
-      if (response.ok) {
-        backendResult = await response.json();
-      }
-    } catch {
-      // Backend not available
+    if (backendOutcome.status === "fulfilled") {
+      backendResult = backendOutcome.value;
     }
 
     if (!supabaseSucceeded && (!backendResult || !backendResult.ok)) {

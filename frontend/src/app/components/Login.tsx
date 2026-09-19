@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from './ui/button';
-import { ArrowLeft, KeyRound, LogIn, Mail, User, Lock, ShieldCheck, Eye, EyeOff, CheckCircle2, ShieldAlert, Clock, RotateCcw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, KeyRound, LogIn, Mail, User, Lock, ShieldCheck, Eye, EyeOff, CheckCircle2, ShieldAlert, Clock, RotateCcw, AlertTriangle, Loader2 } from 'lucide-react';
 import { checkLockoutStatus, clearFailedAttempts, getPostLoginPath, recordFailedAttempt, useAuth } from '../../lib/auth-context';
 import { logAuditEvent } from '../../lib/api/audit-logger';
 import { supabase } from '../../lib/supabase';
@@ -522,18 +522,31 @@ export function Login() {
                   !resetConfirmPassword
                 ))
               }
-              className="w-full h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] shadow-lg shadow-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+              className="w-full h-11 rounded-xl bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] shadow-lg shadow-yellow-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium flex items-center justify-center"
             >
-              {resetStep === 'email' ? (
-                resetCooldownRemaining > 0 ? <Clock className="w-4 h-4 mr-2" /> : <Mail className="w-4 h-4 mr-2" />
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin text-[#15151B]" />
+                  <span>{resetStep === 'email' ? 'Sending Reset OTP...' : 'Verifying & Resetting...'}</span>
+                </>
+              ) : resetStep === 'email' ? (
+                resetCooldownRemaining > 0 ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2" />
+                    <span>Wait {resetCooldownRemaining}s to Resend</span>
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-2" />
+                    <span>Send Reset OTP</span>
+                  </>
+                )
               ) : (
-                <ShieldCheck className="w-4 h-4 mr-2" />
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  <span>Verify OTP and Reset Password</span>
+                </>
               )}
-              {resetStep === 'email'
-                ? resetCooldownRemaining > 0
-                  ? `Wait ${resetCooldownRemaining}s to Resend`
-                  : 'Send Reset OTP'
-                : 'Verify OTP and Reset Password'}
             </Button>
 
             {resetStep === 'otp' && (
@@ -541,9 +554,14 @@ export function Login() {
                 type="button"
                 disabled={submitting || resetCooldownRemaining > 0}
                 onClick={handleForgotPassword}
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#1D1D25] text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#1D1D25] text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
               >
-                {resetCooldownRemaining > 0 ? (
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin text-yellow-400" />
+                    <span>Sending fresh code...</span>
+                  </>
+                ) : resetCooldownRemaining > 0 ? (
                   <>
                     <Clock className="w-4 h-4 mr-2 text-yellow-400 animate-pulse" />
                     <span>Resend OTP in {resetCooldownRemaining}s</span>

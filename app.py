@@ -763,12 +763,12 @@ def send_otp_email(recipient_email, otp_code, display_name):
 
     try:
         if smtp_port == 465:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=4) as server:
                 server.login(smtp_email, smtp_password)
                 server.send_message(message)
                 return
         else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=4) as server:
                 server.starttls()
                 server.login(smtp_email, smtp_password)
                 server.send_message(message)
@@ -782,7 +782,7 @@ def send_otp_email(recipient_email, otp_code, display_name):
     except (smtplib.SMTPConnectError, TimeoutError, OSError) as conn_err:
         logger.warning(f"SMTP connection on port {smtp_port} failed ({conn_err}), attempting SSL on port 465...")
         try:
-            with smtplib.SMTP_SSL(smtp_host, 465, timeout=10) as server:
+            with smtplib.SMTP_SSL(smtp_host, 465, timeout=4) as server:
                 server.login(smtp_email, smtp_password)
                 server.send_message(message)
                 return
