@@ -1574,29 +1574,34 @@ export function ReturnManagement() {
   }, [visibleReturns, searchTerm, selectedStaff, startDate, endDate]);
 
   const completedReturns = filteredReturns.length;
-  const higherReplacementCount = useMemo(
-    () =>
-      filteredReturns.filter((item) =>
-        item.returnDetails.some((detail) => detail.reason.toLowerCase().includes("customer adds") || detail.price_difference > 0),
-      ).length,
-    [filteredReturns],
-  );
-  const filteredAdditionalPayment = useMemo(
-    () => filteredReturns.reduce((sum, item) => sum + Number(item.additional_payment ?? 0), 0),
-    [filteredReturns],
-  );
-  const evenExchangeCount = useMemo(
-    () =>
-      filteredReturns.filter((item) =>
-        item.returnDetails.some((detail) => detail.reason.toLowerCase().includes("even exchange") || detail.price_difference === 0),
-      ).length,
-    [filteredReturns],
-  );
   const totalItemsReplaced = useMemo(
     () =>
       filteredReturns.reduce((sum, item) => {
         return sum + item.returnDetails.reduce((dSum, d) => dSum + Number(d.quantity_returned ?? 0), 0);
       }, 0),
+    [filteredReturns],
+  );
+  const sizeExchangeCount = useMemo(
+    () =>
+      filteredReturns.filter((item) =>
+        item.returnDetails.some(
+          (detail) =>
+            detail.reason.toLowerCase().includes("size") ||
+            detail.inventory_action === "Return to Stock",
+        ),
+      ).length,
+    [filteredReturns],
+  );
+  const defectExchangeCount = useMemo(
+    () =>
+      filteredReturns.filter((item) =>
+        item.returnDetails.some(
+          (detail) =>
+            detail.reason.toLowerCase().includes("defect") ||
+            detail.reason.toLowerCase().includes("damag") ||
+            detail.inventory_action === "Defective / Not Sellable",
+        ),
+      ).length,
     [filteredReturns],
   );
 
@@ -1635,34 +1640,30 @@ export function ReturnManagement() {
           </CardContent>
         </Card>
 
-        {/* Card 2: Customer Adds */}
+        {/* Card 2: Items Replaced */}
         <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Customer Adds</p>
-                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
-                  ₱{filteredAdditionalPayment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-zinc-400 mt-1">
-                  {higherReplacementCount} upgraded shoe{higherReplacementCount === 1 ? "" : "s"}
-                </p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Items Replaced</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{totalItemsReplaced}</p>
+                <p className="text-xs text-zinc-400 mt-1">Total shoe units exchanged</p>
               </div>
               <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
-                <AlertTriangle className="h-5 w-5" />
+                <Package className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Even Exchanges */}
+        {/* Card 3: Size Swaps */}
         <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Even Exchanges</p>
-                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{evenExchangeCount}</p>
-                <p className="text-xs text-zinc-400 mt-1">1:1 size or defect swaps</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Size Swaps</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{sizeExchangeCount}</p>
+                <p className="text-xs text-zinc-400 mt-1">1:1 size or fit exchanges</p>
               </div>
               <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
                 <ArrowRightLeft className="h-5 w-5" />
@@ -1671,17 +1672,17 @@ export function ReturnManagement() {
           </CardContent>
         </Card>
 
-        {/* Card 4: Items Replaced */}
+        {/* Card 4: Defective / Damaged */}
         <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Items Replaced</p>
-                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{totalItemsReplaced}</p>
-                <p className="text-xs text-zinc-400 mt-1">Total units exchanged</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Defective / Damaged</p>
+                <p className="text-2xl font-bold text-white tracking-tight mt-1.5">{defectExchangeCount}</p>
+                <p className="text-xs text-zinc-400 mt-1">Defect or damage replacements</p>
               </div>
               <div className="p-2.5 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 shrink-0">
-                <Package className="h-5 w-5" />
+                <AlertTriangle className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
