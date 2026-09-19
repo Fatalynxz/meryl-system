@@ -1958,108 +1958,6 @@ export function PredictiveAnalytics() {
         </CardContent>
       </Card>}
 
-      {showProduct && (
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="bg-[#16161d] border-[#2b2b36]">
-          <CardHeader className="space-y-5">
-            <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-start">
-              <div className="max-w-3xl">
-                <Badge className="mb-3 bg-yellow-400/10 px-3 py-1 text-yellow-300">Buying Preference Rankings</Badge>
-                <CardTitle className="text-white">Top Brand, Size, and Category</CardTitle>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  Quick restocking guide based on what customers actually buy: brands, sizes, and categories ranked by units or revenue.
-                </p>
-              </div>
-
-              <div className="w-full rounded-xl border border-[#2b2b36] bg-[#0f1017] p-2 xl:w-[350px]">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-300/80">Period</span>
-                  <Badge className="bg-yellow-400 px-2 py-0.5 text-[11px] text-red-950">{analytics.topRankingPeriodLabel}</Badge>
-                </div>
-
-                <div className="relative">
-                  <select
-                    value={topRankingPeriod}
-                    onChange={(event) => setTopRankingPeriod(event.target.value as RevenueTrendPeriod)}
-                    className="h-8 w-full appearance-none rounded-md border border-[#2b2b36] bg-[#181820] px-3 pr-8 text-[13px] font-medium text-white outline-none transition focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/40"
-                  >
-                    {revenueTrendOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/70">⌄</span>
-                </div>
-
-                <div className="mb-1 mt-2.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-300/80">Rank by</span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={topRankingMetric}
-                    onChange={(event) => setTopRankingMetric(event.target.value as RankingMetric)}
-                    className="h-8 w-full appearance-none rounded-md border border-yellow-400 bg-[#181820] px-3 pr-8 text-[13px] font-medium text-white outline-none transition focus:ring-1 focus:ring-yellow-400/40"
-                  >
-                    <option value="units">Units</option>
-                    <option value="revenue">Revenue</option>
-                  </select>
-                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/80">⌄</span>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[
-              { title: "Top Brands", subtitle: "Which brands customers choose most", rows: analytics.topBrands },
-              { title: "Top Sizes", subtitle: "Sizes to prioritize when restocking", rows: analytics.topSizes },
-              { title: "Top Shoe Categories", subtitle: "Shoe groups with strongest demand", rows: analytics.topCategories },
-            ].map((group) => (
-              <div key={group.title} className="rounded-2xl border border-[#2b2b36] bg-[#111118] p-4">
-                <div className="mb-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-white">{group.title}</p>
-                    <Badge className="bg-white/10 text-xs text-white/70">{group.rows.length} ranked</Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-white/45">{group.subtitle}</p>
-                </div>
-                {group.rows.length ? (
-                  <div className="h-[280px] rounded-xl border border-[#2b2b36] bg-[#181820] p-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={group.rows.map((row: any) => ({
-                          name: shortLabel(row.name, 14),
-                          value: topRankingMetric === "revenue" ? Number(row.revenue ?? 0) : Number(row.units ?? 0),
-                          display: topRankingMetric === "revenue" ? money(Number(row.revenue ?? 0)) : `${row.units} units`,
-                        }))}
-                        layout="vertical"
-                        margin={{ top: 8, right: 20, bottom: 8, left: 6 }}
-                      >
-                        <CartesianGrid stroke="#2b2b36" horizontal={false} />
-                        <XAxis type="number" stroke="#a1a1aa" tick={{ fill: "#d4d4d8", fontSize: 12 }} />
-                        <YAxis type="category" dataKey="name" width={120} stroke="#a1a1aa" tick={{ fill: "#d4d4d8", fontSize: 12 }} />
-                        <Tooltip
-                          contentStyle={{ background: "#101017", border: "1px solid #2b2b36", borderRadius: 12 }}
-                          labelStyle={{ color: "#facc15" }}
-                          itemStyle={{ color: "#facc15" }}
-                          formatter={(value: any) =>
-                            topRankingMetric === "revenue" ? money(Number(value)) : `${Number(value)} units`
-                          }
-                        />
-                        <Bar dataKey="value" radius={[0, 8, 8, 0]} fill="#facc15" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <span className="text-sm text-white/45">No data yet.</span>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-      )}
-
       {showCustomer && (
       <div className="grid grid-cols-1 gap-5">
         <Card className="bg-[#16161d] border-[#2b2b36]">
@@ -2067,7 +1965,6 @@ export function PredictiveAnalytics() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-white">Customer Analytics Period</p>
-                <p className="text-xs text-white/50">Filter gender and age charts by time window.</p>
                 <p className="text-xs text-white/50">Filter customer demand and sales by gender across time windows.</p>
               </div>
               <div className="flex flex-wrap gap-2">
