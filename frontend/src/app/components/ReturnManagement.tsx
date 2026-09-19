@@ -599,11 +599,12 @@ export function ReturnManagement() {
     });
 
     if (!matchedSale) {
+      const displayQuery = rawQuery.length > 32 ? `${rawQuery.slice(0, 32)}...` : rawQuery;
       setReceiptValidationStatus({
         state: "not_found",
-        message: `No transaction found matching receipt "${rawQuery}". Please verify the printed receipt.`,
+        message: `No transaction found matching receipt "${displayQuery}". Please verify the printed receipt.`,
       });
-      toast.error(`Receipt "${rawQuery}" not found.`);
+      toast.error(`Receipt "${displayQuery}" not found.`);
       return;
     }
 
@@ -695,6 +696,7 @@ export function ReturnManagement() {
             { facingMode: "environment" },
             {
               fps: 10,
+              aspectRatio: 1.0,
               qrbox: { width: 220, height: 220 },
             },
             (decodedText) => {
@@ -1750,14 +1752,14 @@ export function ReturnManagement() {
                       )}
 
                       {receiptValidationStatus.state === "not_found" && (
-                        <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3.5 flex items-start gap-2.5">
+                        <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3.5 flex items-start gap-2.5 max-w-full overflow-hidden">
                           <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                          <div className="text-xs space-y-0.5">
+                          <div className="text-xs space-y-0.5 min-w-0 max-w-full break-all">
                             <span className="text-red-300 font-semibold text-sm block">
                               Invalid Receipt Number
                             </span>
-                            <p className="text-red-200/80">
-                              {receiptValidationStatus.message} Check the receipt for the SALES-xxx code or search the sales list below.
+                            <p className="text-red-200/80 break-all leading-relaxed">
+                              {receiptValidationStatus.message} Check the receipt for the SALES-xxx or RCP-xxx code or search the sales list below.
                             </p>
                           </div>
                         </div>
@@ -1781,7 +1783,7 @@ export function ReturnManagement() {
                               <Input
                                 value={salePickerSearch}
                                 onChange={(event) => setSalePickerSearch(event.target.value)}
-                                placeholder="Filter sales by ID, customer, status..."
+                                placeholder="Filter sales by Receipt #, customer, status..."
                                 className="h-9 rounded-lg pl-9 bg-[#1D1D25] border-zinc-700 text-white placeholder:text-zinc-500 text-xs focus-visible:ring-[#FFD60A]/40"
                               />
                             </div>
@@ -1789,7 +1791,7 @@ export function ReturnManagement() {
                               <Table className="w-full table-fixed text-xs">
                                 <TableHeader>
                                   <TableRow className="bg-zinc-900 hover:bg-zinc-900 border-zinc-800">
-                                    <TableHead className="w-[20%] text-yellow-300 text-center">Sales ID</TableHead>
+                                    <TableHead className="w-[20%] text-yellow-300 text-center">Receipt #</TableHead>
                                     <TableHead className="w-[28%] text-yellow-300 text-center">Customer</TableHead>
                                     <TableHead className="w-[14%] text-yellow-300 text-center">Items</TableHead>
                                     <TableHead className="w-[20%] text-yellow-300 text-center">Amount</TableHead>
@@ -2639,7 +2641,7 @@ export function ReturnManagement() {
 
           <div className="space-y-4 py-3">
             {/* Viewfinder Area */}
-            <div className="relative w-full aspect-square max-w-[320px] mx-auto rounded-2xl overflow-hidden bg-black border-2 border-yellow-400/40 shadow-inner flex items-center justify-center">
+            <div className="relative w-full aspect-square max-w-[320px] mx-auto rounded-2xl overflow-hidden bg-black border border-zinc-700 shadow-2xl flex items-center justify-center [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover [&_video]:!rounded-xl [&_img]:hidden">
               <div id="receipt-qr-reader" className="w-full h-full" />
               <div id="receipt-file-qr-temp" className="hidden" />
 
@@ -2654,18 +2656,6 @@ export function ReturnManagement() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#181824] p-4 text-center z-10 gap-3">
                   <AlertCircle className="w-10 h-10 text-amber-400" />
                   <p className="text-xs text-zinc-300 leading-relaxed">{qrScanError}</p>
-                </div>
-              )}
-
-              {/* Target Scan Reticle Overlay */}
-              {!qrScanError && !cameraLoading && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 border-2 border-dashed border-yellow-400/80 rounded-xl relative">
-                    <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-yellow-400" />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-yellow-400" />
-                    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-yellow-400" />
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-yellow-400" />
-                  </div>
                 </div>
               )}
             </div>

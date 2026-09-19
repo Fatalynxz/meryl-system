@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Calendar, Eye, RotateCcw, Search, ShoppingCart, Users } from "lucide-react";
+import { Calendar, Eye, Receipt, RotateCcw, Search, ShoppingCart, Users } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
 import { toast } from "sonner";
 import { useProducts, useReturns, useSales, useUsers } from "../../lib/hooks";
 import { useAuth } from "../../lib/auth-context";
@@ -89,6 +91,63 @@ export function SalesManagement() {
   const [endDate, setEndDate] = useState("");
   const [viewingSale, setViewingSale] = useState<any | null>(null);
   const [updatingSaleId, setUpdatingSaleId] = useState<string | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<any | null>(null);
+
+  const openReceiptForSale = (sale: any) => {
+    const totalGross = sale.saleDetails.reduce((sum: number, d: any) => sum + (d.gross || 0), 0);
+    const totalDiscount = sale.saleDetails.reduce((sum: number, d: any) => sum + (d.discount_amount || 0), 0);
+    const totalItemsCount = sale.saleDetails.reduce((sum: number, d: any) => sum + (d.quantity || 0), 0);
+    const totalAmount = Number(sale.total_amount ?? 0);
+    const vatableSales = Number((totalAmount / 1.12).toFixed(2));
+    const vatAmount = Number((totalAmount - vatableSales).toFixed(2));
+    const rawDate = sale.transaction_date ? new Date(sale.transaction_date) : new Date();
+    const dateFormatted = Number.isNaN(rawDate.getTime())
+      ? "N/A"
+      : rawDate.toLocaleString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+    const dateDigits = Number.isNaN(rawDate.getTime())
+      ? new Date().toISOString().slice(0, 10).replace(/-/g, "")
+      : rawDate.toISOString().slice(0, 10).replace(/-/g, "");
+    const saleIdStr = String(sale.sales_id ?? "");
+    const cleanSuffix = saleIdStr.replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase() || "0001";
+    const receiptNumber = `RCP-${dateDigits}-${cleanSuffix}`;
+
+    setViewingReceipt({
+      receiptNumber,
+      rawSalesId: saleIdStr,
+      displayId: sale.display_sales_id,
+      date: dateFormatted,
+      cashier: sale.cashierName || "Administrator",
+      customerName: sale.customerName || "Walk-in Customer",
+      items: sale.saleDetails.map((d: any) => ({
+        name: d.productName,
+        brand: d.brand || "",
+        color: d.color || "",
+        size: d.size || "",
+        quantity: Number(d.quantity || 1),
+        unitPrice: Number(d.unit_price || (d.gross / (d.quantity || 1)) || 0),
+        subtotal: Number(d.subtotal || (d.gross - (d.discount_amount || 0)) || 0),
+      })),
+      grossSubtotal: totalGross,
+      discount: totalDiscount,
+      total: totalAmount,
+      totalItemsCount,
+      vatableSales,
+      vatAmount,
+      vatExemptSales: 0,
+      zeroRatedSales: 0,
+      paymentMethod: sale.payment_method || "Cash",
+      cashReceived: totalAmount,
+      changeAmount: 0,
+    });
+  };
 
   const sales = (salesQuery.data as any[]) ?? [];
   const returns = (returnsQuery.data as any[]) ?? [];
@@ -735,17 +794,28 @@ export function SalesManagement() {
                         </DialogTrigger>
                         <DialogContent className="bg-zinc-950 border border-zinc-800 text-zinc-100 max-w-3xl max-h-[85vh] overflow-y-auto shadow-2xl">
                           <DialogHeader className="border-b border-zinc-800/80 pb-3">
-                            <div className="flex items-center justify-between pr-6">
+                            <div className="flex items-center justify-between pr-6 flex-wrap gap-2">
                               <DialogTitle className="text-zinc-100 text-lg font-bold">
                                 Sale Details • {sale.display_sales_id}
                               </DialogTitle>
-                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                                sale.status === 'Completed' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                                sale.status === 'Pending' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                                'bg-red-950 text-red-300 border border-red-800'
-                              }`}>
-                                {sale.status}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => openReceiptForSale(sale)}
+                                  className="bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] font-bold text-xs h-8 px-3 rounded-lg flex items-center gap-1.5 shadow"
+                                >
+                                  <Receipt className="w-3.5 h-3.5" />
+                                  <span>View Receipt</span>
+                                </Button>
+                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                                  sale.status === 'Completed' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                                  sale.status === 'Pending' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                                  'bg-red-950 text-red-300 border border-red-800'
+                                }`}>
+                                  {sale.status}
+                                </span>
+                              </div>
                             </div>
                           </DialogHeader>
 
@@ -923,6 +993,17 @@ export function SalesManagement() {
                                     </div>
                                   </div>
                                 </div>
+
+                                <div className="pt-2 flex justify-end">
+                                  <Button
+                                    type="button"
+                                    onClick={() => openReceiptForSale(sale)}
+                                    className="bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] font-bold text-xs h-9 px-4 rounded-xl flex items-center gap-2 shadow"
+                                  >
+                                    <Receipt className="w-4 h-4" />
+                                    <span>View &amp; Print Official Receipt</span>
+                                  </Button>
+                                </div>
                               </div>
                             );
                           })()}
@@ -936,6 +1017,153 @@ export function SalesManagement() {
           </div>
         </CardContent>
       </Card>
+
+      {/* THERMAL RECEIPT MODAL */}
+      <Dialog open={!!viewingReceipt} onOpenChange={(open) => !open && setViewingReceipt(null)}>
+        <DialogContent className="bg-[#12121a] border-[#2d2d3d] text-zinc-900 max-w-md rounded-2xl shadow-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto">
+          <DialogHeader className="border-b border-[#252536] pb-3 text-left">
+            <DialogTitle className="text-white text-base font-bold flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-yellow-400" />
+              Official Sales Receipt
+            </DialogTitle>
+          </DialogHeader>
+
+          {viewingReceipt && (
+            <div
+              id="printable-receipt"
+              style={{ backgroundColor: "#ffffff", color: "#000000" }}
+              className="p-5 rounded border border-zinc-200 shadow-2xl font-mono text-[11px] leading-[1.4] w-[302px] mx-auto"
+            >
+              {/* ── STORE HEADER ── */}
+              <div className="text-center mb-1">
+                <img
+                  src={merylLogoBw}
+                  alt="Meryl Shoes Logo"
+                  className="h-9 mx-auto mb-1 object-contain"
+                  style={{ filter: "brightness(0)" }}
+                />
+                <p className="text-[15px] font-black tracking-widest uppercase">MERYL SHOES</p>
+                <p className="text-[10px]">Official Retailer &amp; Shoe Center</p>
+                <p className="text-[10px]">Araneta Ave, Bacolod, 6100 Negros Occidental</p>
+                <p className="text-[10px]">TIN: 432-891-002-000 VAT REGISTERED</p>
+                <p className="text-[10px]">TEL: (034) 435 0128</p>
+              </div>
+
+              {/* ── TRANSACTION INFO ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between"><span>OR No:</span><span className="font-bold">{viewingReceipt.receiptNumber}</span></div>
+                <div className="flex justify-between"><span>Date:</span><span>{viewingReceipt.date}</span></div>
+                <div className="flex justify-between"><span>Cashier:</span><span>{viewingReceipt.cashier}</span></div>
+                <div className="flex justify-between"><span>Terminal:</span><span>POS-01</span></div>
+              </div>
+
+              {/* ── CUSTOMER ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="text-[11px]">
+                <span>Customer: {viewingReceipt.customerName}</span>
+              </div>
+
+              {/* ── ITEMS ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-1.5 text-[11px]">
+                {viewingReceipt.items.map((item: any, idx: number) => (
+                  <div key={idx}>
+                    <p className="font-bold uppercase">{item.name}</p>
+                    <p className="text-[10px]">
+                      {[item.brand, item.color, item.size ? `Size ${item.size}` : ""].filter(Boolean).join(" / ")}
+                    </p>
+                    <div className="flex justify-between">
+                      <span>{item.quantity} @ {item.unitPrice.toFixed(2)}</span>
+                      <span>{item.subtotal.toFixed(2)} V</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── TOTALS ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
+                {viewingReceipt.discount > 0 && (
+                  <>
+                    <div className="flex justify-between"><span>Subtotal:</span><span>{viewingReceipt.grossSubtotal.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span>Discount:</span><span>-{viewingReceipt.discount.toFixed(2)}</span></div>
+                  </>
+                )}
+                <div className="flex justify-between font-bold text-[13px] pt-1">
+                  <span>TOTAL</span>
+                  <span>{viewingReceipt.total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* ── PAYMENT ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between"><span>{viewingReceipt.paymentMethod}:</span><span>{viewingReceipt.paymentMethod}</span></div>
+                <div className="flex justify-between"><span>Total Tender:</span><span>{viewingReceipt.cashReceived.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Change Due:</span><span>{viewingReceipt.changeAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between pt-0.5">
+                  <span>Qty of item(s) purchased:</span>
+                  <span>{viewingReceipt.totalItemsCount}.00</span>
+                </div>
+              </div>
+
+              {/* ── VAT SUMMARY ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center font-bold text-[11px] mb-0.5">VAT SUMMARY</p>
+              <div className="space-y-0.5 text-[11px]">
+                <div className="flex justify-between"><span>Vatable Amt(V):</span><span className="tabular-nums">{viewingReceipt.vatableSales.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Vat Amt(V +12%):</span><span className="tabular-nums">{viewingReceipt.vatAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Vat Exempted Sale(E):</span><span className="tabular-nums">{viewingReceipt.vatExemptSales.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Zero Rated Amt(Z):</span><span className="tabular-nums">{viewingReceipt.zeroRatedSales.toFixed(2)}</span></div>
+              </div>
+
+              {/* ── CUSTOMER COPY ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center font-bold text-[11px]">Customer Copy</p>
+
+              {/* ── QR CODE ── */}
+              <div className="flex justify-center pt-2 pb-1">
+                <QRCodeSVG
+                  value={viewingReceipt.rawSalesId || viewingReceipt.receiptNumber}
+                  size={80}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
+              </div>
+              <p className="text-center text-[9px] font-mono">*{viewingReceipt.receiptNumber}*</p>
+
+              {/* ── FOOTER ── */}
+              <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
+              <p className="text-center text-[10px] font-bold tracking-wide">THIS SERVES AS YOUR</p>
+              <p className="text-center text-[10px] font-bold tracking-wide">OFFICIAL RECEIPT</p>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-end gap-3 pt-3 border-t border-[#252536]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setViewingReceipt(null)}
+              className="border-[#343444] text-zinc-300 hover:text-white rounded-xl text-xs h-9 px-4"
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                window.print();
+                toast.success("Receipt sent to printer");
+              }}
+              className="bg-[#FFD60A] hover:bg-[#ffcf24] text-[#15151B] font-bold rounded-xl text-xs h-9 px-4 flex items-center gap-2 shadow"
+            >
+              <Receipt className="w-4 h-4" />
+              <span>Print Receipt</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
