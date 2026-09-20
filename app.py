@@ -911,7 +911,7 @@ def create_user_profile(name, username, role, password=None, status="active"):
                     "name": name,
                     "username": username,
                     "password": password or (
-                        ADMIN_CREDENTIALS["password"] if canonical_app_role_name(role) == "admin" else "staff123"
+                        os.getenv("ADMIN_PASSWORD", "admin123") if canonical_app_role_name(role) == "admin" else "staff123"
                     ),
                     "role_id": role_id,
                     "status": db_user_status(status),
