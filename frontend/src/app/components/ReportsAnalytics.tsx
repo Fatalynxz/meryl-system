@@ -384,6 +384,8 @@ export function ReportsAnalytics() {
   const [sizeFilter, setSizeFilter] = useState('all');
   const [variantFilter, setVariantFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [inventoryStatusFilter, setInventoryStatusFilter] = useState<'all' | 'critical' | 'reorder' | 'optimal' | 'overstock'>('all');
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
   const [drilldownSection, setDrilldownSection] = useState<'all' | 'shoe' | 'brands' | 'categories' | 'departments' | 'sizes' | 'variants' | 'payments'>('all');
   const salesQuery = useSales();
   const productsQuery = useProducts();
@@ -1340,36 +1342,144 @@ export function ReportsAnalytics() {
       }));
   }, [customEndDate, customStartDate, salesBreakdownPeriod, salesRows, timeRange]);
 
-  const inventoryStatusRows = useMemo(() => (
-    productRows
-      .map((product: any) => {
-        const inventory = Array.isArray(product.inventory) ? product.inventory[0] : product.inventory;
-        const onHand = Number(inventory?.stock_quantity ?? product.stock ?? 0);
-        const reserved = Number(inventory?.reserved_quantity ?? inventory?.held_stock ?? product.reserved_stock ?? 0);
-        const stock = Math.max(0, onHand - reserved);
-        const reorder = Number(product.reorder_level ?? inventory?.reorder_level ?? 10);
-        const status = stock <= Math.max(2, Math.floor(reorder * 0.4))
-          ? 'Critical'
-          : stock <= reorder
-            ? 'Reorder Required'
-            : stock >= reorder * 3
-              ? 'Overstock'
-              : 'Optimal';
+  const inventoryAnalytics = useMemo(() => {
+    let totalStock = 0;
+    let totalRetailValue = 0;
+    let totalCostValue = 0;
+    let outOfStockCount = 0;
+    let criticalCount = 0;
+    let reorderCount = 0;
+    let optimalCount = 0;
+    let overstockCount = 0;
 
-        return {
-          id: String(product.product_id ?? ''),
-          itemId: String(product.sku ?? product.product_id ?? '').slice(0, 8).toUpperCase(),
-          name: `${product.brand ?? 'N/A'} ${product.product_name ?? 'Product'}`.trim(),
-          size: product.size ?? 'N/A',
-          color: product.color ?? 'N/A',
-          stock,
-          reorder,
-          status,
-        };
-      })
-      .sort((a, b) => a.stock - b.stock)
-      .slice(0, 8)
-  ), [productRows]);
+    const brandStockMap = new Map<string, { name: string; pairs: number; value: number }>();
+    const sizeStockMap = new Map<string, { name: string; pairs: number }>();
+
+    const allRows = productRows.map((product: any) => {
+      const inventory = Array.isArray(product.inventory) ? product.inventory[0] : product.inventory;
+      const onHand = Number(inventory?.stock_quantity ?? product.stock ?? 0);
+      const reserved = Number(inventory?.reserved_quantity ?? inventory?.held_stock ?? product.reserved_stock ?? 0);
+      const stock = Math.max(0, onHand - reserved);
+      const reorder = Number(product.reorder_level ?? inventory?.reorder_level ?? 10);
+      const unitPrice = Number(product.unit_price ?? product.price ?? 0);
+      const costPrice = Number(product.cost_price ?? product.cost ?? (unitPrice * 0.6));
+      const brand = String(product.brand ?? 'Other').trim();
+      const size = String(product.size ?? 'N/A').trim();
+      const color = String(product.color ?? 'N/A').trim();
+      const name = `${product.brand ?? ''} ${product.product_name ?? 'Product'}`.trim();
+      const itemId = String(product.sku ?? product.product_id ?? '').slice(0, 10).toUpperCase();
+
+      const retailVal = stock * unitPrice;
+      const costVal = stock * costPrice;
+
+      totalStock += stock;
+      totalRetailValue += retailVal;
+      totalCostValue += costVal;
+
+      let status = 'Optimal';
+      if (stock === 0) {
+        status = 'Out of Stock';
+        outOfStockCount++;
+      } else if (stock <= Math.max(2, Math.floor(reorder * 0.4))) {
+        status = 'Critical';
+        criticalCount++;
+      } else if (stock <= reorder) {
+        status = 'Reorder Required';
+        reorderCount++;
+      } else if (stock >= reorder * 3) {
+        status = 'Overstock';
+        overstockCount++;
+      } else {
+        status = 'Optimal';
+        optimalCount++;
+      }
+
+      // Brand aggregation
+      const brandEntry = brandStockMap.get(brand) ?? { name: brand, pairs: 0, value: 0 };
+      brandEntry.pairs += stock;
+      brandEntry.value += retailVal;
+      brandStockMap.set(brand, brandEntry);
+
+      // Size aggregation
+      if (size && size !== 'N/A') {
+        const sizeEntry = sizeStockMap.get(size) ?? { name: size, pairs: 0 };
+        sizeEntry.pairs += stock;
+        sizeStockMap.set(size, sizeEntry);
+      }
+
+      return {
+        id: String(product.product_id ?? ''),
+        itemId,
+        name,
+        brand,
+        size,
+        color,
+        stock,
+        reorder,
+        unitPrice,
+        costPrice,
+        stockValue: retailVal,
+        status,
+      };
+    });
+
+    const totalProducts = productRows.length;
+    const healthDistribution = [
+      { name: 'Optimal Stock', count: optimalCount, color: '#10b981', share: totalProducts ? Math.round((optimalCount / totalProducts) * 100) : 0 },
+      { name: 'Reorder Needed', count: reorderCount, color: '#f59e0b', share: totalProducts ? Math.round((reorderCount / totalProducts) * 100) : 0 },
+      { name: 'Critical / Out', count: outOfStockCount + criticalCount, color: '#ef4444', share: totalProducts ? Math.round(((outOfStockCount + criticalCount) / totalProducts) * 100) : 0 },
+      { name: 'Overstock', count: overstockCount, color: '#3b82f6', share: totalProducts ? Math.round((overstockCount / totalProducts) * 100) : 0 },
+    ].filter((item) => item.count > 0);
+
+    const brandList = Array.from(brandStockMap.values()).sort((a, b) => b.value - a.value).slice(0, 8);
+    const sizeList = Array.from(sizeStockMap.values()).sort((a, b) => {
+      const numA = parseFloat(a.name);
+      const numB = parseFloat(b.name);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.name.localeCompare(b.name);
+    });
+
+    return {
+      totalStock,
+      totalRetailValue,
+      totalCostValue,
+      outOfStockCount,
+      criticalCount,
+      reorderCount,
+      optimalCount,
+      overstockCount,
+      allRows,
+      healthDistribution,
+      brandList,
+      sizeList,
+    };
+  }, [productRows]);
+
+  const inventoryStatusRows = useMemo(() => {
+    return inventoryAnalytics.allRows.filter((item) => {
+      if (inventoryStatusFilter === 'critical') {
+        if (item.status !== 'Critical' && item.status !== 'Out of Stock') return false;
+      } else if (inventoryStatusFilter === 'reorder') {
+        if (item.status !== 'Reorder Required') return false;
+      } else if (inventoryStatusFilter === 'optimal') {
+        if (item.status !== 'Optimal') return false;
+      } else if (inventoryStatusFilter === 'overstock') {
+        if (item.status !== 'Overstock') return false;
+      }
+
+      if (inventorySearchQuery) {
+        const q = inventorySearchQuery.toLowerCase();
+        const match =
+          item.name.toLowerCase().includes(q) ||
+          item.brand.toLowerCase().includes(q) ||
+          item.itemId.toLowerCase().includes(q) ||
+          item.color.toLowerCase().includes(q) ||
+          item.size.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [inventoryAnalytics.allRows, inventorySearchQuery, inventoryStatusFilter]);
 
   const businessSummary = useMemo(() => {
     const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
@@ -1751,10 +1861,24 @@ export function ReportsAnalytics() {
       drawTitle('Revenue by Category');
       drawTable(['Category', 'Revenue', 'Share', 'Growth'], revenueByCategory.map((row) => [row.category, money(row.revenue), `${row.percentage}%`, `${row.growth}%`]));
     } else if (reportType === 'inventory') {
-      drawTitle('Inventory Turnover');
-      drawTable(['Period', 'Units Sold', 'Turnover', 'Avg Days'], inventoryTurnover.map((row) => [row.month, row.units, `${row.turnover.toFixed(2)}x`, row.avgDays || 0]));
-      drawTitle('Inventory and Stock Status');
-      drawTable(['Item ID', 'Brand and Model', 'Size', 'Color', 'Stock', 'Reorder', 'Status'], inventoryStatusRows.map((row) => [row.itemId, row.name, row.size, row.color, row.stock, row.reorder, row.status]));
+      drawTitle('Inventory Health & Valuation Snapshot');
+      drawTable(['Metric', 'Value'], [
+        ['Total Retail Valuation', money(inventoryAnalytics.totalRetailValue)],
+        ['Total Wholesale Cost Basis', money(inventoryAnalytics.totalCostValue)],
+        ['Total In-Stock Pairs', `${inventoryAnalytics.totalStock.toLocaleString()} pairs`],
+        ['Out of Stock / Critical', `${inventoryAnalytics.outOfStockCount + inventoryAnalytics.criticalCount} models`],
+        ['Reorder Needed', `${inventoryAnalytics.reorderCount} models`],
+        ['Optimal Stock Level', `${inventoryAnalytics.optimalCount} models`],
+        ['Overstock Level', `${inventoryAnalytics.overstockCount} models`],
+      ], [250, 265]);
+
+      ensureSpace(40);
+      drawTitle('Stock Valuation by Brand');
+      drawTable(['Brand', 'Pairs in Stock', 'Retail Valuation'], inventoryAnalytics.brandList.slice(0, 8).map((b) => [b.name, `${b.pairs} pairs`, money(b.value)]), [180, 140, 195]);
+
+      ensureSpace(40);
+      drawTitle('Actionable Restock Priority List');
+      drawTable(['Item ID', 'Brand & Shoe Model', 'Size', 'Color', 'Stock', 'Reorder', 'Status'], inventoryStatusRows.slice(0, 30).map((row) => [row.itemId, row.name, row.size, row.color, String(row.stock), String(row.reorder), row.status]), [65, 200, 45, 65, 45, 45, 50]);
     }
 
     pages.forEach((page, index) => {
@@ -2140,17 +2264,36 @@ export function ReportsAnalytics() {
       }
 
       if (reportType === 'inventory') {
-        lines.push(formatRow(['=== INVENTORY TURNOVER METRICS ===']));
-        lines.push(formatRow(['Period Bucket', 'Units Sold', 'Turnover Rate', 'Average Days to Sell']));
-        (inventoryTurnover ?? []).forEach((it: any) => {
-          lines.push(formatRow([it.month ?? 'N/A', it.units ?? 0, `${Number(it.turnover ?? 0).toFixed(2)}x`, it.avgDays || 0]));
+        lines.push(formatRow(['=== INVENTORY & STOCK VALUATION SUMMARY ===']));
+        lines.push(formatRow(['Metric', 'Value']));
+        lines.push(formatRow(['Total Retail Stock Valuation (PHP)', inventoryAnalytics.totalRetailValue.toFixed(2)]));
+        lines.push(formatRow(['Total Wholesale Cost Valuation (PHP)', inventoryAnalytics.totalCostValue.toFixed(2)]));
+        lines.push(formatRow(['Total In-Stock Units (Pairs)', inventoryAnalytics.totalStock]));
+        lines.push(formatRow(['Out of Stock Models', inventoryAnalytics.outOfStockCount]));
+        lines.push(formatRow(['Critical Low Stock Models', inventoryAnalytics.criticalCount]));
+        lines.push(formatRow(['Reorder Required Models', inventoryAnalytics.reorderCount]));
+        lines.push(formatRow(['Optimal Stock Models', inventoryAnalytics.optimalCount]));
+        lines.push(formatRow(['Overstock Models', inventoryAnalytics.overstockCount]));
+        lines.push('');
+
+        lines.push(formatRow(['=== STOCK VALUATION & PAIRS BY BRAND ===']));
+        lines.push(formatRow(['Brand Name', 'In-Stock Pairs', 'Stock Valuation (PHP)']));
+        inventoryAnalytics.brandList.forEach((b) => {
+          lines.push(formatRow([b.name, b.pairs, b.value.toFixed(2)]));
+        });
+        lines.push('');
+
+        lines.push(formatRow(['=== FOOTWEAR SIZE RUN AVAILABILITY ===']));
+        lines.push(formatRow(['Size (EU)', 'In-Stock Pairs']));
+        inventoryAnalytics.sizeList.forEach((s) => {
+          lines.push(formatRow([s.name, s.pairs]));
         });
         lines.push('');
 
         lines.push(formatRow(['=== INVENTORY AND STOCK STATUS ===']));
-        lines.push(formatRow(['Item ID', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Stock Status']));
+        lines.push(formatRow(['Item ID', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Unit Price (PHP)', 'Stock Valuation (PHP)', 'Stock Status']));
         (inventoryStatusRows ?? []).forEach((item: any) => {
-          lines.push(formatRow([item.itemId ?? 'N/A', item.name ?? 'N/A', item.size ?? 'N/A', item.color ?? 'N/A', item.stock ?? 0, item.reorder ?? 0, item.status ?? 'N/A']));
+          lines.push(formatRow([item.itemId ?? 'N/A', item.name ?? 'N/A', item.size ?? 'N/A', item.color ?? 'N/A', item.stock ?? 0, item.reorder ?? 0, (item.unitPrice ?? 0).toFixed(2), (item.stockValue ?? 0).toFixed(2), item.status ?? 'N/A']));
         });
         lines.push('');
       }
@@ -2292,72 +2435,125 @@ export function ReportsAnalytics() {
       </div>
 
       {/* Key Performance Indicators */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-[#0b0b0f] border-[#24242d]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-white/70">Total Revenue</p>
-                <p className="text-2xl text-white">{money(currentMetrics.current.revenue)}</p>
-                {showComparison && <p className={`text-xs mt-1 ${revenueChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
-                  {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}% vs last period
-                </p>}
+      {reportType === 'inventory' ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Total Stock Valuation</p>
+                  <p className="text-2xl text-yellow-300 font-bold">{money(inventoryAnalytics.totalRetailValue)}</p>
+                  <p className="text-xs text-zinc-400 mt-1">Cost: {money(inventoryAnalytics.totalCostValue)} • {productRows.length} SKUs</p>
+                </div>
+                <Coins className="h-8 w-8 text-yellow-400" />
               </div>
-              <Coins className="h-8 w-8 text-yellow-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-[#0b0b0f] border-[#24242d]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-white/70">Units Sold</p>
-                <p className="text-2xl text-white">{currentMetrics.current.units.toLocaleString()}</p>
-                {showComparison && <p className={`text-xs mt-1 ${unitsChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
-                  {unitsChange >= 0 ? '+' : ''}{unitsChange.toFixed(1)}% vs last period
-                </p>}
+            </CardContent>
+          </Card>
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Total In-Stock Units</p>
+                  <p className="text-2xl text-white font-bold">{inventoryAnalytics.totalStock.toLocaleString()} pairs</p>
+                  <p className="text-xs text-zinc-400 mt-1">Available in warehouse & store</p>
+                </div>
+                <Package className="h-8 w-8 text-yellow-400" />
               </div>
-              <Package className="h-8 w-8 text-yellow-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-[#0b0b0f] border-[#24242d]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-white/70">Gross Profit</p>
-                <p className="text-2xl text-green-400 font-bold">{money(currentMetrics.current.grossProfit)}</p>
-                {showComparison ? (
-                  <p className={`text-xs mt-1 ${profitChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
-                    {profitChange >= 0 ? '+' : ''}{profitChange.toFixed(1)}% • {currentMetrics.current.margin.toFixed(1)}% margin
-                  </p>
-                ) : (
-                  <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.margin.toFixed(1)}% gross profit margin</p>
-                )}
+            </CardContent>
+          </Card>
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Reorder Required</p>
+                  <p className="text-2xl text-yellow-400 font-bold">{inventoryAnalytics.reorderCount} models</p>
+                  <p className="text-xs text-yellow-500/80 mt-1">At or below reorder threshold</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-yellow-400" />
               </div>
-              <TrendingUp className="h-8 w-8 text-green-400" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-[#0b0b0f] border-[#24242d]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-white/70">Avg Order Value (AOV)</p>
-                <p className="text-2xl text-white">{money(currentMetrics.current.aov)}</p>
-                {showComparison ? (
-                  <p className={`text-xs mt-1 ${aovChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
-                    {aovChange >= 0 ? '+' : ''}{aovChange.toFixed(1)}% vs last period
-                  </p>
-                ) : (
-                  <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.transactions.toLocaleString()} completed orders</p>
-                )}
+            </CardContent>
+          </Card>
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Out of Stock / Critical</p>
+                  <p className="text-2xl text-red-400 font-bold">{inventoryAnalytics.outOfStockCount + inventoryAnalytics.criticalCount} models</p>
+                  <p className="text-xs text-red-400/80 mt-1">{inventoryAnalytics.outOfStockCount} depleted • {inventoryAnalytics.criticalCount} critical low</p>
+                </div>
+                <Tag className="h-8 w-8 text-red-400" />
               </div>
-              <ShoppingBag className="h-8 w-8 text-yellow-400" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Total Revenue</p>
+                  <p className="text-2xl text-white">{money(currentMetrics.current.revenue)}</p>
+                  {showComparison && <p className={`text-xs mt-1 ${revenueChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
+                    {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}% vs last period
+                  </p>}
+                </div>
+                <Coins className="h-8 w-8 text-yellow-400" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Units Sold</p>
+                  <p className="text-2xl text-white">{currentMetrics.current.units.toLocaleString()}</p>
+                  {showComparison && <p className={`text-xs mt-1 ${unitsChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
+                    {unitsChange >= 0 ? '+' : ''}{unitsChange.toFixed(1)}% vs last period
+                  </p>}
+                </div>
+                <Package className="h-8 w-8 text-yellow-400" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Gross Profit</p>
+                  <p className="text-2xl text-green-400 font-bold">{money(currentMetrics.current.grossProfit)}</p>
+                  {showComparison ? (
+                    <p className={`text-xs mt-1 ${profitChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
+                      {profitChange >= 0 ? '+' : ''}{profitChange.toFixed(1)}% • {currentMetrics.current.margin.toFixed(1)}% margin
+                    </p>
+                  ) : (
+                    <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.margin.toFixed(1)}% gross profit margin</p>
+                  )}
+                </div>
+                <TrendingUp className="h-8 w-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-[#0b0b0f] border-[#24242d]">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/70">Avg Order Value (AOV)</p>
+                  <p className="text-2xl text-white">{money(currentMetrics.current.aov)}</p>
+                  {showComparison ? (
+                    <p className={`text-xs mt-1 ${aovChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
+                      {aovChange >= 0 ? '+' : ''}{aovChange.toFixed(1)}% vs last period
+                    </p>
+                  ) : (
+                    <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.transactions.toLocaleString()} completed orders</p>
+                  )}
+                </div>
+                <ShoppingBag className="h-8 w-8 text-yellow-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Selected Report Section */}
       {reportType === 'overview' && (
@@ -3863,54 +4059,270 @@ export function ReportsAnalytics() {
       )}
 
       {reportType === 'inventory' && (
-        <div className="space-y-4">
-          <Card className="bg-[#0b0b0f] border-[#24242d]">
-            <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-2"><Package className="w-5 h-5" />Inventory Turnover Rate</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={inventoryTurnover}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#24242d" />
-                  <XAxis dataKey="month" stroke="#fef08a" />
-                  <YAxis yAxisId="left" stroke="#fef08a" />
-                  <YAxis yAxisId="right" orientation="right" stroke="#facc15" />
-                  <Tooltip {...darkChartTooltipProps} />
-                  <Legend wrapperStyle={{ color: '#fef08a' }} />
-                  <Line yAxisId="left" type="monotone" dataKey="turnover" stroke="#fef08a" strokeWidth={2} name="Turnover Rate" />
-                  <Line yAxisId="right" type="monotone" dataKey="avgDays" stroke="#facc15" strokeWidth={2} name="Avg Days to Sell" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#0b0b0f] border-[#24242d]">
-            <CardHeader><CardTitle className="text-yellow-300">Inventory & Stock Status</CardTitle></CardHeader>
-            <CardContent>
-              <div className="overflow-hidden rounded-lg border border-[#24242d] bg-[#07070a]">
+        <div className="space-y-5">
+          {/* Charts Row: Stock Health Donut & Inventory Valuation by Brand */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Stock Health Donut */}
+            <Card className="lg:col-span-4 bg-[#0b0b0f] border-[#24242d] shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-yellow-300 flex items-center gap-2 text-base font-bold">
+                  <Package className="w-5 h-5 text-yellow-400" />
+                  Stock Health Breakdown
+                </CardTitle>
+                <p className="text-xs text-zinc-400">Inventory status & availability ratio across all footwear models</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="h-[210px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={inventoryAnalytics.healthDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={78}
+                        paddingAngle={3}
+                        dataKey="count"
+                        nameKey="name"
+                      >
+                        {inventoryAnalytics.healthDistribution.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<ChartWhiteTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {inventoryAnalytics.healthDistribution.map((h) => (
+                    <div
+                      key={h.name}
+                      onClick={() => {
+                        if (h.name === 'Optimal Stock') setInventoryStatusFilter(inventoryStatusFilter === 'optimal' ? 'all' : 'optimal');
+                        else if (h.name === 'Reorder Needed') setInventoryStatusFilter(inventoryStatusFilter === 'reorder' ? 'all' : 'reorder');
+                        else if (h.name.includes('Critical') || h.name.includes('Out')) setInventoryStatusFilter(inventoryStatusFilter === 'critical' ? 'all' : 'critical');
+                        else if (h.name === 'Overstock') setInventoryStatusFilter(inventoryStatusFilter === 'overstock' ? 'all' : 'overstock');
+                      }}
+                      className="p-2.5 rounded-lg border border-[#222230] bg-[#12121c] flex items-center justify-between cursor-pointer hover:border-white/20 transition-all"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: h.color }} />
+                        <span className="text-xs text-white font-medium truncate">{h.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-yellow-300 ml-1">{h.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Inventory Valuation & Pairs by Brand */}
+            <Card className="lg:col-span-8 bg-[#0b0b0f] border-[#24242d] shadow-lg">
+              <CardHeader className="pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-yellow-300 flex items-center gap-2 text-base font-bold">
+                      <BarChart3 className="w-5 h-5 text-yellow-400" />
+                      Stock Valuation & Pairs by Brand
+                    </CardTitle>
+                    <p className="text-xs text-zinc-400">Total capital valuation and physical pairs on hand by footwear maker</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-zinc-300">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-yellow-400" /> Capital (PHP)</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-sky-400" /> Pairs on Hand</span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[270px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={inventoryAnalytics.brandList} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
+                      <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} />
+                      <YAxis yAxisId="left" stroke="#facc15" fontSize={11} tickFormatter={(v) => money(Number(v))} />
+                      <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" fontSize={11} />
+                      <Tooltip content={<ChartWhiteTooltip />} />
+                      <Bar yAxisId="left" dataKey="value" fill="#facc15" name="Stock Value (PHP)" radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="right" dataKey="pairs" fill="#38bdf8" name="In-Stock Pairs" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Footwear Size Run Availability Curve */}
+          {inventoryAnalytics.sizeList.length > 0 && (
+            <Card className="bg-[#0b0b0f] border-[#24242d] shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-yellow-300 flex items-center gap-2 text-base font-bold">
+                  <Layers className="w-5 h-5 text-yellow-400" />
+                  Footwear Size Run Availability (Stock across EU Sizes)
+                </CardTitle>
+                <p className="text-xs text-zinc-400">Total pairs in stock across sizes — detect and prevent broken size runs (missing core sizes 41, 42, 43)</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={inventoryAnalytics.sizeList} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#24242d" vertical={false} />
+                      <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} label={{ value: 'Size (EU)', position: 'insideBottom', offset: -2, fill: '#71717a', fontSize: 10 }} />
+                      <YAxis stroke="#facc15" fontSize={11} allowDecimals={false} />
+                      <Tooltip content={<ChartWhiteTooltip />} />
+                      <Bar dataKey="pairs" fill="#10b981" name="Pairs in Stock" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Actionable Inventory & Stock Status Table */}
+          <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-yellow-300 flex items-center gap-2 text-lg font-bold">
+                    <Package className="w-5 h-5 text-yellow-400" />
+                    Inventory Stock Status & Restock Priority List
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Showing {inventoryStatusRows.length} of {productRows.length} inventory items • Filter by urgency or search models
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="text"
+                      value={inventorySearchQuery}
+                      onChange={(e) => setInventorySearchQuery(e.target.value)}
+                      placeholder="Search model, brand, SKU..."
+                      className="pl-8 pr-3 py-1.5 rounded-lg border border-[#2b2b3b] bg-[#141420] text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-yellow-400 w-52"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2 pt-3">
+                <button
+                  onClick={() => setInventoryStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    inventoryStatusFilter === 'all'
+                      ? 'bg-yellow-400 text-black shadow-md'
+                      : 'bg-[#161622] text-zinc-300 border border-[#242436] hover:bg-white/[0.05]'
+                  }`}
+                >
+                  All Items ({inventoryAnalytics.allRows.length})
+                </button>
+                <button
+                  onClick={() => setInventoryStatusFilter('critical')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    inventoryStatusFilter === 'critical'
+                      ? 'bg-red-600 text-white shadow-md'
+                      : 'bg-[#161622] text-red-300 border border-[#242436] hover:bg-red-950/30'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  Critical & Out of Stock ({inventoryAnalytics.outOfStockCount + inventoryAnalytics.criticalCount})
+                </button>
+                <button
+                  onClick={() => setInventoryStatusFilter('reorder')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    inventoryStatusFilter === 'reorder'
+                      ? 'bg-amber-500 text-black shadow-md'
+                      : 'bg-[#161622] text-yellow-300 border border-[#242436] hover:bg-amber-950/30'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  Needs Reorder ({inventoryAnalytics.reorderCount})
+                </button>
+                <button
+                  onClick={() => setInventoryStatusFilter('optimal')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    inventoryStatusFilter === 'optimal'
+                      ? 'bg-green-600 text-white shadow-md'
+                      : 'bg-[#161622] text-green-300 border border-[#242436] hover:bg-green-950/30'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-400" />
+                  Healthy Stock ({inventoryAnalytics.optimalCount})
+                </button>
+                <button
+                  onClick={() => setInventoryStatusFilter('overstock')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    inventoryStatusFilter === 'overstock'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-[#161622] text-blue-300 border border-[#242436] hover:bg-blue-950/30'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-400" />
+                  Overstock ({inventoryAnalytics.overstockCount})
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              <div className="overflow-x-auto rounded-lg border border-[#222232] bg-[#0c0c14]">
                 <Table>
-                  <TableHeader className="bg-[#1d1d25]">
-                    <TableRow className="border-[#24242d] hover:bg-[#1d1d25]">
-                      <TableHead className="text-yellow-300 text-center font-semibold">Item ID</TableHead>
-                      <TableHead className="text-yellow-300 text-center font-semibold">Brand & Model</TableHead>
-                      <TableHead className="text-yellow-300 text-center font-semibold">Size</TableHead>
-                      <TableHead className="text-yellow-300 text-center font-semibold">Color</TableHead>
-                      <TableHead className="text-yellow-300 text-center font-semibold">In Stock</TableHead>
-                      <TableHead className="text-yellow-300 text-center font-semibold">Reorder</TableHead>
-                      <TableHead className="text-yellow-300 text-center font-semibold">Status</TableHead>
+                  <TableHeader className="bg-[#141420]">
+                    <TableRow className="border-[#222232]">
+                      <TableHead className="text-yellow-300 text-xs">SKU / Item ID</TableHead>
+                      <TableHead className="text-yellow-300 text-xs">Brand & Shoe Model</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Size</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Color</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">In Stock</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Reorder Point</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Unit Price</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-right">Stock Valuation</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Stock Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventoryStatusRows.map((row) => (
-                      <TableRow key={row.id} className="border-[#24242d] bg-[#07070a] hover:bg-white/[0.03]">
-                        <TableCell className="text-yellow-200 text-center whitespace-nowrap">{row.itemId}</TableCell>
-                        <TableCell className="text-yellow-200 text-center font-medium">{row.name}</TableCell>
-                        <TableCell className="text-yellow-200 text-center whitespace-nowrap">{row.size}</TableCell>
-                        <TableCell className="text-yellow-200 text-center whitespace-nowrap">{row.color}</TableCell>
-                        <TableCell className="text-yellow-200 text-center whitespace-nowrap">{row.stock}</TableCell>
-                        <TableCell className="text-yellow-200 text-center whitespace-nowrap">{row.reorder}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge className={row.status === 'Critical' ? 'bg-red-900 text-red-200' : row.status === 'Reorder Required' ? 'bg-yellow-400 text-black' : row.status === 'Overstock' ? 'bg-blue-600 text-white' : 'bg-green-700 text-white'}>{row.status}</Badge>
+                    {inventoryStatusRows.map((row) => {
+                      const isOutOfStock = row.stock === 0;
+                      const isCritical = row.status === 'Critical';
+                      const isReorder = row.status === 'Reorder Required';
+                      const isOverstock = row.status === 'Overstock';
+
+                      return (
+                        <TableRow key={row.id} className="border-[#1e1e2c] hover:bg-white/[0.03]">
+                          <TableCell className="font-mono text-zinc-400 text-xs font-semibold">{row.itemId}</TableCell>
+                          <TableCell className="text-white font-medium text-xs">
+                            <span className="font-bold text-yellow-300">{row.brand}</span> {row.name.replace(row.brand, '').trim()}
+                          </TableCell>
+                          <TableCell className="text-zinc-200 text-xs text-center font-semibold">{row.size}</TableCell>
+                          <TableCell className="text-zinc-300 text-xs text-center">{row.color}</TableCell>
+                          <TableCell className={`text-xs text-center font-bold ${
+                            isOutOfStock ? 'text-red-400' : isCritical ? 'text-red-300' : isReorder ? 'text-yellow-300' : isOverstock ? 'text-blue-300' : 'text-green-400'
+                          }`}>
+                            {row.stock} pairs
+                          </TableCell>
+                          <TableCell className="text-zinc-400 text-xs text-center">{row.reorder}</TableCell>
+                          <TableCell className="text-zinc-300 text-xs text-right">{money(row.unitPrice)}</TableCell>
+                          <TableCell className="text-yellow-300 font-semibold text-xs text-right">{money(row.stockValue)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={
+                              isOutOfStock ? 'bg-red-950 text-red-300 border border-red-800' :
+                              isCritical ? 'bg-red-900/60 text-red-200 border border-red-700' :
+                              isReorder ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40' :
+                              isOverstock ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' :
+                              'bg-green-500/20 text-green-300 border border-green-500/40'
+                            }>
+                              {row.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {!inventoryStatusRows.length && (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-zinc-500 py-8 text-xs">
+                          No inventory items match the selected filter.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </div>
