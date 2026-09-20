@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
-import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera, Calendar, Package, TrendingUp, Users, ZoomIn, ZoomOut, Zap, Info } from "lucide-react";
+import { FileImage, Minus, Plus, Search, Eye, RotateCcw, AlertTriangle, ArrowRightLeft, Upload, X, Receipt, CheckCircle2, XCircle, AlertCircle, Clock, ShieldCheck, FileCheck, QrCode, Camera, Calendar, Package, TrendingUp, Users, ZoomIn, ZoomOut, Zap, Info, RefreshCw } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import jsQR from "jsqr";
 import { toast } from "sonner";
@@ -437,6 +437,8 @@ export function ReturnManagement() {
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [scannerManualInput, setScannerManualInput] = useState("");
+  const [retryTrigger, setRetryTrigger] = useState(0);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   useEffect(() => {
     getAllReceiptProofs().then((map) => {
@@ -882,6 +884,7 @@ export function ReturnManagement() {
 
   useEffect(() => {
     let qrScanner: Html5Qrcode | null = null;
+    let nativeStream: MediaStream | null = null;
     let scanInterval: any = null;
     let isMounted = true;
     let scanningActive = true;
@@ -993,103 +996,219 @@ export function ReturnManagement() {
         }, 75);
       };
 
-      const initScanner = async () => {
-        try {
-          qrScanner = new Html5Qrcode("receipt-qr-reader");
-
-          // Auto-detect cameras: prefer rear on mobile, webcam on desktop/laptop
-          let cameraConfig: any = { facingMode: "environment" };
+      const stopTracks = () => {
+        if (nativeStream) {
+          nativeStream.getTracks().forEach((t) => {
+            try { t.stop(); } catch {}
+          });
+          nativeStream = null;
+        }
+        const video = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
+        if (video?.srcObject) {
           try {
-            const cameras = await Html5Qrcode.getCameras();
-            if (cameras && cameras.length > 0) {
-              setAvailableCameras(cameras);
-              if (selectedCameraId && cameras.some((c) => c.id === selectedCameraId)) {
-                cameraConfig = selectedCameraId;
-              } else {
-                const rearCamera = cameras.find((c) => /back|rear|environment|world/i.test(c.label));
-                cameraConfig = rearCamera ? rearCamera.id : cameras[0].id;
-              }
-            }
-          } catch {
-            cameraConfig = { facingMode: { ideal: "environment" } };
-          }
+            (video.srcObject as MediaStream).getTracks().forEach((t) => {
+              try { t.stop(); } catch {}
+            });
+          } catch {}
+          video.srcObject = null;
+        }
+      };
 
-          const scanConfig = {
-            fps: 20,
-            videoConstraints: {
-              width: { ideal: 1920, min: 640 },
-              height: { ideal: 1080, min: 480 },
-            },
-          };
-
-          const handleTrackCaps = () => {
-            const video = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
-            if (video) {
-              video.style.transform = `scale(${cameraZoom})`;
-              video.style.transformOrigin = "center center";
-              const track = (video.srcObject as MediaStream)?.getVideoTracks()?.[0];
-              if (track) {
-                try {
-                  const caps: any = track.getCapabilities ? track.getCapabilities() : {};
-                  if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
-                    track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }).catch(() => {});
-                  }
-                  if (caps.torch) {
-                    setTorchSupported(true);
-                  }
-                } catch {}
+      const handleTrackCaps = () => {
+        const video = document.querySelector("#receipt-qr-reader video") as HTMLVideoElement | null;
+        if (video) {
+          video.style.transform = `scale(${cameraZoom})`;
+          video.style.transformOrigin = "center center";
+          const track = (video.srcObject as MediaStream)?.getVideoTracks()?.[0];
+          if (track) {
+            try {
+              const caps: any = track.getCapabilities ? track.getCapabilities() : {};
+              if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+                track.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] }).catch(() => {});
               }
-            }
-          };
-
-          try {
-            await qrScanner.start(
-              cameraConfig,
-              scanConfig,
-              (decodedText) => {
-                handleDetectedQr(decodedText);
-              },
-              () => {}
-            );
-            if (isMounted) {
-              setCameraLoading(false);
-              handleTrackCaps();
-              startFrameScanLoop();
-            }
-            return;
-          } catch (primaryStartErr) {
-            console.warn("Primary camera start failed, trying front webcam fallback:", primaryStartErr);
-            if (isMounted && qrScanner) {
-              await qrScanner.start(
-                { facingMode: "user" },
-                scanConfig,
-                (decodedText) => {
-                  handleDetectedQr(decodedText);
-                },
-                () => {}
-              );
-              if (isMounted) {
-                setCameraLoading(false);
-                handleTrackCaps();
-                startFrameScanLoop();
+              if (caps.torch) {
+                setTorchSupported(true);
               }
-              return;
-            }
-          }
-        } catch (err: any) {
-          if (isMounted) {
-            setCameraLoading(false);
-            console.warn("Camera QR Scanner error:", err);
-            setQrScanError(
-              err?.name === "NotAllowedError" || String(err?.message ?? "").toLowerCase().includes("permission")
-                ? "Camera permission was denied. Please allow camera permissions in your browser or upload a photo of the receipt below."
-                : "Unable to access camera directly. You can upload or drag a photo of the receipt QR code below."
-            );
+            } catch {}
           }
         }
       };
 
-      const timer = setTimeout(initScanner, 150);
+      const updateAvailableCameras = async () => {
+        try {
+          if (typeof navigator !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter((d) => d.kind === "videoinput");
+            if (videoDevices.length > 0 && isMounted) {
+              setAvailableCameras(
+                videoDevices.map((d, i) => ({
+                  id: d.deviceId,
+                  label: d.label || `Camera ${i + 1}`,
+                }))
+              );
+            }
+          }
+        } catch {}
+      };
+
+      const initScanner = async () => {
+        try {
+          stopTracks();
+          setQrScanError(null);
+          setCameraLoading(true);
+
+          if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+            const isSecure = typeof window !== "undefined" ? window.isSecureContext : true;
+            throw new Error(
+              !isSecure
+                ? "INSECURE_CONTEXT: Camera access requires HTTPS or localhost."
+                : "Camera is not supported on this browser."
+            );
+          }
+
+          const scanConfig = {
+            fps: 20,
+            qrbox: (w: number, h: number) => {
+              const edge = Math.floor(Math.min(w, h) * 0.85);
+              return { width: edge, height: edge };
+            },
+            aspectRatio: 1.0,
+          };
+
+          let started = false;
+
+          // Attempt 1: Html5Qrcode using selectedCameraId or environment/user facingMode
+          try {
+            const scanner = new Html5Qrcode("receipt-qr-reader");
+            qrScanner = scanner;
+
+            if (selectedCameraId) {
+              await scanner.start(
+                selectedCameraId,
+                scanConfig,
+                (text) => handleDetectedQr(text),
+                () => {}
+              );
+              started = true;
+            } else {
+              try {
+                // Try rear camera first (for mobile/tablet)
+                await scanner.start(
+                  { facingMode: "environment" },
+                  scanConfig,
+                  (text) => handleDetectedQr(text),
+                  () => {}
+                );
+                started = true;
+              } catch (envErr) {
+                console.warn("Rear camera start failed, trying front/webcam:", envErr);
+                // Fallback to front webcam (standard for laptops/PCs)
+                try { scanner.clear(); } catch {}
+                const fallbackScanner = new Html5Qrcode("receipt-qr-reader");
+                qrScanner = fallbackScanner;
+                await fallbackScanner.start(
+                  { facingMode: "user" },
+                  scanConfig,
+                  (text) => handleDetectedQr(text),
+                  () => {}
+                );
+                started = true;
+              }
+            }
+          } catch (html5Err) {
+            console.warn("Html5Qrcode engine failed, falling back to direct WebRTC:", html5Err);
+          }
+
+          // Attempt 2: Direct WebRTC getUserMedia stream fallback
+          if (!started && isMounted) {
+            const container = document.getElementById("receipt-qr-reader");
+            if (!container) throw new Error("Receipt QR container element not found.");
+            container.innerHTML = "";
+
+            let stream: MediaStream | null = null;
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({
+                video: selectedCameraId
+                  ? { deviceId: { exact: selectedCameraId } }
+                  : {
+                      facingMode: { ideal: "user" },
+                      width: { ideal: 1280 },
+                      height: { ideal: 720 },
+                    },
+                audio: false,
+              });
+            } catch {
+              // Lowest possible constraint fallback
+              stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            }
+
+            if (!stream) throw new Error("Could not acquire camera video stream.");
+            nativeStream = stream;
+
+            const videoEl = document.createElement("video");
+            videoEl.autoplay = true;
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.setAttribute("playsinline", "true");
+            videoEl.className = "w-full h-full object-cover rounded-xl";
+            videoEl.srcObject = stream;
+            container.appendChild(videoEl);
+            await videoEl.play().catch(() => {});
+            started = true;
+          }
+
+          if (isMounted && started) {
+            setCameraLoading(false);
+            setQrScanError(null);
+            handleTrackCaps();
+            startFrameScanLoop();
+            updateAvailableCameras();
+          }
+        } catch (err: any) {
+          if (!isMounted) return;
+          setCameraLoading(false);
+          console.warn("Camera QR Scanner error:", err);
+
+          const errorName = err?.name || "";
+          const errorMsg = String(err?.message || "").toLowerCase();
+
+          let friendly = "Unable to access camera directly. You can upload or drag a photo of the receipt QR code below.";
+
+          if (
+            errorName === "NotAllowedError" ||
+            errorName === "PermissionDeniedError" ||
+            errorMsg.includes("permission") ||
+            errorMsg.includes("allowed")
+          ) {
+            friendly = "Camera permission was denied. Please allow camera access in your browser (check the lock or camera icon in your address bar) or upload a receipt photo below.";
+          } else if (
+            errorName === "NotReadableError" ||
+            errorName === "TrackStartError" ||
+            errorMsg.includes("could not start video source") ||
+            errorMsg.includes("in use")
+          ) {
+            friendly = "Webcam is currently busy or in use by another application (e.g. Zoom, Teams, or another window). Please close other apps and click Try Again.";
+          } else if (
+            errorName === "NotFoundError" ||
+            errorName === "DevicesNotFoundError" ||
+            errorMsg.includes("not found") ||
+            errorMsg.includes("no camera")
+          ) {
+            friendly = "No camera was detected on this computer. You can connect a webcam, enter the receipt number, or upload a photo below.";
+          } else if (
+            errorName === "OverconstrainedError" ||
+            errorName === "ConstraintNotSatisfiedError"
+          ) {
+            friendly = "Camera resolution constraints not supported by your hardware. Click Try Again to retry with standard webcam settings.";
+          } else if (errorMsg.includes("insecure") || (typeof window !== "undefined" && !window.isSecureContext)) {
+            friendly = "Camera access requires a secure connection (HTTPS or http://localhost). You can enter the receipt number or upload a photo below.";
+          }
+
+          setQrScanError(friendly);
+        }
+      };
+
+      const timer = setTimeout(initScanner, 200);
       return () => {
         isMounted = false;
         scanningActive = false;
@@ -1098,14 +1217,22 @@ export function ReturnManagement() {
           clearInterval(scanInterval);
           scanInterval = null;
         }
+        stopTracks();
         if (qrScanner) {
-          qrScanner.stop().catch(() => {}).finally(() => {
-            try { qrScanner?.clear(); } catch {}
-          });
+          try {
+            if (qrScanner.isScanning) {
+              qrScanner.stop().catch(() => {}).finally(() => {
+                try { qrScanner?.clear(); } catch {}
+              });
+            } else {
+              qrScanner.clear();
+            }
+          } catch {}
+          qrScanner = null;
         }
       };
     }
-  }, [isQrScannerOpen, selectedCameraId]);
+  }, [isQrScannerOpen, selectedCameraId, retryTrigger]);
 
   const handleScanQrFromFile = async (file: File) => {
     try {
@@ -3468,7 +3595,25 @@ export function ReturnManagement() {
             </div>
 
             {/* Viewfinder Area */}
-            <div className="relative w-full aspect-square max-w-[300px] mx-auto rounded-2xl overflow-hidden bg-black border-2 border-yellow-400/40 shadow-2xl flex items-center justify-center [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover [&_video]:!rounded-xl [&_img]:hidden">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDraggingOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleScanQrFromFile(file);
+              }}
+              className={`relative w-full aspect-square max-w-[300px] mx-auto rounded-2xl overflow-hidden bg-black border-2 shadow-2xl flex items-center justify-center transition-all [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover [&_video]:!rounded-xl [&_img]:hidden ${
+                isDraggingOver ? "border-yellow-400 bg-yellow-400/10 scale-[1.02]" : "border-yellow-400/40"
+              }`}
+            >
               <div id="receipt-qr-reader" className="w-full h-full" />
               <div id="receipt-file-qr-temp" className="hidden" />
 
@@ -3480,7 +3625,9 @@ export function ReturnManagement() {
               <div className="pointer-events-none absolute bottom-6 right-6 w-6 h-6 border-b-2 border-r-2 border-yellow-400 rounded-br-lg" />
 
               {/* Laser Scanning Animation Line */}
-              <div className="pointer-events-none absolute inset-x-6 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-transparent via-yellow-400 to-transparent shadow-[0_0_12px_#facc15] animate-pulse" />
+              {!cameraLoading && !qrScanError && (
+                <div className="pointer-events-none absolute inset-x-6 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-transparent via-yellow-400 to-transparent shadow-[0_0_12px_#facc15] animate-pulse" />
+              )}
 
               {cameraLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 z-10 gap-2">
@@ -3490,9 +3637,37 @@ export function ReturnManagement() {
               )}
 
               {qrScanError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#181824] p-4 text-center z-10 gap-3">
-                  <AlertCircle className="w-10 h-10 text-amber-400" />
-                  <p className="text-xs text-zinc-300 leading-relaxed">{qrScanError}</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#181824] p-4 text-center z-10 gap-2.5">
+                  <AlertCircle className="w-9 h-9 text-amber-400 shrink-0" />
+                  <p className="text-xs text-zinc-300 leading-relaxed max-w-[250px]">{qrScanError}</p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setQrScanError(null);
+                        setCameraLoading(true);
+                        setRetryTrigger((prev) => prev + 1);
+                      }}
+                      className="h-8 px-3 text-xs bg-yellow-400 hover:bg-yellow-300 text-black font-semibold rounded-lg flex items-center gap-1.5 shadow"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Try Again</span>
+                    </Button>
+                    <label className="h-8 px-3 text-xs bg-zinc-800 hover:bg-zinc-700 text-yellow-300 border border-yellow-400/30 font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer transition">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleScanQrFromFile(file);
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -3546,7 +3721,7 @@ export function ReturnManagement() {
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      const curIdx = availableCameras.findIndex((c) => c.id === selectedCameraId);
+                      const curIdx = Math.max(0, availableCameras.findIndex((c) => c.id === selectedCameraId));
                       const nextCamera = availableCameras[(curIdx + 1) % availableCameras.length];
                       setSelectedCameraId(nextCamera.id);
                     }}
