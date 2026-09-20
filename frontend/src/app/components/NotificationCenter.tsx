@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
 import { useNotifications, useProducts, usePromotions, useReturns, useSales } from "../../lib/hooks";
+import { shortId } from "./ui/utils";
 
 interface NotificationItem {
   id: string;
@@ -42,7 +43,7 @@ function stockVariantLabel(product: any, inventory: any) {
     product?.size ? `Size ${product.size}` : null,
   ]);
   const variantText = variant.length ? ` - ${variant.join(" / ")}` : "";
-  const skuText = sku ? ` (${sku.slice(0, 8)})` : "";
+  const skuText = sku ? ` (${shortId(sku)})` : "";
   return `${brand ? `${brand} ` : ""}${name}${variantText}${skuText}`;
 }
 

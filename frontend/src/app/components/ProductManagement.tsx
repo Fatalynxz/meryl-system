@@ -378,6 +378,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
         product.brand.toLowerCase().includes(q) ||
         product.category.toLowerCase().includes(q) ||
         product.sku.toLowerCase().includes(q) ||
+        shortId(product.sku).toLowerCase().includes(q) ||
         product.color.toLowerCase().includes(q) ||
         product.gender.toLowerCase().includes(q) ||
         product.size.toLowerCase().includes(q) ||
@@ -1054,7 +1055,7 @@ function ProductListTable({ products, onEdit }: { products: UiProduct[]; onEdit:
               <TableCell className="text-center align-middle py-2 px-3">
                 <ProductThumbnail src={product.image_url} alt={product.name} />
               </TableCell>
-              <TableCell className="text-yellow-200 text-center whitespace-nowrap">{shortId(product.sku)}</TableCell>
+              <TableCell className="text-yellow-200 text-center whitespace-nowrap font-mono" title={product.sku}>{shortId(product.sku)}</TableCell>
               <TableCell className="text-yellow-200 text-center whitespace-nowrap">
                 <span>{product.name}</span>
               </TableCell>
@@ -1237,6 +1238,7 @@ function ProductSettingsPage({
         p.name.toLowerCase().includes(term) ||
         p.brand.toLowerCase().includes(term) ||
         p.sku.toLowerCase().includes(term) ||
+        shortId(p.sku).toLowerCase().includes(term) ||
         p.category.toLowerCase().includes(term) ||
         p.color.toLowerCase().includes(term) ||
         p.size.toLowerCase().includes(term);

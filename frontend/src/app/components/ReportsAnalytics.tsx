@@ -8,6 +8,7 @@ import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Tr
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
 import { useProducts, useSales } from '../../lib/hooks';
+import { shortId } from './ui/utils';
 
 function isCompletedSale(sale: any) {
   const payment = Array.isArray(sale.payment) ? sale.payment[0] : sale.payment;
@@ -1367,7 +1368,9 @@ export function ReportsAnalytics() {
       const size = String(product.size ?? 'N/A').trim();
       const color = String(product.color ?? 'N/A').trim();
       const name = `${product.brand ?? ''} ${product.product_name ?? 'Product'}`.trim();
-      const itemId = String(product.sku ?? product.product_id ?? '').slice(0, 10).toUpperCase();
+      const rawSku = String(product.sku ?? product.product_id ?? '').trim();
+      const sku = shortId(rawSku);
+      const itemId = sku;
 
       const retailVal = stock * unitPrice;
       const costVal = stock * costPrice;
@@ -1409,6 +1412,8 @@ export function ReportsAnalytics() {
 
       return {
         id: String(product.product_id ?? ''),
+        sku,
+        rawSku,
         itemId,
         name,
         brand,
@@ -1472,6 +1477,8 @@ export function ReportsAnalytics() {
         const match =
           item.name.toLowerCase().includes(q) ||
           item.brand.toLowerCase().includes(q) ||
+          item.sku.toLowerCase().includes(q) ||
+          item.rawSku.toLowerCase().includes(q) ||
           item.itemId.toLowerCase().includes(q) ||
           item.color.toLowerCase().includes(q) ||
           item.size.toLowerCase().includes(q);
@@ -1878,7 +1885,7 @@ export function ReportsAnalytics() {
 
       ensureSpace(40);
       drawTitle('Actionable Restock Priority List');
-      drawTable(['Item ID', 'Brand & Shoe Model', 'Size', 'Color', 'Stock', 'Reorder', 'Status'], inventoryStatusRows.slice(0, 30).map((row) => [row.itemId, row.name, row.size, row.color, String(row.stock), String(row.reorder), row.status]), [65, 200, 45, 65, 45, 45, 50]);
+      drawTable(['SKU', 'Brand & Shoe Model', 'Size', 'Color', 'Stock', 'Reorder', 'Status'], inventoryStatusRows.slice(0, 30).map((row) => [row.sku, row.name, row.size, row.color, String(row.stock), String(row.reorder), row.status]), [75, 190, 45, 65, 45, 45, 50]);
     }
 
     pages.forEach((page, index) => {
@@ -2291,9 +2298,9 @@ export function ReportsAnalytics() {
         lines.push('');
 
         lines.push(formatRow(['=== INVENTORY AND STOCK STATUS ===']));
-        lines.push(formatRow(['Item ID', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Unit Price (PHP)', 'Stock Valuation (PHP)', 'Stock Status']));
+        lines.push(formatRow(['SKU', 'Brand & Model', 'Size', 'Color', 'Available Stock', 'Reorder Point', 'Unit Price (PHP)', 'Stock Valuation (PHP)', 'Stock Status']));
         (inventoryStatusRows ?? []).forEach((item: any) => {
-          lines.push(formatRow([item.itemId ?? 'N/A', item.name ?? 'N/A', item.size ?? 'N/A', item.color ?? 'N/A', item.stock ?? 0, item.reorder ?? 0, (item.unitPrice ?? 0).toFixed(2), (item.stockValue ?? 0).toFixed(2), item.status ?? 'N/A']));
+          lines.push(formatRow([item.sku ?? item.rawSku ?? 'N/A', item.name ?? 'N/A', item.size ?? 'N/A', item.color ?? 'N/A', item.stock ?? 0, item.reorder ?? 0, (item.unitPrice ?? 0).toFixed(2), (item.stockValue ?? 0).toFixed(2), item.status ?? 'N/A']));
         });
         lines.push('');
       }
@@ -4268,7 +4275,7 @@ export function ReportsAnalytics() {
                 <Table>
                   <TableHeader className="bg-[#141420]">
                     <TableRow className="border-[#222232]">
-                      <TableHead className="text-yellow-300 text-xs">SKU / Item ID</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center whitespace-nowrap">SKU</TableHead>
                       <TableHead className="text-yellow-300 text-xs">Brand & Shoe Model</TableHead>
                       <TableHead className="text-yellow-300 text-xs text-center">Size</TableHead>
                       <TableHead className="text-yellow-300 text-xs text-center">Color</TableHead>
@@ -4288,7 +4295,7 @@ export function ReportsAnalytics() {
 
                       return (
                         <TableRow key={row.id} className="border-[#1e1e2c] hover:bg-white/[0.03]">
-                          <TableCell className="font-mono text-zinc-400 text-xs font-semibold">{row.itemId}</TableCell>
+                          <TableCell className="font-mono text-yellow-200 text-xs text-center whitespace-nowrap" title={row.rawSku}>{row.sku}</TableCell>
                           <TableCell className="text-white font-medium text-xs">
                             <span className="font-bold text-yellow-300">{row.brand}</span> {row.name.replace(row.brand, '').trim()}
                           </TableCell>

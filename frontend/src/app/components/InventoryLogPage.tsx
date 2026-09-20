@@ -7,6 +7,7 @@ import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useInventoryLog } from "../../lib/hooks";
+import { shortId } from "./ui/utils";
 
 type InventoryLogRow = {
   inventory_log_id: string;
@@ -215,7 +216,7 @@ export function InventoryLogPage() {
                           <div className="text-xs text-zinc-400">
                             {product.brand} | Size {product.size} | {product.color}
                           </div>
-                          <div className="mt-1 text-[11px] text-zinc-500">{row.product_id.slice(0, 8)}</div>
+                          <div className="mt-1 text-[11px] text-zinc-500 font-mono" title={row.product_id}>{shortId(row.product_id)}</div>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge className={typeBadgeClass(row.transaction_type)}>{formatType(row.transaction_type)}</Badge>

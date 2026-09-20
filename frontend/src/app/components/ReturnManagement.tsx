@@ -18,6 +18,7 @@ import { useInventory, useProducts, useReturns, useSales, useUsers } from "../..
 import { supabase } from "../../lib/supabase";
 import { saveReceiptProof, getAllReceiptProofs, StoredReceiptProof } from "../../lib/receipt-proof-store";
 import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
+import { shortId } from "./ui/utils";
 
 type ReturnDetail = {
   return_detail_id: string;
@@ -2555,8 +2556,8 @@ export function ReturnManagement() {
                               );
                               return (
                               <TableRow key={`${detail.sales_detail_id}-${detail.product_id}`} className={`border-zinc-800 transition-colors hover:bg-zinc-900 ${isSelected ? "bg-yellow-400/10" : ""}`}>
-                                <TableCell className="truncate text-yellow-200 text-center" title={detail.product_id}>{detail.product_id.slice(0, 8)}</TableCell>
-                                <TableCell className="truncate text-yellow-200 text-center" title={detail.productName}>{detail.productName}</TableCell>
+                                 <TableCell className="text-yellow-200 text-center font-mono whitespace-nowrap" title={detail.product_id}>{shortId(detail.product_id)}</TableCell>
+                                 <TableCell className="truncate text-yellow-200 text-center" title={detail.productName}>{detail.productName}</TableCell>
                                 <TableCell className="text-yellow-200 text-center">{detail.quantity}</TableCell>
                                 <TableCell className="text-yellow-200 text-center">{detail.returnable_quantity}</TableCell>
                                 <TableCell className="text-center">
