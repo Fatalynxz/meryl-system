@@ -13,7 +13,7 @@ export function useSales() {
     queryKey: ["sales", isAdmin ? "all" : "mine", userId],
     queryFn: () => (isAdmin ? salesApi.list() : salesApi.listByUser(userId)),
     enabled: isAdmin || Boolean(userId),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }
 

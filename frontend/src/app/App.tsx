@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router';
 import { router } from './routes';
 import { Toaster } from './components/ui/sonner';
 import { ScreenLockModal } from './components/ScreenLockModal';
+import { RealtimeSyncListener } from '../lib/realtime-sync';
 
 function hasVisibleModal() {
   const modalSelector = [
@@ -116,6 +117,7 @@ export default function App() {
   return (
     <>
       <UiUnlocker />
+      <RealtimeSyncListener />
       <RouterProvider router={router} />
       <ScreenLockModal />
       <Toaster />

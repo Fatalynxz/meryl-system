@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { broadcastQueryInvalidation } from "../realtime-sync";
 
 export function useEntityList<T>(key: string, listFn: () => Promise<T[]>) {
-  return useQuery({ queryKey: [key], queryFn: listFn, staleTime: 30_000 });
+  return useQuery({ queryKey: [key], queryFn: listFn, staleTime: 5_000 });
 }
 
 export function useEntityById<T>(key: string, id: string | undefined, getFn: (id: string) => Promise<T>) {
@@ -9,7 +10,7 @@ export function useEntityById<T>(key: string, id: string | undefined, getFn: (id
     queryKey: [key, id],
     queryFn: () => getFn(id as string),
     enabled: Boolean(id),
-    staleTime: 30_000,
+    staleTime: 5_000,
   });
 }
 
@@ -19,6 +20,19 @@ export function useEntityMutations<T, C = any, U = any>(key: string, api: {
   remove: (id: string) => Promise<void>;
 }) {
   const queryClient = useQueryClient();
+
+  const invalidateWithBroadcast = () => {
+    queryClient.invalidateQueries({ queryKey: [key] });
+    const related = [key];
+    if (key === "sales") related.push("inventory", "products", "analytics");
+    if (key === "inventory") related.push("products", "inventory_log", "inventoryLog");
+    if (key === "products") related.push("inventory");
+    if (key === "returns") related.push("inventory", "sales");
+    related.forEach((k) => {
+      if (k !== key) queryClient.invalidateQueries({ queryKey: [k] });
+    });
+    broadcastQueryInvalidation(related);
+  };
 
   const createMutation = useMutation({
     mutationFn: api.create,
@@ -32,7 +46,7 @@ export function useEntityMutations<T, C = any, U = any>(key: string, api: {
       if (context?.previous) queryClient.setQueryData([key], context.previous);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [key] });
+      invalidateWithBroadcast();
     },
   });
 
@@ -51,7 +65,7 @@ export function useEntityMutations<T, C = any, U = any>(key: string, api: {
       if (context?.previous) queryClient.setQueryData([key], context.previous);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [key] });
+      invalidateWithBroadcast();
     },
   });
 
@@ -73,7 +87,7 @@ export function useEntityMutations<T, C = any, U = any>(key: string, api: {
       if (context?.previous) queryClient.setQueryData([key], context.previous);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [key] });
+      invalidateWithBroadcast();
     },
   });
 

@@ -469,9 +469,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     bootstrapAuth();
 
-    // Cross-tab login/logout synchronization
+    // Cross-tab login/logout synchronization (preserves independent tab sessions)
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === MERYL_USER_STORAGE_KEY) {
+        // If this tab already has its own active session in sessionStorage, keep it isolated
+        // so Cashier in Tab 1 and Admin in Tab 2 run simultaneously without collisions.
+        const currentTabUserRaw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(MERYL_USER_STORAGE_KEY) : null;
+        if (currentTabUserRaw) {
+          return;
+        }
+
         if (!event.newValue) {
           setUser(null);
         } else {
