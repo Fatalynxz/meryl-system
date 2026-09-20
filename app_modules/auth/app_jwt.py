@@ -102,3 +102,4 @@ def verify_jwt_token(token: str) -> dict:
         raise ValueError("Token has expired")
 
     return payload
+

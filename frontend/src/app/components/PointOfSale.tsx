@@ -287,7 +287,7 @@ function formatPercentValue(value: number) {
 
 export function PointOfSale() {
   const queryClient = useQueryClient();
-  const { user, validateCredentials } = useAuth();
+  const { user, validateCredentials, setCurrentUser } = useAuth();
   const productsQuery = useProducts();
   const inventoryQuery = useInventory();
   const customersQuery = useCustomers();
@@ -1164,8 +1164,26 @@ export function PointOfSale() {
       subtotal: Number(getLineTotal(item).toFixed(2)),
     }));
 
+    let cashierUserId = user.user_id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cashierUserId);
+    if (!isUuid) {
+      try {
+        const { data: userRows } = await supabase
+          .from("user")
+          .select("user_id")
+          .ilike("username", user.username || "sales")
+          .limit(1);
+        if (userRows && userRows.length > 0 && userRows[0].user_id) {
+          cashierUserId = userRows[0].user_id;
+          try {
+            setCurrentUser({ ...user, user_id: cashierUserId });
+          } catch {}
+        }
+      } catch {}
+    }
+
     const { data, error } = await supabase.rpc("complete_sale", {
-      p_user_id: user.user_id,
+      p_user_id: cashierUserId,
       p_customer_id,
       p_payment_method: dbPaymentMethod,
       p_amount_paid: paid,

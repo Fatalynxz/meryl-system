@@ -1622,8 +1622,30 @@ def verify_credentials_server(identifier, password):
         matched = (pw_hash == hash_password(clean_password)) if pw_hash else (account.get("password") == clean_password)
         if matched:
             role_name = format_role_label(account.get("role", "sales_staff"))
+            resolved_user_id = str(account.get("user_id") or "").strip()
+
+            # Ensure resolved_user_id is a valid UUID by looking up the user in Supabase
+            if not resolved_user_id or not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", resolved_user_id, re.I):
+                try:
+                    db_user_res = (
+                        supabase()
+                        .table("user")
+                        .select("user_id, role_id")
+                        .ilike("username", clean_identifier)
+                        .limit(1)
+                        .execute()
+                    )
+                    if db_user_res.data and db_user_res.data[0].get("user_id"):
+                        resolved_user_id = str(db_user_res.data[0]["user_id"])
+                except Exception:
+                    pass
+
+            if not resolved_user_id or not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", resolved_user_id, re.I):
+                import uuid
+                resolved_user_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"meryl:user:{clean_identifier}"))
+
             return {
-                "user_id": str(account.get("user_id") or account.get("staff_code") or clean_identifier),
+                "user_id": resolved_user_id,
                 "name": account.get("name") or "Staff User",
                 "username": account.get("username") or clean_identifier,
                 "role_name": role_name,

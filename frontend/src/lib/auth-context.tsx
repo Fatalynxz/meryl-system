@@ -384,6 +384,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (sessionUserFromCookie && mounted) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionUserFromCookie.user_id);
+        if (!isUuid && sessionUserFromCookie.username) {
+          try {
+            const { data: userRow } = await supabase
+              .from("user")
+              .select("user_id")
+              .ilike("username", sessionUserFromCookie.username)
+              .limit(1);
+            if (userRow && userRow[0]?.user_id) {
+              sessionUserFromCookie = { ...sessionUserFromCookie, user_id: userRow[0].user_id };
+            }
+          } catch {}
+        }
         writeStoredUser(sessionUserFromCookie);
         setUser(sessionUserFromCookie);
         if (mounted) setLoading(false);
@@ -391,12 +404,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 2. Fallback to stored user in localStorage / sessionStorage if server endpoint was unreachable
-      const storedUser = readStoredUser();
+      let storedUser = readStoredUser();
       if (storedUser && !isAuthorizedAppUser(storedUser)) {
         sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
         localStorage.removeItem(MERYL_USER_STORAGE_KEY);
         clearGoogleOtpVerifiedEmail();
       } else if (storedUser && mounted) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedUser.user_id);
+        if (!isUuid && storedUser.username) {
+          try {
+            const { data: userRow } = await supabase
+              .from("user")
+              .select("user_id")
+              .ilike("username", storedUser.username)
+              .limit(1);
+            if (userRow && userRow[0]?.user_id) {
+              storedUser = { ...storedUser, user_id: userRow[0].user_id };
+              writeStoredUser(storedUser);
+            }
+          } catch {}
+        }
         setUser(storedUser);
         getStoredAvatarAsync({
           userId: storedUser.user_id,
