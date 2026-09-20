@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Trophy, Medal, Sparkles, Layers, Tag, UserCheck, CreditCard, Grid, FileSpreadsheet, Search, ShoppingBag, ArrowUpRight } from 'lucide-react';
+import { BarChart3, TrendingUp, Coins, Package, Calendar, Download, FileText, Trophy, Medal, Sparkles, Layers, Tag, UserCheck, CreditCard, Grid, FileSpreadsheet, Search, ShoppingBag, ArrowUpRight, ChevronLeft, ChevronRight, X, Filter } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
 import { useProducts, useSales } from '../../lib/hooks';
@@ -387,6 +387,12 @@ export function ReportsAnalytics() {
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<'all' | 'critical' | 'reorder' | 'optimal' | 'overstock'>('all');
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+  const [inventoryBrandFilter, setInventoryBrandFilter] = useState('all');
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('all');
+  const [inventoryDeptFilter, setInventoryDeptFilter] = useState('all');
+  const [inventorySizeFilter, setInventorySizeFilter] = useState('all');
+  const [inventoryCurrentPage, setInventoryCurrentPage] = useState(1);
+  const [inventoryPageSize, setInventoryPageSize] = useState(25);
   const [drilldownSection, setDrilldownSection] = useState<'all' | 'shoe' | 'brands' | 'categories' | 'departments' | 'sizes' | 'variants' | 'payments'>('all');
   const salesQuery = useSales();
   const productsQuery = useProducts();
@@ -1362,12 +1368,25 @@ export function ReportsAnalytics() {
       const reserved = Number(inventory?.reserved_quantity ?? inventory?.held_stock ?? product.reserved_stock ?? 0);
       const stock = Math.max(0, onHand - reserved);
       const reorder = Number(product.reorder_level ?? inventory?.reorder_level ?? 10);
-      const unitPrice = Number(product.unit_price ?? product.price ?? 0);
-      const costPrice = Number(product.cost_price ?? product.cost ?? (unitPrice * 0.6));
+
+      // Price resolution: check inventory.srp, cost_price, unit_price, price
+      const rawCostPrice = Number(product.cost_price ?? product.cost ?? 0);
+      const rawUnitPrice = Number(inventory?.srp ?? product.unit_price ?? product.price ?? (rawCostPrice > 0 ? rawCostPrice : 0));
+      const unitPrice = rawUnitPrice > 0 ? rawUnitPrice : (rawCostPrice > 0 ? rawCostPrice : 0);
+      const costPrice = rawCostPrice > 0 ? rawCostPrice : (unitPrice > 0 ? unitPrice * 0.7 : 0);
+
       const brand = String(product.brand ?? 'Other').trim();
+      const rawProductName = String(product.product_name ?? 'Product').trim();
+      // Remove duplicate brand prefix if present (e.g. "Venus Venus Street Runner")
+      const brandRegex = new RegExp(`^${brand}\\s*`, 'i');
+      const modelName = rawProductName.replace(brandRegex, '').trim() || rawProductName;
+      const name = `${brand} ${modelName}`.trim();
+
+      const categoryObj = Array.isArray(product.category) ? product.category[0] : product.category;
+      const category = String(categoryObj?.category_name ?? product.category_name ?? product.category ?? 'Footwear').trim();
+      const department = String(product.gender ?? product.department ?? 'Unisex').trim();
       const size = String(product.size ?? 'N/A').trim();
       const color = String(product.color ?? 'N/A').trim();
-      const name = `${product.brand ?? ''} ${product.product_name ?? 'Product'}`.trim();
       const rawSku = String(product.sku ?? product.product_id ?? '').trim();
       const sku = shortId(rawSku);
       const itemId = sku;
@@ -1416,7 +1435,10 @@ export function ReportsAnalytics() {
         rawSku,
         itemId,
         name,
+        modelName,
         brand,
+        category,
+        department,
         size,
         color,
         stock,
@@ -1444,6 +1466,16 @@ export function ReportsAnalytics() {
       return a.name.localeCompare(b.name);
     });
 
+    const brands = Array.from(new Set(allRows.map((r) => r.brand).filter(Boolean))).sort();
+    const categories = Array.from(new Set(allRows.map((r) => r.category).filter(Boolean))).sort();
+    const departments = Array.from(new Set(allRows.map((r) => r.department).filter(Boolean))).sort();
+    const sizes = Array.from(new Set(allRows.map((r) => r.size).filter((s) => s && s !== 'N/A'))).sort((a, b) => {
+      const numA = parseFloat(a);
+      const numB = parseFloat(b);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+
     return {
       totalStock,
       totalRetailValue,
@@ -1457,11 +1489,16 @@ export function ReportsAnalytics() {
       healthDistribution,
       brandList,
       sizeList,
+      brands,
+      categories,
+      departments,
+      sizes,
     };
   }, [productRows]);
 
   const inventoryStatusRows = useMemo(() => {
     return inventoryAnalytics.allRows.filter((item) => {
+      // 1. Urgency status filter
       if (inventoryStatusFilter === 'critical') {
         if (item.status !== 'Critical' && item.status !== 'Out of Stock') return false;
       } else if (inventoryStatusFilter === 'reorder') {
@@ -1472,11 +1509,35 @@ export function ReportsAnalytics() {
         if (item.status !== 'Overstock') return false;
       }
 
+      // 2. Brand filter
+      if (inventoryBrandFilter !== 'all' && item.brand.toLowerCase() !== inventoryBrandFilter.toLowerCase()) {
+        return false;
+      }
+
+      // 3. Category filter
+      if (inventoryCategoryFilter !== 'all' && item.category.toLowerCase() !== inventoryCategoryFilter.toLowerCase()) {
+        return false;
+      }
+
+      // 4. Department filter
+      if (inventoryDeptFilter !== 'all' && item.department.toLowerCase() !== inventoryDeptFilter.toLowerCase()) {
+        return false;
+      }
+
+      // 5. Size filter
+      if (inventorySizeFilter !== 'all' && item.size.toLowerCase() !== inventorySizeFilter.toLowerCase()) {
+        return false;
+      }
+
+      // 6. Search query filter
       if (inventorySearchQuery) {
-        const q = inventorySearchQuery.toLowerCase();
+        const q = inventorySearchQuery.toLowerCase().trim();
         const match =
           item.name.toLowerCase().includes(q) ||
           item.brand.toLowerCase().includes(q) ||
+          item.modelName.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q) ||
+          item.department.toLowerCase().includes(q) ||
           item.sku.toLowerCase().includes(q) ||
           item.rawSku.toLowerCase().includes(q) ||
           item.itemId.toLowerCase().includes(q) ||
@@ -1486,7 +1547,41 @@ export function ReportsAnalytics() {
       }
       return true;
     });
-  }, [inventoryAnalytics.allRows, inventorySearchQuery, inventoryStatusFilter]);
+  }, [
+    inventoryAnalytics.allRows,
+    inventoryBrandFilter,
+    inventoryCategoryFilter,
+    inventoryDeptFilter,
+    inventorySearchQuery,
+    inventorySizeFilter,
+    inventoryStatusFilter,
+  ]);
+
+  const totalInventoryPages = Math.max(1, Math.ceil(inventoryStatusRows.length / inventoryPageSize));
+  const safeInventoryPage = Math.min(Math.max(1, inventoryCurrentPage), totalInventoryPages);
+
+  const paginatedInventoryRows = useMemo(() => {
+    const start = (safeInventoryPage - 1) * inventoryPageSize;
+    return inventoryStatusRows.slice(start, start + inventoryPageSize);
+  }, [inventoryStatusRows, safeInventoryPage, inventoryPageSize]);
+
+  const isInventoryFiltering =
+    inventoryStatusFilter !== 'all' ||
+    inventoryBrandFilter !== 'all' ||
+    inventoryCategoryFilter !== 'all' ||
+    inventoryDeptFilter !== 'all' ||
+    inventorySizeFilter !== 'all' ||
+    Boolean(inventorySearchQuery.trim());
+
+  const handleClearAllInventoryFilters = () => {
+    setInventoryStatusFilter('all');
+    setInventoryBrandFilter('all');
+    setInventoryCategoryFilter('all');
+    setInventoryDeptFilter('all');
+    setInventorySizeFilter('all');
+    setInventorySearchQuery('');
+    setInventoryCurrentPage(1);
+  };
 
   const businessSummary = useMemo(() => {
     const { now, start } = rangeWindow(timeRange, customStartDate, customEndDate);
@@ -4186,7 +4281,7 @@ export function ReportsAnalytics() {
 
           {/* Actionable Inventory & Stock Status Table */}
           <Card className="bg-[#0b0b0f] border-[#24242d] shadow-xl">
-            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14]">
+            <CardHeader className="border-b border-[#1f1f2b] pb-4 bg-[#0e0e14] space-y-3.5">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="text-yellow-300 flex items-center gap-2 text-lg font-bold">
@@ -4194,7 +4289,7 @@ export function ReportsAnalytics() {
                     Inventory Stock Status & Restock Priority List
                   </CardTitle>
                   <p className="mt-1 text-xs text-zinc-400">
-                    Showing {inventoryStatusRows.length} of {productRows.length} inventory items • Filter by urgency or search models
+                    Showing {inventoryStatusRows.length} of {productRows.length} inventory items • Filter by urgency, brand, category, or size
                   </p>
                 </div>
 
@@ -4204,18 +4299,111 @@ export function ReportsAnalytics() {
                     <input
                       type="text"
                       value={inventorySearchQuery}
-                      onChange={(e) => setInventorySearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setInventorySearchQuery(e.target.value);
+                        setInventoryCurrentPage(1);
+                      }}
                       placeholder="Search model, brand, SKU..."
-                      className="pl-8 pr-3 py-1.5 rounded-lg border border-[#2b2b3b] bg-[#141420] text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-yellow-400 w-52"
+                      className="pl-8 pr-7 py-1.5 rounded-lg border border-[#2b2b3b] bg-[#141420] text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-yellow-400 w-56"
                     />
+                    {inventorySearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInventorySearchQuery('');
+                          setInventoryCurrentPage(1);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
 
+              {/* Multi-Dimensional Filters: Brand, Category, Department, Size (like the other pages) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                {/* Brand Filter */}
+                <div className="relative">
+                  <select
+                    value={inventoryBrandFilter}
+                    onChange={(e) => {
+                      setInventoryBrandFilter(e.target.value);
+                      setInventoryCurrentPage(1);
+                    }}
+                    className="h-8 w-full appearance-none rounded-lg border border-[#2b2b3b] bg-[#141420] px-2.5 pr-6 text-xs text-white focus:border-yellow-400 focus:outline-none"
+                  >
+                    <option value="all">All Brands ({inventoryAnalytics.brands.length})</option>
+                    {inventoryAnalytics.brands.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">⌄</span>
+                </div>
+
+                {/* Category Filter */}
+                <div className="relative">
+                  <select
+                    value={inventoryCategoryFilter}
+                    onChange={(e) => {
+                      setInventoryCategoryFilter(e.target.value);
+                      setInventoryCurrentPage(1);
+                    }}
+                    className="h-8 w-full appearance-none rounded-lg border border-[#2b2b3b] bg-[#141420] px-2.5 pr-6 text-xs text-white focus:border-yellow-400 focus:outline-none"
+                  >
+                    <option value="all">All Categories ({inventoryAnalytics.categories.length})</option>
+                    {inventoryAnalytics.categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">⌄</span>
+                </div>
+
+                {/* Department (Gender) Filter */}
+                <div className="relative">
+                  <select
+                    value={inventoryDeptFilter}
+                    onChange={(e) => {
+                      setInventoryDeptFilter(e.target.value);
+                      setInventoryCurrentPage(1);
+                    }}
+                    className="h-8 w-full appearance-none rounded-lg border border-[#2b2b3b] bg-[#141420] px-2.5 pr-6 text-xs text-white focus:border-yellow-400 focus:outline-none"
+                  >
+                    <option value="all">All Departments ({inventoryAnalytics.departments.length})</option>
+                    {inventoryAnalytics.departments.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">⌄</span>
+                </div>
+
+                {/* Size Filter */}
+                <div className="relative">
+                  <select
+                    value={inventorySizeFilter}
+                    onChange={(e) => {
+                      setInventorySizeFilter(e.target.value);
+                      setInventoryCurrentPage(1);
+                    }}
+                    className="h-8 w-full appearance-none rounded-lg border border-[#2b2b3b] bg-[#141420] px-2.5 pr-6 text-xs text-white focus:border-yellow-400 focus:outline-none"
+                  >
+                    <option value="all">All Sizes ({inventoryAnalytics.sizes.length})</option>
+                    {inventoryAnalytics.sizes.map((s) => (
+                      <option key={s} value={s}>Size {s}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">⌄</span>
+                </div>
+              </div>
+
               {/* Status Filter Tabs */}
-              <div className="flex flex-wrap items-center gap-2 pt-3">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
-                  onClick={() => setInventoryStatusFilter('all')}
+                  onClick={() => {
+                    setInventoryStatusFilter('all');
+                    setInventoryCurrentPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     inventoryStatusFilter === 'all'
                       ? 'bg-yellow-400 text-black shadow-md'
@@ -4225,7 +4413,10 @@ export function ReportsAnalytics() {
                   All Items ({inventoryAnalytics.allRows.length})
                 </button>
                 <button
-                  onClick={() => setInventoryStatusFilter('critical')}
+                  onClick={() => {
+                    setInventoryStatusFilter('critical');
+                    setInventoryCurrentPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                     inventoryStatusFilter === 'critical'
                       ? 'bg-red-600 text-white shadow-md'
@@ -4236,7 +4427,10 @@ export function ReportsAnalytics() {
                   Critical & Out of Stock ({inventoryAnalytics.outOfStockCount + inventoryAnalytics.criticalCount})
                 </button>
                 <button
-                  onClick={() => setInventoryStatusFilter('reorder')}
+                  onClick={() => {
+                    setInventoryStatusFilter('reorder');
+                    setInventoryCurrentPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                     inventoryStatusFilter === 'reorder'
                       ? 'bg-amber-500 text-black shadow-md'
@@ -4247,7 +4441,10 @@ export function ReportsAnalytics() {
                   Needs Reorder ({inventoryAnalytics.reorderCount})
                 </button>
                 <button
-                  onClick={() => setInventoryStatusFilter('optimal')}
+                  onClick={() => {
+                    setInventoryStatusFilter('optimal');
+                    setInventoryCurrentPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                     inventoryStatusFilter === 'optimal'
                       ? 'bg-green-600 text-white shadow-md'
@@ -4258,7 +4455,10 @@ export function ReportsAnalytics() {
                   Healthy Stock ({inventoryAnalytics.optimalCount})
                 </button>
                 <button
-                  onClick={() => setInventoryStatusFilter('overstock')}
+                  onClick={() => {
+                    setInventoryStatusFilter('overstock');
+                    setInventoryCurrentPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                     inventoryStatusFilter === 'overstock'
                       ? 'bg-blue-600 text-white shadow-md'
@@ -4269,14 +4469,68 @@ export function ReportsAnalytics() {
                   Overstock ({inventoryAnalytics.overstockCount})
                 </button>
               </div>
+
+              {/* Active Filters Pill Bar */}
+              {isInventoryFiltering && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#1e1e2c]">
+                  <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                    <Filter className="w-3 h-3 text-yellow-400" /> Active Filters:
+                  </span>
+                  {inventorySearchQuery && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 text-[11px] text-yellow-300">
+                      Search: "{inventorySearchQuery}"
+                      <button type="button" onClick={() => { setInventorySearchQuery(''); setInventoryCurrentPage(1); }} className="hover:text-white">×</button>
+                    </span>
+                  )}
+                  {inventoryBrandFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 text-[11px] text-yellow-300">
+                      Brand: {inventoryBrandFilter}
+                      <button type="button" onClick={() => { setInventoryBrandFilter('all'); setInventoryCurrentPage(1); }} className="hover:text-white">×</button>
+                    </span>
+                  )}
+                  {inventoryCategoryFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 text-[11px] text-yellow-300">
+                      Category: {inventoryCategoryFilter}
+                      <button type="button" onClick={() => { setInventoryCategoryFilter('all'); setInventoryCurrentPage(1); }} className="hover:text-white">×</button>
+                    </span>
+                  )}
+                  {inventoryDeptFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 text-[11px] text-yellow-300">
+                      Dept: {inventoryDeptFilter}
+                      <button type="button" onClick={() => { setInventoryDeptFilter('all'); setInventoryCurrentPage(1); }} className="hover:text-white">×</button>
+                    </span>
+                  )}
+                  {inventorySizeFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 text-[11px] text-yellow-300">
+                      Size: {inventorySizeFilter}
+                      <button type="button" onClick={() => { setInventorySizeFilter('all'); setInventoryCurrentPage(1); }} className="hover:text-white">×</button>
+                    </span>
+                  )}
+                  {inventoryStatusFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-400/10 border border-yellow-400/30 px-2 py-0.5 text-[11px] text-yellow-300 capitalize">
+                      Status: {inventoryStatusFilter}
+                      <button type="button" onClick={() => { setInventoryStatusFilter('all'); setInventoryCurrentPage(1); }} className="hover:text-white">×</button>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleClearAllInventoryFilters}
+                    className="ml-auto text-[11px] font-medium text-red-400 underline hover:text-red-300 cursor-pointer"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              )}
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
+
+            <CardContent className="p-4 space-y-4">
               <div className="overflow-x-auto rounded-lg border border-[#222232] bg-[#0c0c14]">
                 <Table>
                   <TableHeader className="bg-[#141420]">
                     <TableRow className="border-[#222232]">
                       <TableHead className="text-yellow-300 text-xs text-center whitespace-nowrap">SKU</TableHead>
                       <TableHead className="text-yellow-300 text-xs">Brand & Shoe Model</TableHead>
+                      <TableHead className="text-yellow-300 text-xs text-center">Category</TableHead>
                       <TableHead className="text-yellow-300 text-xs text-center">Size</TableHead>
                       <TableHead className="text-yellow-300 text-xs text-center">Color</TableHead>
                       <TableHead className="text-yellow-300 text-xs text-center">In Stock</TableHead>
@@ -4287,7 +4541,7 @@ export function ReportsAnalytics() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventoryStatusRows.map((row) => {
+                    {paginatedInventoryRows.map((row) => {
                       const isOutOfStock = row.stock === 0;
                       const isCritical = row.status === 'Critical';
                       const isReorder = row.status === 'Reorder Required';
@@ -4297,8 +4551,9 @@ export function ReportsAnalytics() {
                         <TableRow key={row.id} className="border-[#1e1e2c] hover:bg-white/[0.03]">
                           <TableCell className="font-mono text-yellow-200 text-xs text-center whitespace-nowrap" title={row.rawSku}>{row.sku}</TableCell>
                           <TableCell className="text-white font-medium text-xs">
-                            <span className="font-bold text-yellow-300">{row.brand}</span> {row.name.replace(row.brand, '').trim()}
+                            <span className="font-bold text-yellow-300">{row.brand}</span> {row.modelName}
                           </TableCell>
+                          <TableCell className="text-zinc-400 text-xs text-center">{row.category}</TableCell>
                           <TableCell className="text-zinc-200 text-xs text-center font-semibold">{row.size}</TableCell>
                           <TableCell className="text-zinc-300 text-xs text-center">{row.color}</TableCell>
                           <TableCell className={`text-xs text-center font-bold ${
@@ -4325,13 +4580,102 @@ export function ReportsAnalytics() {
                     })}
                     {!inventoryStatusRows.length && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-zinc-500 py-8 text-xs">
-                          No inventory items match the selected filter.
+                        <TableCell colSpan={10} className="text-center text-zinc-500 py-8 text-xs">
+                          No inventory items match the selected filters.
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
+              </div>
+
+              {/* Pagination Controls Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                {/* Left: Page Size Selector & Record Count */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-400">Show:</span>
+                    <select
+                      value={inventoryPageSize}
+                      onChange={(e) => {
+                        setInventoryPageSize(Number(e.target.value));
+                        setInventoryCurrentPage(1);
+                      }}
+                      className="h-8 rounded-lg border border-[#2b2b36] bg-[#141420] px-2 text-xs font-semibold text-white outline-none focus:border-yellow-400"
+                    >
+                      <option value={10}>10 items</option>
+                      <option value={15}>15 items</option>
+                      <option value={25}>25 items</option>
+                      <option value={50}>50 items</option>
+                      <option value={100}>100 items</option>
+                    </select>
+                  </div>
+                  <span className="text-xs text-zinc-400">
+                    Showing{' '}
+                    <strong className="text-white">
+                      {inventoryStatusRows.length > 0 ? (safeInventoryPage - 1) * inventoryPageSize + 1 : 0}
+                    </strong>{' '}
+                    to{' '}
+                    <strong className="text-white">
+                      {Math.min(safeInventoryPage * inventoryPageSize, inventoryStatusRows.length)}
+                    </strong>{' '}
+                    of <strong className="text-yellow-400">{inventoryStatusRows.length}</strong> items
+                  </span>
+                </div>
+
+                {/* Right: Page Navigation Prev / Page Numbers / Next */}
+                {totalInventoryPages > 1 && (
+                  <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setInventoryCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={safeInventoryPage <= 1}
+                      className="flex h-8 items-center gap-1 rounded-lg border border-[#2b2b36] bg-white/[0.03] px-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <span>Prev</span>
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalInventoryPages }, (_, i) => i + 1)
+                        .filter((page) => {
+                          if (totalInventoryPages <= 7) return true;
+                          if (page === 1 || page === totalInventoryPages) return true;
+                          return Math.abs(page - safeInventoryPage) <= 1;
+                        })
+                        .map((page, idx, arr) => {
+                          const prev = arr[idx - 1];
+                          const hasGap = prev && page - prev > 1;
+                          return (
+                            <div key={page} className="flex items-center">
+                              {hasGap && <span className="px-1 text-xs text-white/30">...</span>}
+                              <button
+                                type="button"
+                                onClick={() => setInventoryCurrentPage(page)}
+                                className={`h-8 min-w-[32px] rounded-lg px-2 text-xs font-semibold transition ${
+                                  safeInventoryPage === page
+                                    ? 'bg-yellow-400 text-black font-bold shadow'
+                                    : 'border border-[#2b2b36] bg-white/[0.03] text-white/70 hover:bg-white/[0.08] hover:text-white'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setInventoryCurrentPage((prev) => Math.min(totalInventoryPages, prev + 1))}
+                      disabled={safeInventoryPage >= totalInventoryPages}
+                      className="flex h-8 items-center gap-1 rounded-lg border border-[#2b2b36] bg-white/[0.03] px-2.5 text-xs font-semibold text-white/70 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <span>Next</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
