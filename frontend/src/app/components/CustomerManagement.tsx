@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -10,6 +10,7 @@ import { Badge } from "./ui/badge";
 import { Crown, Edit, Mail, MapPin, Phone, Search, Star, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useCustomers, useCustomersMutations, useSales } from "../../lib/hooks";
+import { TablePagination } from "./ui/table-pagination";
 
 type CustomerStatus = "Active" | "Inactive";
 
@@ -42,6 +43,10 @@ function formatDate(value: string | null | undefined) {
 
 export function CustomerManagement() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState<CustomerFormData>(defaultForm);
 
@@ -85,14 +90,38 @@ export function CustomerManagement() {
 
   const filteredCustomers = useMemo(
     () =>
-      uiCustomers.filter(
-        (customer) =>
+      uiCustomers.filter((customer) => {
+        const matchesSearch =
+          !searchTerm ||
           (customer.name ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
           (customer.email ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (customer.contact_number ?? "").includes(searchTerm),
-      ),
-    [uiCustomers, searchTerm],
+          (customer.contact_number ?? "").includes(searchTerm);
+        if (!matchesSearch) return false;
+
+        if (statusFilter !== "all") {
+          const s = (customer.status ?? "Active").toLowerCase();
+          if (s !== statusFilter.toLowerCase()) return false;
+        }
+
+        if (genderFilter !== "all") {
+          const g = (customer.gender ?? "").toLowerCase();
+          if (!g.includes(genderFilter.toLowerCase())) return false;
+        }
+
+        return true;
+      }),
+    [uiCustomers, searchTerm, statusFilter, genderFilter],
   );
+
+  const totalCustomerPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const safeCustomerPage = Math.min(Math.max(1, currentPage), totalCustomerPages);
+  const paginatedCustomers = useMemo(() => {
+    return filteredCustomers.slice((safeCustomerPage - 1) * pageSize, safeCustomerPage * pageSize);
+  }, [filteredCustomers, safeCustomerPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, genderFilter]);
 
   const activeCustomers = uiCustomers.filter((c) => (c.status ?? "Active").toLowerCase() === "active").length;
   const topCustomer =
@@ -194,14 +223,41 @@ export function CustomerManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400" />
-            <Input
-              placeholder="Search by name, email, or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-yellow-300/50"
-            />
+          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-yellow-400" />
+              <Input
+                placeholder="Search by name, email, or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-red-600 border-red-800 text-yellow-200 placeholder:text-yellow-300/50"
+              />
+            </div>
+            <div className="w-full sm:w-44 shrink-0">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full bg-red-600 border-red-800 text-yellow-200 text-sm focus:ring-yellow-400/40">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-red-700 border-red-800 text-yellow-200">
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full sm:w-44 shrink-0">
+              <Select value={genderFilter} onValueChange={setGenderFilter}>
+                <SelectTrigger className="w-full bg-red-600 border-red-800 text-yellow-200 text-sm focus:ring-yellow-400/40">
+                  <SelectValue placeholder="All Genders" />
+                </SelectTrigger>
+                <SelectContent className="bg-red-700 border-red-800 text-yellow-200">
+                  <SelectItem value="all">All Genders</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Kids">Kids</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="border border-red-800 rounded-lg overflow-x-auto scrollbar-hide">
@@ -220,7 +276,14 @@ export function CustomerManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer: any) => (
+                {paginatedCustomers.length === 0 ? (
+                  <TableRow className="border-red-800">
+                    <TableCell colSpan={9} className="h-24 text-center text-yellow-200/70">
+                      No customers found matching the search or filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedCustomers.map((customer: any) => (
                   <TableRow key={customer.customer_id} className="border-red-800">
                     <TableCell className="text-yellow-200 whitespace-nowrap text-center">{customer.name}</TableCell>
                     <TableCell className="min-w-[180px]">
@@ -286,10 +349,20 @@ export function CustomerManagement() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )))}
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            currentPage={safeCustomerPage}
+            pageSize={pageSize}
+            totalItems={filteredCustomers.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 15, 25, 50]}
+            unitName="customers"
+          />
         </CardContent>
       </Card>
     </div>

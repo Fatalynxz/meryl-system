@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, History, Package, RefreshCw, Search } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useInventoryLog } from "../../lib/hooks";
 import { shortId } from "./ui/utils";
+import { TablePagination } from "./ui/table-pagination";
 
 type InventoryLogRow = {
   inventory_log_id: string;
@@ -66,6 +67,9 @@ export function InventoryLogPage() {
   const inventoryLogQuery = useInventoryLog();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [directionFilter, setDirectionFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const logs = ((inventoryLogQuery.data as InventoryLogRow[]) ?? []).map((row) => ({
     ...row,
@@ -84,6 +88,11 @@ export function InventoryLogPage() {
       const product = getProduct(row);
       const type = String(row.transaction_type ?? "adjustment").trim().toLowerCase();
       const matchesType = typeFilter === "all" || type === typeFilter;
+      if (!matchesType) return false;
+
+      if (directionFilter === "in" && row.quantity_change <= 0) return false;
+      if (directionFilter === "out" && row.quantity_change >= 0) return false;
+
       const haystack = [
         row.inventory_log_id,
         row.product_id,
@@ -96,9 +105,19 @@ export function InventoryLogPage() {
       ]
         .join(" ")
         .toLowerCase();
-      return matchesType && (!term || haystack.includes(term));
+      return !term || haystack.includes(term);
     });
-  }, [logs, search, typeFilter]);
+  }, [logs, search, typeFilter, directionFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, typeFilter, directionFilter]);
+
+  const totalLogPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const safeLogPage = Math.min(Math.max(1, currentPage), totalLogPages);
+  const paginatedLogs = useMemo(() => {
+    return filteredLogs.slice((safeLogPage - 1) * pageSize, safeLogPage * pageSize);
+  }, [filteredLogs, safeLogPage, pageSize]);
 
   const totalIn = logs.filter((row) => row.quantity_change > 0).reduce((sum, row) => sum + row.quantity_change, 0);
   const totalOut = logs.filter((row) => row.quantity_change < 0).reduce((sum, row) => sum + Math.abs(row.quantity_change), 0);
@@ -153,7 +172,7 @@ export function InventoryLogPage() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_200px_180px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-yellow-400" />
               <Input
@@ -174,6 +193,16 @@ export function InventoryLogPage() {
                     {formatType(type)}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={directionFilter} onValueChange={setDirectionFilter}>
+              <SelectTrigger className="h-11 rounded-xl border-zinc-800 bg-zinc-900 text-yellow-100">
+                <SelectValue placeholder="All Flows" />
+              </SelectTrigger>
+              <SelectContent className="border-zinc-800 bg-zinc-950 text-yellow-100">
+                <SelectItem value="all">All Flows</SelectItem>
+                <SelectItem value="in">Stock In (+)</SelectItem>
+                <SelectItem value="out">Stock Out (-)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -205,7 +234,7 @@ export function InventoryLogPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredLogs.map((row) => {
+                  paginatedLogs.map((row) => {
                     const product = getProduct(row);
                     const qty = Number(row.quantity_change ?? 0);
                     return (
@@ -234,6 +263,16 @@ export function InventoryLogPage() {
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            currentPage={safeLogPage}
+            pageSize={pageSize}
+            totalItems={filteredLogs.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 15, 25, 50, 100]}
+            unitName="movements"
+          />
         </CardContent>
       </Card>
     </div>

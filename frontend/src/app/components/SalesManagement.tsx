@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -15,6 +15,7 @@ import { useProducts, useReturns, useSales, useUsers } from "../../lib/hooks";
 import { useAuth } from "../../lib/auth-context";
 import { supabase } from "../../lib/supabase";
 import { writeAuditLog } from "../../lib/audit";
+import { TablePagination } from "./ui/table-pagination";
 
 type SaleStatus = "Completed" | "Pending" | "Voided";
 
@@ -87,6 +88,10 @@ export function SalesManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCashier, setSelectedCashier] = useState("all");
   const [replacementFilter, setReplacementFilter] = useState<"all" | "replaced" | "not_replaced">("all");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "quarter" | "year" | "custom">("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -399,15 +404,20 @@ export function SalesManagement() {
     setSearchTerm("");
     setSelectedCashier("all");
     setReplacementFilter("all");
+    setPaymentMethodFilter("all");
+    setStatusFilter("all");
     setDatePreset("all");
     setStartDate("");
     setEndDate("");
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
     selectedCashier !== "all" ||
     replacementFilter !== "all" ||
+    paymentMethodFilter !== "all" ||
+    statusFilter !== "all" ||
     startDate ||
     endDate ||
     datePreset !== "all"
@@ -451,6 +461,14 @@ export function SalesManagement() {
         if (replacementFilter === "not_replaced" && repStatus !== "Not Replaced") return false;
       }
 
+      if (paymentMethodFilter !== "all") {
+        if (s.payment_method.toLowerCase() !== paymentMethodFilter.toLowerCase()) return false;
+      }
+
+      if (statusFilter !== "all") {
+        if (s.status.toLowerCase() !== statusFilter.toLowerCase()) return false;
+      }
+
       if (startDate && s.transaction_date !== "N/A" && s.transaction_date < startDate) {
         return false;
       }
@@ -460,7 +478,17 @@ export function SalesManagement() {
 
       return true;
     });
-  }, [visibleSales, searchTerm, selectedCashier, replacementFilter, replacementLabelBySaleId, startDate, endDate]);
+  }, [visibleSales, searchTerm, selectedCashier, replacementFilter, paymentMethodFilter, statusFilter, replacementLabelBySaleId, startDate, endDate]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCashier, replacementFilter, paymentMethodFilter, statusFilter, datePreset, startDate, endDate]);
+
+  const totalSalesPages = Math.max(1, Math.ceil(filteredSales.length / pageSize));
+  const safeSalesPage = Math.min(Math.max(1, currentPage), totalSalesPages);
+  const paginatedSales = useMemo(() => {
+    return filteredSales.slice((safeSalesPage - 1) * pageSize, safeSalesPage * pageSize);
+  }, [filteredSales, safeSalesPage, pageSize]);
 
   const filteredCompletedSales = useMemo(
     () => filteredSales.filter((s) => s.status === "Completed"),
@@ -674,6 +702,35 @@ export function SalesManagement() {
                 </Select>
               </div>
 
+              {/* Box 4: Payment Method Filter */}
+              <div className="w-full xl:w-36 shrink-0">
+                <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
+                  <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
+                    <SelectValue placeholder="Payment Mode" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 shadow-2xl">
+                    <SelectItem value="all">All Modes</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="gcash">GCash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Box 5: Order Status Filter */}
+              <div className="w-full xl:w-36 shrink-0">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 shadow-2xl">
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Voided">Voided</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Presets: All, Daily, Weekly, Monthly, Quarterly, Annually */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs flex-wrap">
@@ -845,7 +902,7 @@ export function SalesManagement() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSales.map((sale: any) => (
+                  paginatedSales.map((sale: any) => (
                   <TableRow key={sale.sales_id} className="border-b border-[#20202C] hover:bg-[#1A1A26]/70 transition-colors">
                     <TableCell className="text-yellow-400 font-mono font-medium whitespace-nowrap text-center">{sale.display_sales_id}</TableCell>
                     {isAdmin && (
@@ -1119,6 +1176,16 @@ export function SalesManagement() {
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            currentPage={safeSalesPage}
+            pageSize={pageSize}
+            totalItems={filteredSales.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 15, 25, 50, 100]}
+            unitName="sales"
+          />
         </CardContent>
       </Card>
 

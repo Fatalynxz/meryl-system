@@ -19,6 +19,7 @@ import { supabase } from "../../lib/supabase";
 import { saveReceiptProof, getAllReceiptProofs, StoredReceiptProof } from "../../lib/receipt-proof-store";
 import merylLogoBw from "../../assets/Meryl_Logo_BW.svg";
 import { shortId } from "./ui/utils";
+import { TablePagination } from "./ui/table-pagination";
 
 type ReturnDetail = {
   return_detail_id: string;
@@ -391,6 +392,9 @@ export function ReturnManagement() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStaff, setSelectedStaff] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [datePreset, setDatePreset] = useState<"all" | "today" | "week" | "month" | "quarter" | "year" | "custom">("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -1893,14 +1897,17 @@ export function ReturnManagement() {
   const handleResetFilters = () => {
     setSearchTerm("");
     setSelectedStaff("all");
+    setStatusFilter("all");
     setDatePreset("all");
     setStartDate("");
     setEndDate("");
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
     selectedStaff !== "all" ||
+    statusFilter !== "all" ||
     startDate ||
     endDate ||
     datePreset !== "all"
@@ -1958,6 +1965,11 @@ export function ReturnManagement() {
         if (!matchesStaff) return false;
       }
 
+      if (statusFilter !== "all") {
+        const matchesStatus = (returnItem.return_status || "").toLowerCase() === statusFilter.toLowerCase();
+        if (!matchesStatus) return false;
+      }
+
       if (startDate && returnItem.return_date !== "N/A" && returnItem.return_date < startDate) {
         return false;
       }
@@ -1967,7 +1979,17 @@ export function ReturnManagement() {
 
       return true;
     });
-  }, [visibleReturns, searchTerm, selectedStaff, startDate, endDate]);
+  }, [visibleReturns, searchTerm, selectedStaff, statusFilter, startDate, endDate]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedStaff, statusFilter, datePreset, startDate, endDate]);
+
+  const totalReturnPages = Math.max(1, Math.ceil(filteredReturns.length / pageSize));
+  const safeReturnPage = Math.min(Math.max(1, currentPage), totalReturnPages);
+  const paginatedReturns = useMemo(() => {
+    return filteredReturns.slice((safeReturnPage - 1) * pageSize, safeReturnPage * pageSize);
+  }, [filteredReturns, safeReturnPage, pageSize]);
 
   const completedReturns = filteredReturns.length;
   const totalItemsReplaced = useMemo(
@@ -2884,6 +2906,23 @@ export function ReturnManagement() {
                 </Select>
               </div>
 
+              {/* Box 3: Status Dropdown Filter */}
+              <div className="w-full xl:w-44 shrink-0">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full bg-[#181824] border-[#282836] text-zinc-200 text-sm focus:ring-yellow-400/40 rounded-xl">
+                    <div className="flex items-center gap-2 truncate">
+                      <ShieldCheck className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <SelectValue placeholder="All Status" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#181824] border-[#2E2E3E] text-zinc-200 shadow-2xl">
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Presets: All, Daily, Weekly, Monthly, Quarterly, Annually */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <div className="inline-flex items-center p-0.5 rounded-lg bg-[#181824] border border-[#282836] text-xs flex-wrap">
@@ -3044,7 +3083,7 @@ export function ReturnManagement() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredReturns.map((returnItem) => {
+                  paginatedReturns.map((returnItem) => {
                     return (
                     <TableRow key={returnItem.return_id} className="border-b border-[#20202C] hover:bg-[#1A1A26]/70 transition-colors">
                       <TableCell className="text-yellow-400 font-mono font-medium whitespace-nowrap text-center">{returnItem.display_return_id}</TableCell>
@@ -3255,6 +3294,16 @@ export function ReturnManagement() {
               </TableBody>
             </Table>
           </div>
+
+          <TablePagination
+            currentPage={safeReturnPage}
+            pageSize={pageSize}
+            totalItems={filteredReturns.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 15, 25, 50, 100]}
+            unitName="replacements"
+          />
         </CardContent>
       </Card>
 

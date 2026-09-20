@@ -14,6 +14,7 @@ import { useCategories, useInventory, useProducts, useProductsMutations } from "
 import { supabase } from "../../lib/supabase";
 import { logAuditEvent } from "../../lib/api/audit-logger";
 import { cleanProductImageUrl, getWebpageUrlWarning } from "../../lib/image-utils";
+import { TablePagination } from "./ui/table-pagination";
 
 type InventoryStatus = "Active" | "Inactive";
 type ProductTab = "list" | "settings" | "inventory";
@@ -249,6 +250,12 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
     }));
   };
 
+  const [selectedBrand, setSelectedBrand] = useState("all");
+  const [selectedGender, setSelectedGender] = useState("all");
+  const [selectedStockStatus, setSelectedStockStatus] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<UiProduct | null>(null);
   const [deleteTargetProductId, setDeleteTargetProductId] = useState<string>("");
@@ -369,6 +376,22 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [baseProducts, categories]);
 
+  const availableBrands = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of baseProducts) {
+      if (p.brand && p.brand !== "N/A") set.add(p.brand);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [baseProducts]);
+
+  const availableGenders = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of baseProducts) {
+      if (p.gender && p.gender !== "N/A") set.add(p.gender);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [baseProducts]);
+
   const filteredProducts = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
     return baseProducts.filter((product) => {
@@ -389,9 +412,36 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
         product.category_id === selectedCategory ||
         product.category.toLowerCase() === selectedCategory.toLowerCase();
 
-      return matchesSearch && matchesCategory;
+      const matchesBrand =
+        selectedBrand === "all" ||
+        product.brand.toLowerCase() === selectedBrand.toLowerCase();
+
+      const matchesGender =
+        selectedGender === "all" ||
+        product.gender.toLowerCase() === selectedGender.toLowerCase();
+
+      let matchesStock = true;
+      if (selectedStockStatus === "in_stock") {
+        matchesStock = product.available_stock > 10;
+      } else if (selectedStockStatus === "low_stock") {
+        matchesStock = product.available_stock > 0 && product.available_stock <= 10;
+      } else if (selectedStockStatus === "out_of_stock") {
+        matchesStock = product.available_stock <= 0;
+      }
+
+      return matchesSearch && matchesCategory && matchesBrand && matchesGender && matchesStock;
     });
-  }, [baseProducts, searchTerm, selectedCategory]);
+  }, [baseProducts, searchTerm, selectedCategory, selectedBrand, selectedGender, selectedStockStatus]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedBrand, selectedGender, selectedStockStatus, activeTab]);
+
+  const totalProductPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const safeProductPage = Math.min(Math.max(1, currentPage), totalProductPages);
+  const paginatedProducts = useMemo(() => {
+    return filteredProducts.slice((safeProductPage - 1) * pageSize, safeProductPage * pageSize);
+  }, [filteredProducts, safeProductPage, pageSize]);
 
   const selectedSettingsProduct = productMap.get(stockForm.product_id);
   const editableVariantGroup = useMemo(() => {
@@ -885,9 +935,9 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Search and Category Filter Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative flex-1">
+            {/* Search and Multi-Dimensional Filter Controls */}
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2.5">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400" />
                 <Input
                   placeholder={activeTab === "inventory" ? "Search by SKU, product, brand, category, or variant..." : "Search by SKU, product, brand, or category..."}
@@ -907,7 +957,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
               </div>
 
               {/* Category Filter Dropdown */}
-              <div className="w-full sm:w-60 shrink-0">
+              <div className="w-full xl:w-48 shrink-0">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="h-10 bg-[#12121A] border-[#24242F] text-white focus:ring-yellow-400/40">
                     <div className="flex items-center gap-2 truncate">
@@ -932,6 +982,55 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
                         {cat.name} ({cat.count})
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Brand Filter Dropdown */}
+              <div className="w-full xl:w-40 shrink-0">
+                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                  <SelectTrigger className="h-10 bg-[#12121A] border-[#24242F] text-white focus:ring-yellow-400/40">
+                    <SelectValue placeholder="All Brands" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#15161d] border-[#2a2c36] text-white max-h-72">
+                    <SelectItem value="all">All Brands</SelectItem>
+                    {availableBrands.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Department / Gender Filter Dropdown */}
+              <div className="w-full xl:w-36 shrink-0">
+                <Select value={selectedGender} onValueChange={setSelectedGender}>
+                  <SelectTrigger className="h-10 bg-[#12121A] border-[#24242F] text-white focus:ring-yellow-400/40">
+                    <SelectValue placeholder="All Depts" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#15161d] border-[#2a2c36] text-white max-h-72">
+                    <SelectItem value="all">All Depts</SelectItem>
+                    {availableGenders.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {g}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Stock Status Filter Dropdown */}
+              <div className="w-full xl:w-36 shrink-0">
+                <Select value={selectedStockStatus} onValueChange={setSelectedStockStatus}>
+                  <SelectTrigger className="h-10 bg-[#12121A] border-[#24242F] text-white focus:ring-yellow-400/40">
+                    <SelectValue placeholder="All Stock" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#15161d] border-[#2a2c36] text-white max-h-72">
+                    <SelectItem value="all">All Stock</SelectItem>
+                    <SelectItem value="in_stock">In Stock (&gt;10)</SelectItem>
+                    <SelectItem value="low_stock">Low Stock (1-10)</SelectItem>
+                    <SelectItem value="out_of_stock">Out of Stock (0)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -973,12 +1072,16 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
                     </button>
                   );
                 })}
-                {(selectedCategory !== "all" || searchTerm) && (
+                {(selectedCategory !== "all" || searchTerm || selectedBrand !== "all" || selectedGender !== "all" || selectedStockStatus !== "all") && (
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedCategory("all");
                       setSearchTerm("");
+                      setSelectedBrand("all");
+                      setSelectedGender("all");
+                      setSelectedStockStatus("all");
+                      setCurrentPage(1);
                     }}
                     className="text-xs text-yellow-400/80 hover:text-yellow-300 underline underline-offset-2 shrink-0 ml-2"
                   >
@@ -989,12 +1092,21 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
             )}
 
             {/* Active Filter Info Notice */}
-            {(selectedCategory !== "all" || searchTerm) && (
+            {(selectedCategory !== "all" || searchTerm || selectedBrand !== "all" || selectedGender !== "all" || selectedStockStatus !== "all") && (
               <div className="flex items-center justify-between text-xs text-zinc-400 px-1 pt-1">
                 <span>
                   Showing <strong className="text-yellow-400">{filteredProducts.length}</strong> matching items
                   {selectedCategory !== "all" && (
                     <> in category <strong className="text-white">"{selectedCategory}"</strong></>
+                  )}
+                  {selectedBrand !== "all" && (
+                    <> &bull; brand <strong className="text-white">"{selectedBrand}"</strong></>
+                  )}
+                  {selectedGender !== "all" && (
+                    <> &bull; dept <strong className="text-white">"{selectedGender}"</strong></>
+                  )}
+                  {selectedStockStatus !== "all" && (
+                    <> &bull; status <strong className="text-white">"{selectedStockStatus.replace(/_/g, " ")}"</strong></>
                   )}
                   {searchTerm && (
                     <> matching <strong className="text-white">"{searchTerm}"</strong></>
@@ -1005,6 +1117,10 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
                   onClick={() => {
                     setSelectedCategory("all");
                     setSearchTerm("");
+                    setSelectedBrand("all");
+                    setSelectedGender("all");
+                    setSelectedStockStatus("all");
+                    setCurrentPage(1);
                   }}
                   className="text-yellow-400 hover:underline cursor-pointer"
                 >
@@ -1014,10 +1130,20 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
             )}
 
             {activeTab === "list" ? (
-              <ProductListTable products={filteredProducts} onEdit={openEditProduct} />
+              <ProductListTable products={paginatedProducts} onEdit={openEditProduct} />
             ) : (
-              <InventoryTable products={filteredProducts} onConfigure={openSettingsForProduct} />
+              <InventoryTable products={paginatedProducts} onConfigure={openSettingsForProduct} />
             )}
+
+            <TablePagination
+              currentPage={safeProductPage}
+              pageSize={pageSize}
+              totalItems={filteredProducts.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={[10, 15, 25, 50, 100]}
+              unitName={activeTab === "list" ? "products" : "items"}
+            />
           </CardContent>
         </Card>
       )}
