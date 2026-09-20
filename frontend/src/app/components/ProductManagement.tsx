@@ -1339,10 +1339,22 @@ function ProductSettingsPage({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedBrand, setSelectedBrand] = useState("all");
   const [selectedStockFilter, setSelectedStockFilter] = useState<"all" | "in_stock" | "low_stock" | "out_of_stock" | "inactive">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState<UiProduct | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Available brands
+  const availableBrands = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      if (p.brand && p.brand !== "N/A") set.add(p.brand);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [products]);
 
   // Inventory summary metrics
   const totalVariants = products.length;
@@ -1375,6 +1387,11 @@ function ProductSettingsPage({
         p.category_id === selectedCategory ||
         p.category.toLowerCase() === selectedCategory.toLowerCase();
 
+      // Brand filter
+      const matchesBrand =
+        selectedBrand === "all" ||
+        p.brand.toLowerCase() === selectedBrand.toLowerCase();
+
       // Stock status filter
       const stock = Number(p.stock || 0);
       const reorder = Number(p.reorder_level || 10);
@@ -1390,9 +1407,19 @@ function ProductSettingsPage({
         matchesStock = isInactive;
       }
 
-      return matchesSearch && matchesCategory && matchesStock;
+      return matchesSearch && matchesCategory && matchesBrand && matchesStock;
     });
-  }, [products, searchQuery, selectedCategory, selectedStockFilter]);
+  }, [products, searchQuery, selectedCategory, selectedBrand, selectedStockFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedBrand, selectedStockFilter]);
+
+  const totalSettingsPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const safeSettingsPage = Math.min(Math.max(1, currentPage), totalSettingsPages);
+  const paginatedProducts = useMemo(() => {
+    return filteredProducts.slice((safeSettingsPage - 1) * pageSize, safeSettingsPage * pageSize);
+  }, [filteredProducts, safeSettingsPage, pageSize]);
 
   // Open modal for a specific product
   const handleOpenConfigure = (product: UiProduct) => {
@@ -1496,7 +1523,7 @@ function ProductSettingsPage({
 
         <CardContent className="p-5 space-y-4">
           {/* SEARCH & FILTERS CONTROLS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-400/70" />
               <Input
@@ -1526,6 +1553,21 @@ function ProductSettingsPage({
                 {categories.map((c: any) => (
                   <SelectItem key={c.category_id} value={c.category_id}>
                     {c.category_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Brand Filter */}
+            <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+              <SelectTrigger className="h-10 bg-[#171722] border-[#2d2d3a] text-yellow-100 rounded-xl">
+                <SelectValue placeholder="All Brands" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#15151d] border-[#2d2d3a] text-yellow-100 max-h-64">
+                <SelectItem value="all">All Brands</SelectItem>
+                {availableBrands.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1563,8 +1605,8 @@ function ProductSettingsPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.length > 0 ? (
-                  filteredProducts.map((product) => {
+                {paginatedProducts.length > 0 ? (
+                  paginatedProducts.map((product) => {
                     const statusMeta = getProductStatusMeta(product);
                     const isLow = Number(product.stock || 0) > 0 && Number(product.stock || 0) <= Number(product.reorder_level || 10);
                     const isOut = Number(product.stock || 0) <= 0;
@@ -1663,7 +1705,7 @@ function ProductSettingsPage({
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-12 text-center text-yellow-200/60">
+                    <TableCell colSpan={9} className="py-12 text-center text-yellow-200/60">
                       <Package className="w-8 h-8 mx-auto mb-2 text-yellow-400/40" />
                       <p className="text-sm font-semibold">No products found matching your search.</p>
                       <p className="text-xs text-yellow-200/40 mt-1">Try clearing filters or searching for another SKU.</p>
@@ -1673,6 +1715,17 @@ function ProductSettingsPage({
               </TableBody>
             </Table>
           </div>
+
+          {/* PAGINATION */}
+          <TablePagination
+            currentPage={safeSettingsPage}
+            pageSize={pageSize}
+            totalItems={filteredProducts.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 15, 25, 50, 100]}
+            unitName="variants"
+          />
         </CardContent>
       </Card>
 
