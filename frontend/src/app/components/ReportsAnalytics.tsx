@@ -2623,7 +2623,7 @@ export function ReportsAnalytics() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-white/70">Gross Profit</p>
-                  <p className="text-2xl text-green-400 font-bold">{money(currentMetrics.current.grossProfit)}</p>
+                  <p className="text-2xl text-white">{money(currentMetrics.current.grossProfit)}</p>
                   {showComparison ? (
                     <p className={`text-xs mt-1 ${profitChange >= 0 ? 'text-green-400' : 'text-red-300'}`}>
                       {profitChange >= 0 ? '+' : ''}{profitChange.toFixed(1)}% • {currentMetrics.current.margin.toFixed(1)}% margin
@@ -2632,7 +2632,7 @@ export function ReportsAnalytics() {
                     <p className="text-xs text-zinc-400 mt-1">{currentMetrics.current.margin.toFixed(1)}% gross profit margin</p>
                   )}
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-400" />
+                <TrendingUp className="h-8 w-8 text-yellow-400" />
               </div>
             </CardContent>
           </Card>
