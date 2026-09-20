@@ -25,10 +25,11 @@ The Authentication Gateway is the unified, secure entry point for all store pers
 2. In the **Username / Email** input field, type your assigned staff credentials (e.g., `admin`, `cashier1`, or `inventory1`).
 3. In the **Password** input field, type your secret password.
 4. Click the blue **Sign In** button.
-5. Upon successful authentication, the system displays: *"Login successful! Redirecting to dashboard..."* and automatically redirects you to your designated portal:
+5. Upon successful authentication, the system creates an RFC 7519 HS256 JWT session, sets encrypted HTTP-only cookies (`meryl_session`), displays: *"Login successful! Redirecting to dashboard..."*, and automatically redirects you to your designated portal:
    - **Administrators** &rarr; `/admin`
    - **Sales Staff / Cashiers** &rarr; `/sales`
    - **Inventory Custodians** &rarr; `/inventory`
+6. **Multi-Tab & Refresh Protection ("Key in Every Door")**: Your authenticated session is securely bound to an HTTP-only cookie. Opening new browser tabs, refreshing the page, or opening links automatically restores your verified session across all doors without requiring re-login. Automatic cross-tab storage events immediately synchronize sign-in and sign-out states across every open window.
 
 ---
 
@@ -232,17 +233,23 @@ The Product List interface serves as the primary master data repository for Mery
 * **Box 4 [Catalog Master Search Bar & Clear Button]**: "Search input with yellow magnifying glass icon and instant clear button (X) accepting SKU codes, shoe names, brands, categories, or colors."
 * **Box 5 [Category Dropdown Filter]**: "Dropdown selector with filter icon showing all registered footwear categories alongside live variant counts per category."
 * **Box 6 [Quick-Select Category Filter Pills]**: "Horizontal row of interactive pills (All, Basketball Shoes, Boots, Casual Shoes, Formal Shoes, Sandals, Sports Shoes) for fast 1-click catalog filtering."
-* **Box 7 [Master Data Catalog Table]**: "Comprehensive table displaying Image thumbnails, SKU identifiers, Product titles, Brands, Categories, Colors, Target Departments, EU Sizes, Unit Prices (PHP), and Row Action controls."
+* **Box 7 [Master Data Catalog Table]**: "Comprehensive table displaying Image thumbnails, matching SKU identifiers, Product titles, Brands, Categories, Colors, Target Departments, EU Sizes, Unit Prices (PHP), and Row Action controls."
 * **Box 8 [Edit Variant Action Icon]**: "Yellow square edit pencil button on each product row that opens the Edit Product modal for attribute updates or deletion."
+* **Box 9 [Matching SKU Hierarchy & Variant Alignment]**: "Standardized SKU format directly linked to the shoe model and variant attributes, ensuring the SKU displayed on product rows perfectly matches inventory stock records to prevent conflicting product information."
+* **Box 10 [Table Pagination & Page Size Selector]**: "Interactive pagination bar featuring page size selection (10, 15, 25, 50, 100 items per page), live record counter ('Showing 1 to 10 of 879 products'), and previous/next/numbered navigation pills."
+* **Box 11 [Multi-Dimensional Filters]**: "Comprehensive filtering bar offering Brand dropdown, Department/Gender selector (Men, Women, Kids, Unisex), and Stock Availability status filters with one-click 'Reset all' badge."
 
 #### STEPS
 1. Click **Product List** in the left navigation sidebar.
 2. Review the live catalog records badge at the top right to verify total registered styles (e.g., `879 records`).
 3. To filter by footwear style, click any of the **Quick-Select Category Pills** (e.g., *Basketball Shoes (2)*, *Casual Shoes*, or *All*), or select a category from the **Category Dropdown**.
-4. Use the **Catalog Master Search Bar** to instantly find specific models by typing the SKU barcode, product name (e.g., *Street Runner*), brand (e.g., *Venus*, *Nike*), or color. Click the **X** button to quickly clear your search query.
-5. Click **Show Archived** if you need to inspect or restore previously discontinued products.
-6. To enroll a brand-new shoe model into the catalog, click the golden **+ Add Product** button.
-7. To edit an existing footwear item, click the yellow **Edit** icon in the **Actions** column of the desired row.
+4. Use the **Brand**, **Department**, or **Stock Status** dropdowns to further isolate specific product groups. Click **Reset all** to clear active filters.
+5. Notice that all variant SKUs strictly match the product matrix hierarchy, ensuring that POS terminals and inventory logs use synchronized barcodes.
+6. Use the **Table Pagination Bar** at the bottom of the table to navigate through large catalogs. Adjust items per page (10, 15, 25, 50, 100) or click page numbers directly. Changing filters automatically returns the view to Page 1.
+7. Use the **Catalog Master Search Bar** to instantly find specific models by typing the SKU barcode, product name (e.g., *Street Runner*), brand (e.g., *Venus*, *Nike*), or color. Click the **X** button to quickly clear your search query.
+8. Click **Show Archived** if you need to inspect or restore previously discontinued products.
+9. To enroll a brand-new shoe model into the catalog, click the golden **+ Add Product** button.
+10. To edit an existing footwear item, click the yellow **Edit** icon in the **Actions** column of the desired row.
 
 ---
 
@@ -307,14 +314,17 @@ The Product Settings dashboard provides high-level inventory health metrics acro
 * **Box 1 [Inventory KPI Metrics Bar]**: "Four summary stat cards displaying Total Variants, POS Available in-stock count, Low Stock Warnings, and Out of Stock counts."
 * **Box 2 [Stock Health Status Filter Dropdown]**: "Dropdown selector to filter by inventory status: 'All Stock Statuses', 'In-Stock & Sellable', 'Low Stock (≤ Reorder)', 'Out of Stock', or 'Inactive Items'."
 * **Box 3 [Category Filter Dropdown]**: "Filters the settings matrix by footwear classification."
-* **Box 4 [Variant Inventory Configuration Table]**: "Table listing SKU, Product Name, Brand, Unit Cost, SRP, On-Hand Stock, ROP, and the Configure action icon."
-* **Box 5 [Configure Parameters Action Button]**: "Gear icon on each variant row that launches the Configure Product Parameters modal."
+* **Box 4 [Brand Filter Dropdown]**: "Dynamic brand filter selector (All Brands, Nike, Adidas, etc.) to evaluate specific manufacturer portfolios."
+* **Box 5 [Variant Inventory Configuration Table]**: "Table listing SKU, Product Name, Brand, Unit Cost, SRP, On-Hand Stock, ROP, Gross Profit (rendered in high-contrast uniform white), and the Configure action icon."
+* **Box 6 [Table Pagination Bar]**: "Interactive pagination controls (10, 15, 25, 50, 100 variants/page) with record counter ('Showing 1 to 10 of 882 variants') and navigation pills."
+* **Box 7 [Configure Parameters Action Button]**: "Gear icon on each variant row that launches the Configure Product Parameters modal."
 
 #### STEPS
 1. Click **Product Settings** in the left navigation sidebar.
-2. Review the four top KPI cards to monitor stock health (Total Variants, POS Available, Low Stock, Out of Stock).
-3. Filter the table using the **Stock Status** dropdown to isolate low-stock or out-of-stock shoes.
-4. Click the gear **Configure** button on any variant to adjust its inventory parameters.
+2. Review the four top KPI cards to monitor stock health (Total Variants, POS Available, Low Stock, Out of Stock). Notice that Gross Profit numbers are formatted in uniform white to maintain legibility.
+3. Filter the table using the **Category**, **Brand**, or **Stock Status** dropdowns to isolate specific low-stock or high-turnover lines.
+4. Use the **Table Pagination Bar** at the bottom to browse through variants; filter adjustments automatically return the table to Page 1.
+5. Click the gear **Configure** button on any variant to adjust its inventory parameters.
 
 ---
 
@@ -350,17 +360,21 @@ The Sellable Inventory portal provides centralized visibility over all active fo
 * **Box 2 [Header Banner & Total Records Badge]**: "Header banner showing the yellow Warehouse icon, Sellable Inventory title, and a golden pill displaying total active inventory records (e.g., 8 records)."
 * **Box 3 [Quick Classification Selector]**: "Quick classification selector (All Categories) located in the upper-right corner of the inventory card."
 * **Box 4 [Interactive Category Filter Pills]**: "Horizontal row of filter pills showing live quantities per footwear category."
-* **Box 5 [High-Contrast Inventory Data Table]**: "High-contrast data table displaying seven core columns (Image, Product, Variant, Price, Available, Status, Actions)."
+* **Box 5 [High-Contrast Inventory Data Table]**: "High-contrast data table displaying core columns (Image, Product, Variant, Price, Available, Gross Profit in uniform white, Status, Actions)."
 * **Box 6 [Row Action Controls (Eye & Gear Buttons)]**: "Use the Eye icon to view detailed inventory audits, and the Gear icon to configure product settings."
+* **Box 7 [Table Pagination Bar]**: "Controls items per page (10, 15, 25, 50, 100) and displays record count with page navigation buttons."
+* **Box 8 [Multi-Dimensional Filters]**: "Dropdown controls for Brand, Department (Men, Women, Kids), and Stock Status (In Stock, Low Stock, Out of Stock)."
 
 #### STEPS
 1. Navigate to **Inventory** in the sidebar navigation (or access `/inventory`).
 2. Review the list of active footwear products configured with sellable stock.
 3. In the **Real-Time Search Input (Box 1)**, type a keyword (SKU barcode, shoe model, brand, colorway, or variant) to filter records in real time.
 4. Observe the **Header Banner & Total Records Badge (Box 2)** to see the count of matching items.
-5. Use the **Quick Classification Selector (Box 3)** or click any of the **Interactive Category Filter Pills (Box 4)** (e.g., *Basketball Shoes (2)*, *Casual Shoes (4)*, *Running Shoes (2)*) to isolate specific footwear styles.
-6. Inspect the **High-Contrast Inventory Data Table (Box 5)**, observing the **Available** column badge (green indicates in-stock sellable units ready for POS checkouts).
-7. Under the **Row Action Controls (Box 6)**:
+5. Use the **Quick Classification Selector (Box 3)** or click any of the **Interactive Category Filter Pills (Box 4)** to isolate specific footwear styles.
+6. Use the **Brand**, **Department**, or **Stock Status** dropdowns **(Box 8)** for fine-grained filtering.
+7. Inspect the **High-Contrast Inventory Data Table (Box 5)**, observing that Gross Profit is rendered in uniform white and in-stock units are highlighted in green.
+8. Navigate through pages using the **Table Pagination Bar (Box 7)**.
+9. Under the **Row Action Controls (Box 6)**:
    - Click the **Eye icon** to view detailed inventory audits (physical on-hand vs. reservations, condition, and batch dates).
    - Click the **Gear icon** to configure product settings (restock intake, markups, ROP, department, and expiration dates).
 
@@ -424,15 +438,18 @@ The Inventory Movement Log (`/inventory-log`) provides an immutable, chronologic
 * **Box 4 [Chronological Movement Ledger Table]**: "Chronological audit ledger recording timestamp, shoe model, EU size, colorway, and SKU barcode for each stock event."
 * **Box 5 [Movement Category & Quantity Delta Badges]**: "Color-coded classification pills (Restock, Sale, Reserved/Hold, Adjustment) with signed inventory deltas (+50, -1)."
 * **Box 6 [Reference & Transaction Traceability Hash]**: "System transaction UUID or delivery reference linking the stock movement directly to sales receipts or restocks."
+* **Box 7 [Direction / Flow Filter Dropdown]**: "Filter by net inventory flow: 'All Flows', 'Stock In (+)', or 'Stock Out (-)' to isolate incoming replenishment vs outgoing sales."
+* **Box 8 [Table Pagination Bar]**: "Interactive pagination controls (10, 15, 25, 50 rows/page, default 15) with page numbers, record counter ('Showing 1 to 15 of 842 movements'), and auto-page reset."
 
 #### STEPS
 1. Click **Inventory Log** in the left navigation sidebar (or access `http://localhost:5173/inventory-log`).
 2. Review the top KPI cards **(Box 1)** to monitor total **Stock In**, **Stock Out**, and **Net Movement**.
 3. In the **Search input (Box 2)**, type a footwear style name, brand, SKU code, or movement reference to quickly filter log entries.
-4. Select a specific movement filter from the **All movement types dropdown (Box 3)** (e.g., *Restock*, *Sale*, *Reserved / Hold*, or *Adjustment*), or click **Refresh** to reload the latest database events.
-5. In the **Movement Ledger Table (Box 4)**, inspect each row for the exact date/time, shoe model, EU sizing, and SKU identifier.
-6. Verify the signed units in the **Qty Change column (Box 5)** to track additions (green) vs deductions (red).
-7. Trace the transaction via the **Reference column (Box 6)** to verify corresponding customer receipt numbers or delivery shipment invoices.
+4. Select a movement filter from **Movement Types (Box 3)** and use the **Flow Filter (Box 7)** to view only incoming shipments or sales deductions.
+5. Navigate through historical records using the **Table Pagination Bar (Box 8)** (adjust page size or click page pills).
+6. In the **Movement Ledger Table (Box 4)**, inspect each row for the exact date/time, shoe model, EU sizing, and SKU identifier.
+7. Verify the signed units in the **Qty Change column (Box 5)** to track additions (green) vs deductions (red).
+8. Trace the transaction via the **Reference column (Box 6)** to verify corresponding customer receipt numbers or delivery shipment invoices.
 
 ---
 
@@ -446,14 +463,18 @@ The Sales Management module (`/sales`) serves as the master sales transaction le
 * **Box 3 [Sales Master Data Table]**: "Comprehensive ledger columns: Transaction ID, Receipt #, Timestamp, Items Sold count, Total Amount in PHP (₱), Payment Method (Cash/GCash), and Cashier Name."
 * **Box 4 [Payment & Tender Method Badges]**: "Color-coded pills indicating tender type: Green for Cash checkouts, Blue for GCash digital wallet payments."
 * **Box 5 [Order Inspection & Reprint Action Buttons]**: "Row action buttons: Blue Eye icon to view the itemized order breakdown, and Printer icon to generate an official duplicate thermal receipt."
+* **Box 6 [Payment Mode Filter Dropdown]**: "Dropdown filter to isolate transactions by payment tender: 'All Modes', 'Cash', or 'GCash'."
+* **Box 7 [Order Status Filter Dropdown]**: "Dropdown filter to isolate transaction statuses: 'All Status', 'Completed', 'Pending', or 'Voided'."
+* **Box 8 [Table Pagination Bar]**: "Interactive pagination bar supporting 10, 15, 25, 50, or 100 transactions per page with page jump pills and active record counts."
 
 #### STEPS
 1. Click **Sales** in the left navigation sidebar (or navigate to `http://localhost:5173/sales`).
 2. Review the chronological sales register to audit daily store transactions and total revenue.
 3. In the **Search Bar (Box 1)**, type a customer name or Official Receipt number to locate a specific sale.
-4. Use the **Date Range & Cashier Filters (Box 2)** to narrow down orders processed during a specific cashier shift.
-5. In the **Sales Master Table (Box 3)**, inspect the transaction timestamp, items sold, and verify the payment tender type **(Box 4)**.
-6. Under **Actions (Box 5)**:
+4. Use the **Date Range & Cashier Filters (Box 2)**, **Payment Mode Filter (Box 6)**, or **Order Status Filter (Box 7)** to narrow down transactions.
+5. Use the **Table Pagination Bar (Box 8)** at the bottom to browse through transactions; changing filters automatically returns the view to Page 1.
+6. In the **Sales Master Table (Box 3)**, inspect the transaction timestamp, items sold, and verify the payment tender type **(Box 4)**.
+7. Under **Actions (Box 5)**:
    - Click the **Eye icon** (`View`) to open the **Itemized Order Details Modal**.
    - Click the **Printer icon** (`Reprint`) to generate a duplicate customer receipt.
 
@@ -515,15 +536,20 @@ The Customer Management module (`/customers`) manages the store's customer datab
 * **Box 3 [Customer Multi-Field Search Input]**: "Search input accepting customer full name, mobile phone number, or email address with instant filtering."
 * **Box 4 [Customer Directory Data Table]**: "Data grid displaying Customer Name, Mobile Number, Email Address, Default Shoe Size Preference, Total Orders, Lifetime Spend (₱), and Action buttons."
 * **Box 5 [Row Action Controls (History & Edit)]**: "Quick action buttons: Clock/History icon to open Customer Purchase Dossier, and Pencil/Edit icon to modify contact details and size preferences."
+* **Box 6 [Customer Status Filter Dropdown]**: "Filter by customer status: 'All Status', 'Active', or 'Inactive'."
+* **Box 7 [Demographic / Gender Filter Dropdown]**: "Filter profiles by gender category: 'All Genders', 'Male', 'Female', or 'Kids'."
+* **Box 8 [Table Pagination Bar]**: "Interactive pagination controls (10, 15, 25, 50 per page) with record count and page pills."
 
 #### STEPS
 1. Click **Customers** in the left navigation sidebar (or navigate to `http://localhost:5173/customers`).
 2. View the customer directory table **(Box 4)** to inspect active client profiles and lifetime spend totals.
 3. In the **Search Bar (Box 3)**, type a customer's phone number or name to locate their record.
-4. Click **+ Add Customer (Box 2)** to enroll a new shopper into the loyalty database.
-5. Under **Actions (Box 5)**:
-   - Click the **Pencil icon** (`Edit`) to update contact info or preferred shoe sizes.
-   - Click the **Clock icon** (`Purchase History`) to view their complete purchase dossier.
+4. Use the **Status Filter (Box 6)** or **Gender Filter (Box 7)** to target specific customer demographics.
+5. Navigate across customer pages using the **Table Pagination Bar (Box 8)**.
+6. Click **+ Add Customer (Box 2)** to enroll a new shopper into the loyalty database.
+7. Under **Actions (Box 5)**:
+   - Click the **History icon** to view the customer's purchase history and preferred shoe sizes.
+   - Click the **Pencil/Edit icon** to update contact details, address, or sizing preferences.
 
 ---
 
@@ -580,12 +606,16 @@ The Replacement Management module allows administrators to inspect defective foo
 * **Box 3 [Defect Assessment Notes]**: "Details the physical condition of the returned shoe (sole detachment, upper tear, factory defect)."
 * **Box 4 [Process Replacement Button]**: "Opens the structured 5-step return intake wizard."
 * **Box 5 [Review Claim Action Button]**: "Opens the inspection modal to view uploaded receipt proof and defect photos for managerial decision."
+* **Box 6 [Claim Status Filter Dropdown]**: "Filter replacement requests by status: 'All Status', 'Completed', or 'Pending'."
+* **Box 7 [Table Pagination Bar]**: "Interactive pagination controls (10, 15, 25, 50 tickets/page) with active record counts and page jump pills."
 
 #### STEPS
 1. Click **Replacement** in the navigation sidebar.
-2. Review the list of active tickets in the **Pending Claims** table.
-3. Click **Review Claim** on any ticket to evaluate evidence and decide on disposition.
-4. To initiate a walk-in replacement directly at the administrative desk, click **Process Replacement**.
+2. Review the list of tickets in the claims table.
+3. Use the **Status Filter (Box 6)** to isolate pending claims awaiting managerial review.
+4. Navigate through replacement history using the **Table Pagination Bar (Box 7)**. Changing filters or search terms automatically returns the view to Page 1.
+5. Click **Review Claim (Box 5)** on any ticket to evaluate evidence and decide on disposition.
+6. To initiate a walk-in replacement directly at the administrative desk, click **Process Replacement (Box 4)**.
 
 ---
 
@@ -641,40 +671,50 @@ Opens when an Administrator clicks Review Claim on any pending claim ticket in /
 
 ### Section 2.25: Predictive Analytics & Sales Demand Forecasting
 #### Screen Description
-The Predictive Analytics module utilizes machine learning linear regression algorithms to forecast 7-day and 30-day footwear sales demand, classify fast versus slow-moving inventory, and provide automated purchase reorder suggestions.
+The Predictive Analytics module utilizes an advanced **Blended Statistical Ensemble Model** combining Weighted Moving Average (50%), Linear Trend Projection (30%), and Simple Moving Average (20%) with an 85% safety floor to forecast 7-day and 30-day footwear sales demand, establish low/high scenario confidence spreads, classify fast versus slow-moving inventory, and generate automated replenishment suggestions.
 
 #### Screenshot Callout Labels
 * **Box 1 [Forecast Horizon Selector]**: "Toggle between 7-Day Short-Term and 30-Day Monthly predictive demand models."
-* **Box 2 [Sales Demand Forecast Chart]**: "Visual trend graph illustrating projected sales units versus historical volume across top shoe models."
-* **Box 3 [Fast-Moving Footwear Leaderboard]**: "Ranks styles with highest inventory turnover velocity and quickest days-to-stockout."
-* **Box 4 [Slow-Moving Inventory Alert Panel]**: "Identifies low-turnover footwear tying up capital, recommending discount promotions."
-* **Box 5 [Automated Reorder Suggestions Table]**: "Displays system-calculated purchase order quantities based on sales velocity and lead times."
-* **Box 6 [Export Analytics Button]**: "Exports predictive data and restocking forecasts to PDF or CSV."
+* **Box 2 [Sales Demand Forecast Chart & Scenario Bands]**: "Visual trend graph displaying historical sales alongside projected baseline units, framed by -15% Low Scenario and +25% High Scenario confidence spreads."
+* **Box 3 [Ensemble Confidence Metric & Formula Card]**: "Displays dynamic model confidence (75%–92%) computed from data variance, volume, and trend stability, underpinned by the 50% WMA + 30% Trend + 20% SMA ensemble formula."
+* **Box 4 [Fast-Moving Footwear Leaderboard]**: "Ranks styles with highest inventory turnover velocity and quickest days-to-stockout."
+* **Box 5 [Slow-Moving Inventory Alert Panel]**: "Identifies low-turnover footwear tying up capital, recommending targeted discount promotions."
+* **Box 6 [Automated Reorder Suggestions Table]**: "Displays system-calculated purchase order quantities based on sales velocity, lead times, and an 85% SMA safety floor."
+* **Box 7 [Export Restock Plan Button]**: "Exports predictive sales data and restocking purchase orders to CSV or printable format."
 
 #### STEPS
-1. Click **Analytics** in the left navigation sidebar.
-2. Select your desired forecast period (**7-Day** or **30-Day** forecast).
-3. Review the **Sales Demand Forecast** graph to identify which footwear styles are trending upward.
-4. Examine the **Automated Reorder Suggestions** table to identify sizes that risk stocking out before the next supplier delivery.
-5. Click **Export Restock Plan** to generate a purchase order worksheet for supplier replenishment.
+1. Click **Analytics** in the left navigation sidebar (or navigate to `http://localhost:5173/analytics`).
+2. Select your desired forecast horizon (**7-Day** or **30-Day** forecast) **(Box 1)**.
+3. Review the **Sales Demand Forecast** graph **(Box 2)**:
+   - The central trend line indicates projected baseline units calculated via the blended ensemble:
+     $$\text{Baseline} = (0.50 \times \text{WMA}) + (0.30 \times \text{Linear Trend}) + (0.20 \times \text{SMA})$$
+   - Observe the shaded area representing the **Low Scenario (-15%)** and **High Scenario (+25%)** planning corridors.
+4. Verify the **Forecast Confidence Score (Box 3)** to understand prediction reliability based on historical transaction frequency.
+5. Inspect the **Fast-Moving Leaderboard (Box 4)** to spot top-selling shoe styles before they run out of stock.
+6. Consult the **Automated Reorder Suggestions Table (Box 6)** to review suggested restocking quantities (protected by an 85% SMA safety floor to prevent under-ordering during fluctuating sales cycles).
+7. Click **Export Restock Plan (Box 7)** to generate an official procurement worksheet for footwear vendors.
 
 ---
 
 ### Section 2.26: Targeted Promotions Management Ledger
 #### Screen Description
-The Promotions Management module enables administrators to design percentage discounts, create Buy-One-Get-One (BOGO) combo deals, and broadcast automated promotional newsletters to targeted customer segments using Brevo / Gmail API integration.
+The Promotions Management module enables administrators to design percentage discounts, create Buy-One-Get-One (BOGO) combo deals, browse active/scheduled campaigns with interactive table pagination, and broadcast automated promotional newsletters to targeted customer segments using Brevo / Gmail API integration.
 
 #### Screenshot Callout Labels
 * **Box 1 [Create Campaign Button]**: "Opens the promotion campaign builder wizard."
 * **Box 2 [Active Promotions Register]**: "Table listing Campaign Name, Type, Discount Value, Date Range, Status (Active/Scheduled/Expired), and Actions."
 * **Box 3 [Send Email Blast Action Button]**: "Launches the targeted customer email broadcaster modal."
 * **Box 4 [Edit / Deactivate Campaign Buttons]**: "Modify active campaign parameters or pause discount rules."
+* **Box 5 [Status Filter Dropdown]**: "Filter promotions by state: 'All Status', 'Active', 'Scheduled', or 'Expired'."
+* **Box 6 [Table Pagination Bar]**: "Standardized pagination controls (10, 15, 25, 50 campaigns/page) with record counters and page jump navigation."
 
 #### STEPS
-1. Click **Promotions** in the left navigation sidebar.
-2. Review the active campaigns running across POS registers.
-3. Click **Create Campaign** to design a new discount promotion.
-4. Click **Send Email Blast** on an active campaign to notify customers via email.
+1. Click **Promotions** in the left navigation sidebar (or navigate to `http://localhost:5173/promotions`).
+2. Filter the campaign list using the **Status Filter (Box 5)** to focus on active or scheduled promotions.
+3. Navigate across pages using the **Table Pagination Bar (Box 6)**.
+4. Click **Create Campaign (Box 1)** to design a new discount promotion or BOGO offer.
+5. Click **Send Email Blast (Box 3)** on an active campaign to dispatch marketing flyers to registered customers.
+6. Use **Edit / Deactivate (Box 4)** to adjust discount parameters or deactivate expired promotions.
 
 ---
 
@@ -871,19 +911,19 @@ Accessible across all portals by clicking your avatar or Profile & Settings in t
 
 ### Section 3.1: Frontline Cashier POS Terminal Overview
 #### Screen Description
-The Sales Staff layout provides cashiers with a high-speed, streamlined Point of Sale terminal optimized for barcode scanning, quick size selection, and responsive customer checkout.
+The Sales Staff layout provides cashiers with a high-speed, streamlined Point of Sale terminal optimized for barcode scanning, quick size selection, automated cashier identity UUID verification (preventing database type mismatches), and responsive customer checkout.
 
 #### Screenshot Callout Labels
 * **Box 1 [Cashier Navigation Sidebar]**: "Simplified menu containing Point of Sale, Sales History, Replacement, Customers, and Profile."
-* **Box 2 [Active Cashier Banner]**: "Displays cashier name, shift station ID, and active date/time."
-* **Box 3 [Quick Search / Barcode Input Field]**: "Receives direct inputs from the barcode scanner or keyboard product lookups."
-* **Box 4 [Footwear Selection Grid]**: "Visual product cards displaying available shoe models and retail prices."
-* **Box 5 [Cart Summary Sidebar]**: "Real-time checkout cart displaying items, sizes, quantities, and subtotal."
+* **Box 2 [Active Cashier Banner & Shift Status]**: "Displays authenticated cashier display name, active station ID, verified Supabase UUID session tag, and live date/time."
+* **Box 3 [Quick Search / Barcode Input Field]**: "Receives direct laser scanner inputs or keyboard product lookups."
+* **Box 4 [Footwear Selection Grid]**: "Visual product cards displaying available shoe models, brand tags, and retail prices."
+* **Box 5 [Cart Summary Sidebar]**: "Real-time checkout cart displaying items, sizes, quantities, discount tags, and subtotal."
 
 #### STEPS
-1. Sign in with your cashier credentials. The system automatically launches the **Point of Sale** terminal.
-2. Verify that your cashier name appears in the top-left status banner.
-3. Keep the cursor focused in the barcode search field, ready to scan shoebox barcodes.
+1. Sign in with your cashier credentials (`sales`). The system automatically validates your session and launches the **Point of Sale** terminal (`http://localhost:5173/pos`).
+2. Verify that your cashier name appears in the top status banner **(Box 2)**.
+3. Keep the cursor focused in the barcode search field **(Box 3)**, ready to scan shoebox barcodes.
 
 ---
 
@@ -911,23 +951,27 @@ This workflow demonstrates how a cashier searches or scans footwear, interacts w
 
 ### Section 3.3: Customer Lookup, Tender Calculation, BOGO Promotions & Thermal Receipt
 #### Screen Description
-The checkout completion workflow calculates active discounts and BOGO promotions, computes cash tender and change, and triggers official receipt printing.
+The checkout completion workflow calculates active discounts and Buy-One-Get-One (BOGO) promotions, computes cash tender and change, validates the cashier's authentic database UUID to ensure flawless PostgreSQL transaction logging, and triggers official receipt printing.
 
 #### Screenshot Callout Labels
 * **Box 1 [Auto-Applied BOGO / Promo Discount Banner]**: "Shows automatic discounts or BOGO savings applied to the total order."
 * **Box 2 [Net Total Amount Due]**: "Displays the final balance due after subtracting all promotional discounts."
 * **Box 3 [Cash Tendered Input Field]**: "Cashier types the physical cash received from the customer."
 * **Box 4 [Change Due Display]**: "Large green numerical indicator showing exact change to return to the customer."
-* **Box 5 [Complete Checkout Button]**: "Finalizes sale, commits stock deduction, and opens the Official Receipt print modal."
-* **Box 6 [Official Thermal Receipt Modal]**: "Modal rendering the formal 58mm/80mm receipt with tax breakdown, warranty policy, and barcode."
+* **Box 5 [Complete Checkout Button]**: "Finalizes sale via atomic transaction, updates warehouse balances, and opens the Official Thermal Receipt modal."
+* **Box 6 [Official Thermal Receipt Modal]**: "Modal rendering the formal 58mm/80mm receipt with cashier name, tax breakdown, 7-day warranty policy, and barcode."
 
 #### STEPS
 1. Verify the order items in the cart. Notice that qualifying BOGO or percentage deals are automatically deducted.
-2. Announce the **Total Amount Due** to the customer.
-3. Enter the cash amount handed over by the customer into the **Amount Tendered** field (or enter GCash Reference Number if paying via digital wallet).
-4. Confirm the **Change Due** calculated by the system and hand the change to the customer.
-5. Click **Complete Payment & Checkout**.
-6. In the receipt preview modal, click **Print Receipt** to issue the thermal receipt to the customer. Click **Close** to reset the register for the next transaction.
+2. If attaching a customer loyalty profile, use the customer lookup bar or quick-enroll a walk-in shopper.
+3. Announce the **Total Amount Due** to the customer.
+4. Select payment tender:
+   - For **Cash**: Enter the amount handed over into the **Amount Tendered** field.
+   - For **GCash**: Enter the 13-digit transaction reference number.
+5. Confirm the **Change Due** calculated by the system and hand the physical change to the customer.
+6. Click **Complete Payment & Checkout**.
+   - *Behind the Scenes*: The system verifies the cashier's active session UUID (guaranteeing clean transaction recording without UUID parsing errors), atomically deducts inventory balances, and generates an official sales record.
+7. In the receipt preview modal, click **Print Receipt** to output the thermal receipt to the customer's printer. Click **Close** to reset the register for the next transaction.
 
 ---
 
