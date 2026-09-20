@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
+import { TablePagination } from './ui/table-pagination';
 import { Tag, Plus, Edit, Trash2, TrendingUp, Coins, ShoppingCart, Percent, Mail, CheckCircle, X, Check, ToggleLeft, ToggleRight, Power, Copy, RotateCcw, Calendar, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomers, useProducts, usePromotions, usePromotionsMutations, useSales } from '../../lib/hooks';
@@ -1211,9 +1212,12 @@ export function PromotionManagement() {
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'ended'>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
   const [datePreset, setDatePreset] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'custom'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   const applyDatePreset = (preset: 'all' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'custom') => {
     setDatePreset(preset);
@@ -1263,18 +1267,25 @@ export function PromotionManagement() {
   const handleResetFilters = () => {
     setStatusFilter('all');
     setSearchTerm('');
+    setSelectedTypeFilter('all');
     setDatePreset('all');
     setStartDate('');
     setEndDate('');
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
     statusFilter !== 'all' ||
+    selectedTypeFilter !== 'all' ||
     datePreset !== 'all' ||
     startDate ||
     endDate
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm, selectedTypeFilter, datePreset, startDate, endDate]);
 
   const handleDuplicatePromotion = (promo: Promotion) => {
     const today = new Date();
@@ -1315,7 +1326,12 @@ export function PromotionManagement() {
         if (p.status !== 'Ended') return false;
       }
 
-      // 2. Search Term Filter
+      // 2. Promo Type Filter
+      if (selectedTypeFilter !== 'all') {
+        if (p.discount_type !== selectedTypeFilter) return false;
+      }
+
+      // 3. Search Term Filter
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const matchesName = p.promo_name.toLowerCase().includes(q);
@@ -1324,7 +1340,7 @@ export function PromotionManagement() {
         if (!matchesName && !matchesProducts && !matchesType) return false;
       }
 
-      // 3. Date Range Filter
+      // 4. Date Range Filter
       if (startDate || endDate) {
         const fStart = startDate || '1970-01-01';
         const fEnd = endDate || '2099-12-31';
@@ -1335,7 +1351,13 @@ export function PromotionManagement() {
 
       return true;
     });
-  }, [promotions, statusFilter, searchTerm, startDate, endDate]);
+  }, [promotions, statusFilter, selectedTypeFilter, searchTerm, startDate, endDate]);
+
+  const totalPromoPages = Math.max(1, Math.ceil(displayedPromotions.length / pageSize));
+  const safePromoPage = Math.min(Math.max(1, currentPage), totalPromoPages);
+  const paginatedPromotions = useMemo(() => {
+    return displayedPromotions.slice((safePromoPage - 1) * pageSize, safePromoPage * pageSize);
+  }, [displayedPromotions, safePromoPage, pageSize]);
 
   const avgEffectiveness = promotions.filter(p => p.effectiveness > 0).reduce((sum, p) => sum + p.effectiveness, 0) / promotions.filter(p => p.effectiveness > 0).length || 0;
   const sentNotificationCount = lastNotificationBatch.filter(
@@ -1671,6 +1693,23 @@ export function PromotionManagement() {
                     className="h-8 w-36 bg-[#181824] border-[#282836] text-white text-xs px-2.5 rounded-lg cursor-pointer [color-scheme:dark]"
                   />
                 </div>
+
+                {/* Promo Type Filter */}
+                <div className="flex items-center gap-1.5 sm:ml-2">
+                  <Filter className="w-3.5 h-3.5 text-yellow-400" />
+                  <Select value={selectedTypeFilter} onValueChange={setSelectedTypeFilter}>
+                    <SelectTrigger className="h-8 w-36 bg-[#181824] border-[#282836] text-yellow-100 text-xs rounded-lg">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#15151d] border-[#282836] text-yellow-100 text-xs">
+                      <SelectItem value="all">All Promo Types</SelectItem>
+                      <SelectItem value="Percentage">Percentage</SelectItem>
+                      <SelectItem value="Fixed Amount">Fixed Amount</SelectItem>
+                      <SelectItem value="BOGO">BOGO (Buy 1 Get 1)</SelectItem>
+                      <SelectItem value="Bundle">Bundle</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="text-xs text-zinc-400">
@@ -1693,8 +1732,8 @@ export function PromotionManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayedPromotions.length > 0 ? (
-                  displayedPromotions.map((promotion) => (
+                {paginatedPromotions.length > 0 ? (
+                  paginatedPromotions.map((promotion) => (
                     <TableRow key={promotion.promo_id} className="border-[#24242F] hover:bg-white/[0.02]">
                       <TableCell className="min-w-[200px] text-center align-middle">
                         <div>
@@ -1828,6 +1867,17 @@ export function PromotionManagement() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Table Pagination */}
+          <TablePagination
+            currentPage={safePromoPage}
+            pageSize={pageSize}
+            totalItems={displayedPromotions.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[10, 15, 25, 50]}
+            unitName="campaigns"
+          />
         </CardContent>
       </Card>
 
