@@ -1,6 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
+import hashlib
+import json
 import logging
 import math
 import os
@@ -12,8 +14,9 @@ from pathlib import Path
 import re
 
 from dotenv import load_dotenv
-from flask import Flask, Response, abort, redirect, render_template, request, send_from_directory, session, url_for, g
+from flask import Flask, Response, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for, g
 from supabase import create_client
+from app_modules.auth.app_jwt import create_jwt_token, verify_jwt_token
 from app_modules.auth.app_auth_store import (
     find_auth_account as store_find_auth_account,
     generate_staff_code as store_generate_staff_code,
@@ -174,7 +177,33 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "meryl-secure-production-jwt-key-2026-secret"
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production" or not os.getenv("FLASK_DEBUG"),
+)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.brevo.com; "
+        "frame-ancestors 'self';"
+    )
+    response.headers["Content-Security-Policy"] = csp
+    return response
+
 REACT_DIST_DIR = Path(__file__).resolve().parent / "frontend" / "dist"
 REACT_ASSETS_DIR = REACT_DIST_DIR / "assets"
 
@@ -227,7 +256,6 @@ def supabase():
 
 ADMIN_CREDENTIALS = {
     "username": "admin",
-    "password": "admin123",
     "name": "Administrator",
     "role": "admin",
 }
@@ -290,7 +318,7 @@ def resolve_db_user_row(current_user=None):
             current_user.get("name") or ADMIN_CREDENTIALS["name"],
             username,
             app_role,
-            ADMIN_CREDENTIALS["password"],
+            current_user.get("password") or os.getenv("ADMIN_PASSWORD", "admin123"),
             current_user.get("status") or "active",
         )
 
@@ -649,19 +677,13 @@ def build_system_notifications(current_user=None):
 def ensure_core_role_accounts():
     if not table_exists("user"):
         return
-    defaults = [
-        ("admin", ADMIN_CREDENTIALS["name"], ADMIN_CREDENTIALS["username"], ADMIN_CREDENTIALS["password"], "active"),
-        ("sales_staff", "Sales Staff Account", "sales", "sales123", "active"),
-        ("inventory_staff", "Inventory Staff Account", "inventory", "inv123", "active"),
-    ]
-    for role, name, username, password, status in defaults:
-        existing = next(
-            (row for row in fetch_rows("user") if str(row.get("username", "")).strip().lower() == username.lower()),
-            None,
-        )
-        if existing:
-            continue
-        create_user_profile(name, username, role, password=password, status=status)
+    existing_admin = next(
+        (row for row in fetch_rows("user") if str(row.get("username", "")).strip().lower() == ADMIN_CREDENTIALS["username"].lower()),
+        None,
+    )
+    if not existing_admin:
+        admin_pw = os.getenv("ADMIN_PASSWORD", "admin123")
+        create_user_profile(ADMIN_CREDENTIALS["name"], ADMIN_CREDENTIALS["username"], "admin", password=admin_pw, status="active")
 
 
 def sync_sales_summary_entry(summary_date=None):
@@ -1050,22 +1072,8 @@ def before_request():
 # Health check endpoint (no auth required)
 @app.route("/health", methods=["GET"])
 def health_check():
-    """Health check endpoint to verify app is running and Supabase is configured."""
-    try:
-        # Try to check if Supabase is accessible
-        supabase()
-        return {
-            "status": "healthy",
-            "message": "Application is running with Supabase connected",
-            "database": "connected"
-        }, 200
-    except Exception as e:
-        return {
-            "status": "degraded",
-            "message": "Application is running but Supabase is not configured",
-            "database": "disconnected",
-            "error": str(e)
-        }, 200  # Still return 200 so the app is considered alive
+    """Sanitized health check endpoint without leaking internal database topology."""
+    return {"status": "healthy"}, 200
 
 
 # Error handler for Supabase initialization failures
@@ -1525,27 +1533,124 @@ def build_customer_lookup():
     return customer_build_lookup(fetch_rows=fetch_rows)
 
 
+def verify_credentials_server(identifier, password):
+    clean_identifier = str(identifier or "").strip().lower()
+    clean_password = str(password or "").strip()
+    if not clean_identifier or not clean_password:
+        return None
+
+    # 1. Try Supabase login_user RPC
+    try:
+        rpc_res = supabase().rpc("login_user", {
+            "p_username": clean_identifier,
+            "p_password": clean_password,
+        }).execute()
+        if rpc_res and rpc_res.data:
+            data = rpc_res.data
+            if isinstance(data, dict):
+                if data.get("error") == "inactive" or str(data.get("status", "")).lower() == "inactive":
+                    raise ValueError("This account is inactive. Please contact the administrator.")
+                if data.get("user_id"):
+                    return {
+                        "user_id": str(data.get("user_id")),
+                        "name": data.get("name") or "User",
+                        "username": data.get("username") or clean_identifier,
+                        "role_name": data.get("role_name") or "Administrator",
+                        "role_id": str(data.get("role_id") or ""),
+                        "status": data.get("status") or "active",
+                        "email": data.get("email") or "",
+                        "avatar_url": data.get("avatar_url") or "",
+                    }
+    except Exception as exc:
+        if "inactive" in str(exc).lower():
+            raise
+        logger.warning(f"login_user RPC check error: {exc}")
+
+    # 2. Query user table directly with bcrypt / sha256
+    try:
+        users = supabase().table("user").select("user_id, name, username, password, role_id, status, email, avatar_url").ilike("username", clean_identifier).limit(1).execute().data or []
+        if not users:
+            users = supabase().table("user").select("user_id, name, username, password, role_id, status, email, avatar_url").ilike("email", clean_identifier).limit(1).execute().data or []
+        if users:
+            row = users[0]
+            status = str(row.get("status") or "active").lower()
+            if status in {"inactive", "disabled", "deactivated"}:
+                raise ValueError("This account is inactive. Please contact the administrator.")
+
+            db_pw = str(row.get("password") or "")
+            matched = False
+            if db_pw.startswith("$2"):
+                try:
+                    import bcrypt
+                    matched = bcrypt.checkpw(clean_password.encode("utf-8"), db_pw.encode("utf-8"))
+                except Exception:
+                    pass
+            if not matched:
+                sha = hashlib.sha256(clean_password.encode("utf-8")).hexdigest()
+                matched = (db_pw == clean_password) or (db_pw == sha)
+
+            if matched:
+                role_id = row.get("role_id")
+                role_name = "Administrator"
+                if role_id:
+                    role_rows = supabase().table("role").select("role_name").eq("role_id", role_id).limit(1).execute().data or []
+                    if role_rows:
+                        role_name = role_rows[0].get("role_name") or "Administrator"
+
+                return {
+                    "user_id": str(row.get("user_id")),
+                    "name": row.get("name") or "User",
+                    "username": row.get("username") or clean_identifier,
+                    "role_name": role_name,
+                    "role_id": str(role_id or ""),
+                    "status": row.get("status") or "active",
+                    "email": row.get("email") or "",
+                    "avatar_url": row.get("avatar_url") or "",
+                }
+    except Exception as exc:
+        if "inactive" in str(exc).lower():
+            raise
+        logger.warning(f"Direct user table lookup error: {exc}")
+
+    # 3. Fallback to auth_accounts.json if present
+    account = find_auth_account(clean_identifier)
+    if account:
+        status = str(account.get("status") or "active").lower()
+        if status in {"inactive", "disabled", "deactivated"}:
+            raise ValueError("This account is inactive. Please contact the administrator.")
+        pw_hash = account.get("password_hash")
+        matched = (pw_hash == hash_password(clean_password)) if pw_hash else (account.get("password") == clean_password)
+        if matched:
+            role_name = format_role_label(account.get("role", "sales_staff"))
+            return {
+                "user_id": str(account.get("user_id") or account.get("staff_code") or clean_identifier),
+                "name": account.get("name") or "Staff User",
+                "username": account.get("username") or clean_identifier,
+                "role_name": role_name,
+                "role_id": str(account.get("staff_code") or ""),
+                "status": account.get("status") or "active",
+                "email": account.get("email") or "",
+                "avatar_url": "",
+            }
+
+    return None
+
+
 def authenticate_login(identifier, password):
-    normalized_identifier = identifier.strip().lower()
-    if (
-        normalized_identifier == ADMIN_CREDENTIALS["username"]
-        and password == ADMIN_CREDENTIALS["password"]
-    ):
-        return build_admin_login_payload(ADMIN_CREDENTIALS)
-
-    account = find_auth_account(normalized_identifier)
-    if not account:
+    try:
+        user_info = verify_credentials_server(identifier, password)
+        if user_info:
+            return {
+                "name": user_info["name"],
+                "username": user_info["username"],
+                "role": user_info["role_name"],
+                "email": user_info["email"],
+                "user_id": user_info["user_id"],
+                "status": user_info["status"],
+            }
+    except Exception:
         return None
-
-    if account.get("role") not in STAFF_ROLES:
-        return None
-
-    password_hash = account.get("password_hash")
-    password_match = password_hash == hash_password(password) if password_hash else account.get("password") == password
-    if not password_match:
-        return None
-
-    return build_staff_login_payload(account)
+    return None
 
 
 def build_sales_rows():
@@ -2243,16 +2348,7 @@ def api_password_reset_request():
     if email_sent:
         return {"ok": True, "message": "OTP sent. Check your registered email."}
 
-    # If running in development / local mode, provide the OTP directly so testing / development is not blocked
-    if not is_production:
-        return {
-            "ok": True,
-            "message": f"Email delivery failed ({email_error_msg}), but local development mode generated your OTP: {otp_code}",
-            "dev_otp": otp_code,
-            "warning": email_error_msg,
-        }
-
-    return {"ok": False, "error": email_error_msg or "Unable to send password reset OTP right now."}, 500
+    return {"ok": False, "error": email_error_msg or "Unable to send password reset OTP right now. Please check email settings or contact administrator."}, 500
 
 
 @app.route("/api/auth/password-reset/verify", methods=["POST"])
@@ -2319,6 +2415,149 @@ def api_password_reset_verify():
         return {"ok": False, "error": str(exc) or "Unable to reset password right now."}, 500
 
     return {"ok": True, "message": "Password updated successfully."}
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_auth_login():
+    payload = request.get_json(silent=True) or {}
+    username = str(payload.get("username") or "").strip()
+    password = str(payload.get("password") or "").strip()
+
+    if not username or not password:
+        return {"ok": False, "error": "Username and password are required."}, 400
+
+    try:
+        user_info = verify_credentials_server(username, password)
+        if not user_info:
+            return {"ok": False, "error": "Invalid username or password."}, 401
+
+        token = create_jwt_token({
+            "user_id": user_info["user_id"],
+            "username": user_info["username"],
+            "name": user_info["name"],
+            "role_name": user_info["role_name"],
+            "role_id": user_info["role_id"],
+            "email": user_info["email"],
+            "status": user_info["status"],
+            "avatar_url": user_info["avatar_url"],
+        }, expires_in_seconds=7 * 24 * 3600)
+
+        response = Response(
+            json.dumps({"ok": True, "token": token, "user": user_info}),
+            status=200,
+            mimetype="application/json",
+        )
+
+        is_secure = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+        # 1. Secure HTTP-only cookie for robust cross-tab and refresh session persistence
+        response.set_cookie(
+            "meryl_session",
+            token,
+            max_age=7 * 24 * 3600,
+            httponly=True,
+            secure=is_secure,
+            samesite="Lax",
+            path="/",
+        )
+        # 2. Companion cookie visible in browser inspection
+        response.set_cookie(
+            "meryl_token",
+            token,
+            max_age=7 * 24 * 3600,
+            httponly=False,
+            secure=is_secure,
+            samesite="Lax",
+            path="/",
+        )
+
+        session["current_user"] = {
+            "user_id": user_info["user_id"],
+            "username": user_info["username"],
+            "name": user_info["name"],
+            "role": user_info["role_name"],
+            "email": user_info["email"],
+        }
+
+        return response
+    except ValueError as val_err:
+        return {"ok": False, "error": str(val_err)}, 403
+    except Exception as exc:
+        logger.exception("API Login Error")
+        return {"ok": False, "error": "Authentication server error. Please try again."}, 500
+
+
+@app.route("/api/auth/me", methods=["GET"])
+def api_auth_me():
+    token = request.cookies.get("meryl_session") or request.cookies.get("meryl_token")
+    if not token:
+        auth_header = request.headers.get("Authorization") or ""
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header[7:].strip()
+
+    if not token:
+        return {"ok": False, "error": "No active authentication session found."}, 401
+
+    try:
+        claims = verify_jwt_token(token)
+        user_info = {
+            "user_id": claims.get("user_id"),
+            "name": claims.get("name"),
+            "username": claims.get("username"),
+            "role_name": claims.get("role_name"),
+            "role_id": claims.get("role_id"),
+            "email": claims.get("email"),
+            "status": claims.get("status", "active"),
+            "avatar_url": claims.get("avatar_url", ""),
+        }
+        return {"ok": True, "user": user_info}, 200
+    except ValueError as err:
+        return {"ok": False, "error": str(err)}, 401
+    except Exception:
+        return {"ok": False, "error": "Invalid session token"}, 401
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def api_auth_logout():
+    response = Response(
+        json.dumps({"ok": True, "message": "Logged out successfully"}),
+        status=200,
+        mimetype="application/json",
+    )
+    response.delete_cookie("meryl_session", path="/")
+    response.delete_cookie("meryl_token", path="/")
+    session.clear()
+    return response
+
+
+@app.route("/api/auth/authorize-manager", methods=["POST"])
+def api_auth_authorize_manager():
+    payload = request.get_json(silent=True) or {}
+    username = str(payload.get("username") or "").strip()
+    password = str(payload.get("password") or "").strip()
+
+    if not username or not password:
+        return {"ok": False, "error": "Manager username and password are required."}, 400
+
+    try:
+        user_info = verify_credentials_server(username, password)
+        if not user_info:
+            return {"ok": False, "error": "Invalid manager credentials."}, 401
+
+        role_lower = str(user_info.get("role_name") or "").lower()
+        if "admin" not in role_lower and "manager" not in role_lower:
+            return {"ok": False, "error": "Authorization failed. Administrator or Manager credentials required."}, 403
+
+        return {
+            "ok": True,
+            "manager": {
+                "user_id": user_info["user_id"],
+                "name": user_info["name"],
+                "username": user_info["username"],
+                "role_name": user_info["role_name"],
+            }
+        }, 200
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}, 403
 
 
 @app.route("/reports")

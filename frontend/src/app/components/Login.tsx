@@ -233,9 +233,9 @@ export function Login() {
     setNotice('');
 
     try {
-      const res: any = await requestPasswordReset(resetEmail);
+      await requestPasswordReset(resetEmail);
       setResetStep('otp');
-      setResetOtp(res?.dev_otp || '');
+      setResetOtp('');
       setResetPassword('');
       setResetConfirmPassword('');
 
@@ -251,11 +251,7 @@ export function Login() {
       setResetCooldownRemaining(60);
       sessionStorage.setItem('meryl_reset_cooldown_until', String(cooldownTime));
 
-      if (res?.dev_otp) {
-        setNotice(`OTP: ${res.dev_otp} (Testing mode: OTP provided here). Valid for 10 minutes.`);
-      } else {
-        setNotice('Verification code sent to your email! Please check your inbox and enter the 6 to 8-digit code below.');
-      }
+      setNotice('Verification code sent to your email! Please check your inbox and enter the 6 to 8-digit code below.');
     } catch (resetError) {
       const message = resetError instanceof Error ? resetError.message : 'Unable to send password reset request right now.';
 

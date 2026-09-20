@@ -50,12 +50,13 @@ async function assertUniqueUserConstraints(payload: any, excludeUserId?: string)
   }
 }
 
+const SAFE_USER_COLUMNS = "user_id, name, username, role_id, status, email, avatar_url, staff_code, created_at, updated_at, role:role(*)";
+
 async function createUserFallback(payload: any) {
   await assertUniqueUserConstraints(payload);
   const insertPayload: any = {
     name: payload.name,
     username: payload.username,
-    password: payload.password,
     role_id: payload.role_id,
     status: payload.status,
     email: payload.email,
@@ -67,14 +68,14 @@ async function createUserFallback(payload: any) {
   let { data, error } = await supabase
     .from("user")
     .insert(insertPayload)
-    .select("*, role:role(*)")
+    .select(SAFE_USER_COLUMNS)
     .single();
   if (error && isMissingStaffCodeColumn(error)) {
     delete insertPayload.staff_code;
     ({ data, error } = await supabase
       .from("user")
       .insert(insertPayload)
-      .select("*, role:role(*)")
+      .select(SAFE_USER_COLUMNS)
       .single());
   }
   if (error && isMissingAvatarUrlColumn(error)) {
@@ -82,7 +83,7 @@ async function createUserFallback(payload: any) {
     ({ data, error } = await supabase
       .from("user")
       .insert(insertPayload)
-      .select("*, role:role(*)")
+      .select(SAFE_USER_COLUMNS)
       .single());
   }
   if (error) throw error;
@@ -109,7 +110,7 @@ async function updateUserFallback(id: string, payload: any) {
     .from("user")
     .update(updatePayload)
     .eq("user_id", id)
-    .select("*, role:role(*)")
+    .select(SAFE_USER_COLUMNS)
     .single();
   if (error && isMissingStaffCodeColumn(error)) {
     delete updatePayload.staff_code;
@@ -117,7 +118,7 @@ async function updateUserFallback(id: string, payload: any) {
       .from("user")
       .update(updatePayload)
       .eq("user_id", id)
-      .select("*, role:role(*)")
+      .select(SAFE_USER_COLUMNS)
       .single());
   }
   if (error && isMissingAvatarUrlColumn(error)) {
@@ -126,7 +127,7 @@ async function updateUserFallback(id: string, payload: any) {
       .from("user")
       .update(updatePayload)
       .eq("user_id", id)
-      .select("*, role:role(*)")
+      .select(SAFE_USER_COLUMNS)
       .single());
   }
   if (error) throw error;
@@ -134,8 +135,8 @@ async function updateUserFallback(id: string, payload: any) {
 }
 
 export const usersApi = {
-  list: () => listRows("user", "*, role:role(*)", "created_at"),
-  getById: (id: string) => getRowById("user", id, "*, role:role(*)"),
+  list: () => listRows("user", SAFE_USER_COLUMNS, "created_at"),
+  getById: (id: string) => getRowById("user", id, SAFE_USER_COLUMNS),
   create: async (payload: any) => {
     await assertUniqueUserConstraints(payload);
     const { data, error } = await supabase.rpc("upsert_user", {

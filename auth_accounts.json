@@ -4,7 +4,6 @@
     "name": "Sales Staff Account",
     "username": "sales",
     "email": "alvillafuerte.chmsu@gmail.com",
-    "password": "sales123",
     "password_hash": "6bc0a63cb29c92306020c0a6bbc358cc4628db277dc06e253535e126517ad637",
     "role": "sales_staff",
     "status": "active",

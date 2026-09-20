@@ -891,7 +891,30 @@ export function PointOfSale() {
 
     setManagerVerifying(true);
     try {
-      const verifiedUser = await validateCredentials(managerUsername.trim(), managerPassword.trim());
+      let verifiedUser: any = null;
+      try {
+        const resp = await fetch("/api/auth/authorize-manager", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            username: managerUsername.trim(),
+            password: managerPassword.trim(),
+          }),
+        });
+        const data = await resp.json().catch(() => null);
+        if (resp.ok && data?.ok && data?.user) {
+          verifiedUser = data.user;
+        } else if (data?.error) {
+          toast.error(data.error);
+          setManagerVerifying(false);
+          return;
+        }
+      } catch {
+        // Fallback to validateCredentials if direct endpoint is unreachable
+        verifiedUser = await validateCredentials(managerUsername.trim(), managerPassword.trim());
+      }
+
       if (!verifiedUser || getRoleGroup(verifiedUser.role_name) !== "admin") {
         toast.error("Authorization failed. Administrator or Manager credentials required.");
         setManagerVerifying(false);

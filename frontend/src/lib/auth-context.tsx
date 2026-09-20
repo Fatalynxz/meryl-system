@@ -46,7 +46,7 @@ type AuthContextValue = {
   validateCredentials: (username: string, password: string) => Promise<AuthUser | null>;
   setCurrentUser: (user: AuthUser) => void;
   signInWithGoogle: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<{ ok?: boolean; message?: string; dev_otp?: string } | void>;
+  requestPasswordReset: (email: string) => Promise<{ ok?: boolean; message?: string } | void>;
   updatePasswordAfterRecovery: (newPassword: string) => Promise<void>;
   verifyPasswordResetOtpAndUpdate: (
     email: string,
@@ -357,6 +357,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     async function bootstrapAuth() {
+      // 1. Check server-side session cookie via /api/auth/me (enables multi-tabbing & refresh seamlessly)
+      let sessionUserFromCookie: AuthUser | null = null;
+      try {
+        const meRes = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include", // Transmit cookie across all tabs
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData?.ok && meData?.user) {
+            sessionUserFromCookie = {
+              user_id: meData.user.user_id,
+              name: meData.user.name || meData.user.username,
+              username: meData.user.username,
+              role_id: meData.user.role_id || "",
+              role_name: meData.user.role_name || "Administrator",
+              status: meData.user.status || "Active",
+              email: meData.user.email || null,
+              avatar_url: meData.user.avatar_url || undefined,
+            };
+          }
+        }
+      } catch {
+        // Network / offline fallback
+      }
+
+      if (sessionUserFromCookie && mounted) {
+        writeStoredUser(sessionUserFromCookie);
+        setUser(sessionUserFromCookie);
+        if (mounted) setLoading(false);
+        return;
+      }
+
+      // 2. Fallback to stored user in localStorage / sessionStorage if server endpoint was unreachable
       const storedUser = readStoredUser();
       if (storedUser && !isAuthorizedAppUser(storedUser)) {
         sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
@@ -408,6 +442,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     bootstrapAuth();
 
+    // Cross-tab login/logout synchronization
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === MERYL_USER_STORAGE_KEY) {
+        if (!event.newValue) {
+          setUser(null);
+        } else {
+          try {
+            const parsed = JSON.parse(event.newValue);
+            if (isAuthorizedAppUser(parsed)) {
+              setUser(parsed);
+            }
+          } catch {}
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -422,6 +473,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      window.removeEventListener("storage", handleStorageChange);
       subscription.unsubscribe();
     };
   }, [completeExternalAuth]);
@@ -738,7 +790,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanPassword = password.trim();
     if (!cleanUsername || !cleanPassword) return null;
 
-    // 1. Try Supabase RPC first
+    // 1. Primary: Authenticate securely via Server-Side API endpoint
+    // The server validates credentials against database hashes, sets secure HTTP-only cookies, and returns signed JWT
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Transmit and store cookies across all tabs
+        body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.ok && data?.user) {
+          const authUser: AuthUser = {
+            user_id: data.user.user_id,
+            name: data.user.name || cleanUsername,
+            username: data.user.username || cleanUsername,
+            role_id: data.user.role_id || "",
+            role_name: data.user.role_name || "Administrator",
+            status: data.user.status || "Active",
+            email: data.user.email || null,
+            avatar_url: data.user.avatar_url || getStoredAvatarSync({
+              userId: data.user.user_id,
+              username: data.user.username || cleanUsername,
+              email: data.user.email || null,
+            }),
+          };
+          return authUser;
+        }
+      } else {
+        const errJson = await response.json().catch(() => null);
+        if (errJson?.error && String(errJson.error).toLowerCase().includes("inactive")) {
+          throw new Error("This account is inactive. Please contact the administrator.");
+        }
+        if (response.status === 401) {
+          return null;
+        }
+      }
+    } catch (apiErr: any) {
+      if (apiErr?.message && apiErr.message.toLowerCase().includes("inactive")) {
+        throw apiErr;
+      }
+      // If backend server was temporarily unreachable, fall through to Supabase RPC login_user
+    }
+
+    // 2. Secondary fallback: Supabase RPC login_user (server-side PostgreSQL function)
     try {
       const { data, error } = await supabase.rpc("login_user", {
         p_username: cleanUsername,
@@ -750,128 +847,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (payload.error === "inactive" || String(payload.status ?? "").toLowerCase() === "inactive") {
           throw new Error("This account is inactive. Please contact the administrator.");
         }
-        const authUser = { ...(data as AuthUser) };
-        const resolvedAvatar =
-          authUser.avatar_url ||
-          getStoredAvatarSync({
-            userId: authUser.user_id,
-            username: authUser.username,
-            email: authUser.email,
-          });
-        authUser.avatar_url = resolvedAvatar;
-
-        if (authUser.avatar_url && typeof window !== "undefined") {
-          saveStoredAvatar(
-            { userId: authUser.user_id, username: authUser.username, email: authUser.email },
-            authUser.avatar_url
-          );
+        if (payload.user_id) {
+          const authUser: AuthUser = {
+            user_id: payload.user_id,
+            name: payload.name || cleanUsername,
+            username: payload.username || cleanUsername,
+            role_id: payload.role_id || "",
+            role_name: payload.role_name || "Administrator",
+            status: payload.status || "Active",
+            email: payload.email || null,
+            avatar_url: payload.avatar_url || getStoredAvatarSync({
+              userId: payload.user_id,
+              username: payload.username || cleanUsername,
+              email: payload.email || null,
+            }),
+          };
+          return authUser;
         }
-        return authUser;
       }
     } catch (rpcErr: any) {
       if (rpcErr?.message && rpcErr.message.toLowerCase().includes("inactive")) {
         throw rpcErr;
       }
-      // Ignore RPC error and fall through to direct DB lookup
     }
 
-    // 2. Direct database query fallback
-    try {
-      let users: any[] | null = null;
-      const { data: usersWithAvatar, error: avatarSelectError } = await supabase
-        .from("user")
-        .select("user_id, name, username, password, role_id, status, email, avatar_url")
-        .ilike("username", cleanUsername)
-        .limit(1);
-
-      if (avatarSelectError) {
-        const { data: fallbackUsers, error: userError } = await supabase
-          .from("user")
-          .select("user_id, name, username, password, role_id, status, email")
-          .ilike("username", cleanUsername)
-          .limit(1);
-        if (userError || !fallbackUsers || fallbackUsers.length === 0) return null;
-        users = fallbackUsers;
-      } else {
-        if (!usersWithAvatar || usersWithAvatar.length === 0) return null;
-        users = usersWithAvatar;
-      }
-
-      const row = users[0] as any;
-      const isInactive =
-        String(row.status ?? "active").trim().toLowerCase() === "inactive" ||
-        String(row.status ?? "").trim().toLowerCase() === "disabled" ||
-        String(row.status ?? "").trim().toLowerCase() === "deactivated";
-
-      const dbPassword = String(row.password ?? "");
-      const isMatch = (dbPassword === cleanPassword) || (dbPassword === password);
-
-      // Check default fallback accounts
-      const isDefaultAdmin = (cleanUsername === "admin" && (cleanPassword === "admin123" || cleanPassword === "Admin@123"));
-      const isDefaultSales = (cleanUsername === "sales" && (cleanPassword === "sales123" || cleanPassword === "Cashier@123"));
-      const isDefaultCashier1 = (cleanUsername === "cashier1" && (cleanPassword === "sales123" || cleanPassword === "Cashier@123"));
-      const isDefaultCashier2 = (cleanUsername === "cashier2" && (cleanPassword === "sales123" || cleanPassword === "Cashier@123"));
-      const isDefaultInventory = (cleanUsername === "inventory" && (cleanPassword === "inv123" || cleanPassword === "Inventory@123"));
-
-      if (isInactive) {
-        throw new Error("This account is inactive. Please contact the administrator.");
-      }
-
-      if (!isMatch && !isDefaultAdmin && !isDefaultSales && !isDefaultCashier1 && !isDefaultCashier2 && !isDefaultInventory) {
-        return null;
-      }
-
-      // Fetch role
-      let roleName = "Administrator";
-      if (row.role_id) {
-        const { data: roleRows } = await supabase
-          .from("role")
-          .select("role_name")
-          .eq("role_id", row.role_id)
-          .limit(1);
-        if (roleRows?.[0]?.role_name) {
-          roleName = roleRows[0].role_name;
-        }
-      } else {
-        if (cleanUsername.toLowerCase().includes("sales") || cleanUsername.toLowerCase().includes("cashier")) {
-          roleName = "Sales Staff";
-        } else if (cleanUsername.toLowerCase().includes("inventory")) {
-          roleName = "Inventory Staff";
-        }
-      }
-
-      const resolvedAvatar =
-        row.avatar_url ||
-        getStoredAvatarSync({
-          userId: row.user_id,
-          username: row.username || cleanUsername,
-          email: row.email || null,
-        });
-
-      if (row.avatar_url && typeof window !== "undefined") {
-        saveStoredAvatar(
-          {
-            userId: row.user_id,
-            username: row.username || cleanUsername,
-            email: row.email || null,
-          },
-          row.avatar_url
-        );
-      }
-
-      return {
-        user_id: row.user_id,
-        name: row.name || cleanUsername,
-        username: row.username || cleanUsername,
-        role_id: row.role_id || "",
-        role_name: roleName,
-        status: "Active",
-        email: row.email || null,
-        avatar_url: resolvedAvatar,
-      };
-    } catch {
-      return null;
-    }
+    return null;
   }, []);
 
   const setCurrentUser = useCallback((authUser: AuthUser) => {
@@ -999,6 +999,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         metadata: { username: user.username, role: user.role_name },
       });
     }
+
+    // Invalidate server-side cookies
+    try {
+      fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => null);
+    } catch {}
+
+    if (typeof document !== "undefined") {
+      document.cookie = "meryl_session=; Max-Age=0; path=/;";
+      document.cookie = "meryl_token=; Max-Age=0; path=/;";
+    }
+
     sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
     localStorage.removeItem(MERYL_USER_STORAGE_KEY);
     sessionStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);
