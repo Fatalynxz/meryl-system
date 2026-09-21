@@ -218,22 +218,12 @@ export function NotificationCenter() {
 
   useEffect(() => {
     try {
-      const readRaw = localStorage.getItem(READ_STORAGE_KEY);
-      const dismissedRaw = localStorage.getItem(DISMISSED_STORAGE_KEY);
-      if (readRaw) setReadIds(new Set(JSON.parse(readRaw)));
-      if (dismissedRaw) setDismissedIds(new Set(JSON.parse(dismissedRaw)));
+      localStorage.removeItem(READ_STORAGE_KEY);
+      localStorage.removeItem(DISMISSED_STORAGE_KEY);
     } catch {
-      // Ignore malformed local storage values.
+      // Ignore
     }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(Array.from(readIds)));
-  }, [readIds]);
-
-  useEffect(() => {
-    localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(Array.from(dismissedIds)));
-  }, [dismissedIds]);
 
   useEffect(() => {
     if (!isOpen) return;

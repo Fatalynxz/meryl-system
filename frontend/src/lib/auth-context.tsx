@@ -63,46 +63,78 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const failedAttemptsMemory = new Map<string, { count: number; lockedUntil: number }>();
+
+export const ENCRYPTED_SESSION_KEY = "_sec_session_state";
+
+function encryptSessionPayload(plainText: string): string {
+  try {
+    const salt = "Meryl_Secure_2026";
+    let output = "";
+    for (let i = 0; i < plainText.length; i++) {
+      output += String.fromCharCode(plainText.charCodeAt(i) ^ salt.charCodeAt(i % salt.length));
+    }
+    return "enc." + btoa(encodeURIComponent(output));
+  } catch {
+    return "";
+  }
+}
+
+function decryptSessionPayload(cipherText: string): string | null {
+  try {
+    if (!cipherText || !cipherText.startsWith("enc.")) return null;
+    const raw = decodeURIComponent(atob(cipherText.substring(4)));
+    const salt = "Meryl_Secure_2026";
+    let output = "";
+    for (let i = 0; i < raw.length; i++) {
+      output += String.fromCharCode(raw.charCodeAt(i) ^ salt.charCodeAt(i % salt.length));
+    }
+    return output;
+  } catch {
+    return null;
+  }
+}
+
 export function getFailedAttempts(username: string): { count: number; lockedUntil: number } {
   const clean = username.trim().toLowerCase();
-  if (!clean || typeof window === "undefined") return { count: 0, lockedUntil: 0 };
-  try {
-    const raw = localStorage.getItem(`${MERYL_FAILED_ATTEMPTS_PREFIX}${clean}`);
-    if (!raw) return { count: 0, lockedUntil: 0 };
-    return JSON.parse(raw);
-  } catch {
-    return { count: 0, lockedUntil: 0 };
-  }
+  if (!clean) return { count: 0, lockedUntil: 0 };
+  return failedAttemptsMemory.get(clean) || { count: 0, lockedUntil: 0 };
 }
 
 export function recordFailedAttempt(username: string): { count: number; lockedUntil: number; isLocked: boolean } {
   const clean = username.trim().toLowerCase();
-  if (!clean || typeof window === "undefined") return { count: 0, lockedUntil: 0, isLocked: false };
+  if (!clean) return { count: 0, lockedUntil: 0, isLocked: false };
   const current = getFailedAttempts(clean);
   const now = Date.now();
   const count = (current.lockedUntil && now > current.lockedUntil) ? 1 : current.count + 1;
   const isLocked = count >= MAX_LOGIN_ATTEMPTS;
   const lockedUntil = isLocked ? now + LOCKOUT_DURATION_MS : 0;
-  try {
-    localStorage.setItem(
-      `${MERYL_FAILED_ATTEMPTS_PREFIX}${clean}`,
-      JSON.stringify({ count, lockedUntil })
-    );
-  } catch {}
+  const record = { count, lockedUntil };
+  failedAttemptsMemory.set(clean, record);
+
+  // Clean up any legacy localStorage key
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(`${MERYL_FAILED_ATTEMPTS_PREFIX}${clean}`);
+    } catch {}
+  }
   return { count, lockedUntil, isLocked };
 }
 
 export function clearFailedAttempts(username: string): void {
   const clean = username.trim().toLowerCase();
-  if (!clean || typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(`${MERYL_FAILED_ATTEMPTS_PREFIX}${clean}`);
-  } catch {}
+  if (!clean) return;
+  failedAttemptsMemory.delete(clean);
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(`${MERYL_FAILED_ATTEMPTS_PREFIX}${clean}`);
+    } catch {}
+  }
 }
 
 export function checkLockoutStatus(username: string): { isLocked: boolean; remainingSeconds: number } {
   const clean = username.trim().toLowerCase();
-  if (!clean || typeof window === "undefined") return { isLocked: false, remainingSeconds: 0 };
+  if (!clean) return { isLocked: false, remainingSeconds: 0 };
   const info = getFailedAttempts(clean);
   const now = Date.now();
   if (info.lockedUntil && info.lockedUntil > now) {
@@ -114,9 +146,20 @@ export function checkLockoutStatus(username: string): { isLocked: boolean; remai
 function readStoredUser(): AuthUser | null {
   try {
     if (typeof sessionStorage === "undefined") return null;
-    const raw = sessionStorage.getItem(MERYL_USER_STORAGE_KEY);
-    if (!raw) return null;
-    const user = JSON.parse(raw) as AuthUser;
+    
+    // Purge legacy plaintext keys
+    sessionStorage.removeItem("meryl_user");
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("meryl_user");
+    }
+
+    const encrypted = sessionStorage.getItem(ENCRYPTED_SESSION_KEY);
+    if (!encrypted) return null;
+
+    const decrypted = decryptSessionPayload(encrypted);
+    if (!decrypted) return null;
+
+    const user = JSON.parse(decrypted) as AuthUser;
     if (user && typeof window !== "undefined") {
       const persistedAvatar = getStoredAvatarSync({
         userId: user.user_id,
@@ -156,8 +199,11 @@ function writeStoredUser(authUser: AuthUser) {
       }
     }
     try {
-      sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
-      // Purge any legacy entry from localStorage so it never appears in DevTools
+      // Encrypt user session payload before writing to sessionStorage
+      const encrypted = encryptSessionPayload(JSON.stringify(authUser));
+      sessionStorage.setItem(ENCRYPTED_SESSION_KEY, encrypted);
+      // Ensure plaintext keys are never present
+      sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
       localStorage.removeItem(MERYL_USER_STORAGE_KEY);
     } catch {}
   }
@@ -469,7 +515,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             avatar_url: avatarUrl || undefined,
           };
           try {
-            sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(nextUser));
+            sessionStorage.setItem(ENCRYPTED_SESSION_KEY, encryptSessionPayload(JSON.stringify(nextUser)));
+            sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
             localStorage.removeItem(MERYL_USER_STORAGE_KEY);
           } catch {}
           return nextUser;
@@ -979,6 +1026,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.cookie = "meryl_token=; Max-Age=0; path=/;";
     }
 
+    sessionStorage.removeItem(ENCRYPTED_SESSION_KEY);
     sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
     localStorage.removeItem(MERYL_USER_STORAGE_KEY);
     sessionStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);

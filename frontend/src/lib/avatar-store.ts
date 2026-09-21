@@ -295,23 +295,31 @@ export async function removeStoredAvatar(identifiers: AvatarIdentifiers): Promis
  * so that browser inspection (DevTools) stays completely clean.
  */
 export function purgeLocalStorageSensitiveData(): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
+  if (typeof window === "undefined") return;
   try {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (
-        k &&
-        (k.startsWith("meryl_avatar_") ||
-          k.startsWith("meryl_receipt_proof_") ||
-          k === "meryl_user" ||
-          k === "meryl_local_audit_log")
-      ) {
-        keysToRemove.push(k);
+    if (window.localStorage) {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.startsWith("meryl_") ||
+            k.startsWith("promotions.") ||
+            k.includes("avatar") ||
+            k.includes("receipt") ||
+            k.includes("failed_attempts") ||
+            k.includes("notifications"))
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      for (const k of keysToRemove) {
+        localStorage.removeItem(k);
       }
     }
-    for (const k of keysToRemove) {
-      localStorage.removeItem(k);
+    // Also remove any plaintext meryl_user from sessionStorage
+    if (window.sessionStorage) {
+      sessionStorage.removeItem("meryl_user");
     }
   } catch {
     // Ignore storage restrictions

@@ -567,26 +567,11 @@ export function PromotionManagement() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('promotions.hiddenRecommendationIds');
-      if (!raw) return;
-      const ids = JSON.parse(raw);
-      if (!Array.isArray(ids)) return;
-      setHiddenRecommendationIds(new Set(ids.map((id) => String(id))));
+      localStorage.removeItem('promotions.hiddenRecommendationIds');
     } catch {
-      // ignore bad stored values
+      // ignore
     }
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        'promotions.hiddenRecommendationIds',
-        JSON.stringify(Array.from(hiddenRecommendationIds)),
-      );
-    } catch {
-      // ignore local storage write failures
-    }
-  }, [hiddenRecommendationIds]);
 
   const triggerPromotionEmailNotification = async (promoId: string) => {
     const parseResult = async (response: Response) => response.json().catch(() => ({}));

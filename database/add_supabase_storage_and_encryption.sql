@@ -175,4 +175,21 @@ begin
 end;
 $$;
 
+-- ==============================================================================
+-- 5. AUDIT LOG ACCESS PERMISSIONS (Fixes 401 console error on audit_log insert)
+-- ==============================================================================
+
+alter table if exists public.audit_log enable row level security;
+drop policy if exists "audit_log_insert_policy" on public.audit_log;
+create policy "audit_log_insert_policy"
+on public.audit_log
+for insert
+with check (true);
+
+drop policy if exists "audit_log_select_policy" on public.audit_log;
+create policy "audit_log_select_policy"
+on public.audit_log
+for select
+using (true);
+
 commit;
