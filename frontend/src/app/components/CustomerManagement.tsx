@@ -254,7 +254,6 @@ export function CustomerManagement() {
                   <SelectItem value="all">All Genders</SelectItem>
                   <SelectItem value="Male">Male</SelectItem>
                   <SelectItem value="Female">Female</SelectItem>
-                  <SelectItem value="Kids">Kids</SelectItem>
                 </SelectContent>
               </Select>
             </div>
