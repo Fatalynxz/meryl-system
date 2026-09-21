@@ -114,6 +114,7 @@ function toUiStatus(value: string | null | undefined): InventoryStatus {
 
 function getProductStatusMeta(product?: UiProduct) {
   if (!product) return { label: "Not Selected", className: "border-slate-500/30 bg-slate-500/15 text-slate-200" };
+  if (!product.hasInventory) return { label: "Unconfigured", className: "border-amber-500/40 bg-amber-500/15 text-amber-200" };
   if (product.status !== "Active") return { label: "Inactive", className: "border-slate-500/30 bg-slate-500/15 text-slate-200" };
   if (isExpiredProduct(product)) return { label: "Expired", className: "border-red-500/40 bg-red-500/15 text-red-200" };
   if (Number(product.available_stock || 0) <= 0) return { label: "Out of Stock", className: "border-red-500/40 bg-red-500/15 text-red-200" };
@@ -427,6 +428,8 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
         matchesStock = product.available_stock > 0 && product.available_stock <= 10;
       } else if (selectedStockStatus === "out_of_stock") {
         matchesStock = product.available_stock <= 0;
+      } else if (selectedStockStatus === "unconfigured") {
+        matchesStock = !product.hasInventory;
       }
 
       return matchesSearch && matchesCategory && matchesBrand && matchesGender && matchesStock;
@@ -677,11 +680,15 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
         },
       });
 
-      await queryClient.invalidateQueries({ queryKey: ["products"] });
-      await queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      await queryClient.invalidateQueries({ queryKey: ["inventoryLog"] });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["products"] }),
+        queryClient.refetchQueries({ queryKey: ["inventory"] }),
+        queryClient.refetchQueries({ queryKey: ["inventoryLog"] }),
+      ]);
       toast.success("Product settings saved and inventory updated.");
-      setActiveTab("inventory");
+      if (selectedStockStatus === "out_of_stock") {
+        setSelectedStockStatus("all");
+      }
       setStockForm(defaultStockForm);
     } catch (error: any) {
       toast.error(error?.message ?? "Failed to save product settings");
@@ -1028,6 +1035,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
                   </SelectTrigger>
                   <SelectContent className="bg-[#15161d] border-[#2a2c36] text-white max-h-72">
                     <SelectItem value="all">All Stock</SelectItem>
+                    <SelectItem value="unconfigured">Unconfigured</SelectItem>
                     <SelectItem value="in_stock">In Stock (&gt;10)</SelectItem>
                     <SelectItem value="low_stock">Low Stock (1-10)</SelectItem>
                     <SelectItem value="out_of_stock">Out of Stock (0)</SelectItem>
@@ -1130,7 +1138,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
             )}
 
             {activeTab === "list" ? (
-              <ProductListTable products={paginatedProducts} onEdit={openEditProduct} />
+              <ProductListTable products={paginatedProducts} onEdit={openEditProduct} onConfigure={openSettingsForProduct} />
             ) : (
               <InventoryTable products={paginatedProducts} onConfigure={openSettingsForProduct} />
             )}
@@ -1164,7 +1172,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
   );
 }
 
-function ProductListTable({ products, onEdit }: { products: UiProduct[]; onEdit: (product: UiProduct) => void }) {
+function ProductListTable({ products, onEdit, onConfigure }: { products: UiProduct[]; onEdit: (product: UiProduct) => void; onConfigure?: (product: UiProduct) => void }) {
   return (
     <div className="border border-[#24242F] rounded-xl overflow-x-auto bg-[#111118]">
       <Table className="w-full min-w-[1040px]">
@@ -1193,7 +1201,12 @@ function ProductListTable({ products, onEdit }: { products: UiProduct[]; onEdit:
               <TableCell className="text-yellow-300 text-center whitespace-nowrap">{formatMoney(product.unit_price)}</TableCell>
               <TableCell className="text-center whitespace-nowrap">
                 <div className="flex justify-center gap-2">
-                  <Button size="sm" variant="ghost" className="text-yellow-400 hover:bg-zinc-800" onClick={() => onEdit(product)}><Edit className="w-4 h-4" /></Button>
+                  <Button size="sm" variant="ghost" title="Edit product master" className="text-yellow-400 hover:bg-zinc-800" onClick={() => onEdit(product)}><Edit className="w-4 h-4" /></Button>
+                  {onConfigure && (
+                    <Button size="sm" variant="ghost" title={product.hasInventory ? "Product settings & stock" : "Configure initial stock & pricing"} className="text-yellow-400 hover:bg-zinc-800" onClick={() => onConfigure(product)}>
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -1340,12 +1353,19 @@ function ProductSettingsPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState("all");
-  const [selectedStockFilter, setSelectedStockFilter] = useState<"all" | "in_stock" | "low_stock" | "out_of_stock" | "inactive">("all");
+  const [selectedStockFilter, setSelectedStockFilter] = useState<"all" | "in_stock" | "low_stock" | "out_of_stock" | "inactive" | "unconfigured">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState<UiProduct | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Auto-open modal if a product was selected externally (e.g. from Product List or Inventory)
+  useEffect(() => {
+    if (selectedProduct && (!activeProduct || activeProduct.product_id !== selectedProduct.product_id)) {
+      handleOpenConfigure(selectedProduct);
+    }
+  }, [selectedProduct]);
 
   // Available brands
   const availableBrands = useMemo(() => {
@@ -1405,6 +1425,8 @@ function ProductSettingsPage({
         matchesStock = stock <= 0 && !isInactive;
       } else if (selectedStockFilter === "inactive") {
         matchesStock = isInactive;
+      } else if (selectedStockFilter === "unconfigured") {
+        matchesStock = !p.hasInventory;
       }
 
       return matchesSearch && matchesCategory && matchesBrand && matchesStock;
@@ -1451,6 +1473,11 @@ function ProductSettingsPage({
     setIsSaving(true);
     try {
       await onSave();
+      // If the current stock filter would hide the newly configured item (out of stock, unconfigured, or inactive),
+      // reset it to "all" so the user immediately sees the configured product in the table!
+      if (selectedStockFilter === "out_of_stock" || selectedStockFilter === "unconfigured" || selectedStockFilter === "inactive") {
+        setSelectedStockFilter("all");
+      }
       setIsConfigDialogOpen(false);
     } finally {
       setIsSaving(false);
@@ -1580,6 +1607,7 @@ function ProductSettingsPage({
               </SelectTrigger>
               <SelectContent className="bg-[#15151d] border-[#2d2d3a] text-yellow-100">
                 <SelectItem value="all">All Stock Statuses</SelectItem>
+                <SelectItem value="unconfigured">Unconfigured (New Products)</SelectItem>
                 <SelectItem value="in_stock">In-Stock & Sellable</SelectItem>
                 <SelectItem value="low_stock">Low Stock (≤ Reorder)</SelectItem>
                 <SelectItem value="out_of_stock">Out of Stock</SelectItem>
@@ -1709,6 +1737,23 @@ function ProductSettingsPage({
                       <Package className="w-8 h-8 mx-auto mb-2 text-yellow-400/40" />
                       <p className="text-sm font-semibold">No products found matching your search.</p>
                       <p className="text-xs text-yellow-200/40 mt-1">Try clearing filters or searching for another SKU.</p>
+                      {(searchQuery || selectedCategory !== "all" || selectedBrand !== "all" || selectedStockFilter !== "all") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchQuery("");
+                            setSelectedCategory("all");
+                            setSelectedBrand("all");
+                            setSelectedStockFilter("all");
+                            setCurrentPage(1);
+                          }}
+                          className="mt-3 border-yellow-400/40 text-yellow-300 hover:bg-yellow-400/10 text-xs"
+                        >
+                          Clear all filters
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 )}
