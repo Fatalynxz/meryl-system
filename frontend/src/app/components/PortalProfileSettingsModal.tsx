@@ -32,6 +32,7 @@ import {
   getStoredAvatarAsync,
   saveStoredAvatar,
   removeStoredAvatar,
+  uploadAvatarToSupabaseStorage,
 } from "../../lib/avatar-store";
 
 interface PortalProfileSettingsModalProps {
@@ -54,6 +55,7 @@ export function PortalProfileSettingsModal({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -217,12 +219,13 @@ export function PortalProfileSettingsModal({
       return;
     }
 
+    setPendingAvatarFile(file);
     const dataUrl = await resizeImageToDataUrl(file);
     if (dataUrl) {
       setAvatarUrl(dataUrl);
       setUrlInput("");
       setShowUrlInput(false);
-      toast.success("Profile photo uploaded! Click Save Changes to apply.");
+      toast.success("Profile photo selected! Click Save Changes to upload to Supabase.");
     }
   };
 
@@ -233,6 +236,7 @@ export function PortalProfileSettingsModal({
       return;
     }
     setAvatarUrl(trimmed);
+    setPendingAvatarFile(null);
     setShowUrlInput(false);
     setProfileError("");
     toast.success("Image URL applied! Click Save Changes to apply.");
@@ -240,6 +244,7 @@ export function PortalProfileSettingsModal({
 
   const handleRemovePhoto = () => {
     setAvatarUrl("");
+    setPendingAvatarFile(null);
     setUrlInput("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     toast.info("Profile photo cleared. Click Save Changes to apply.");
@@ -263,7 +268,18 @@ export function PortalProfileSettingsModal({
     setProfileNotice("");
 
     try {
-      // 1. Check duplicate email if email was changed
+      // 1. Upload to Supabase Storage if a new file was chosen
+      let finalAvatarUrl = avatarUrl;
+      if (pendingAvatarFile && currentUser) {
+        toast.loading("Uploading avatar to Supabase Storage...", { id: "avatar-upload" });
+        const cloudUrl = await uploadAvatarToSupabaseStorage(currentUser.user_id, pendingAvatarFile);
+        toast.dismiss("avatar-upload");
+        if (cloudUrl) {
+          finalAvatarUrl = cloudUrl;
+        }
+      }
+
+      // 2. Check duplicate email if email was changed
       if (trimmedEmail && trimmedEmail !== (currentUser.email || "").toLowerCase()) {
         const { data: existingUser } = await supabase
           .from("user")
@@ -277,10 +293,10 @@ export function PortalProfileSettingsModal({
         }
       }
 
-      // 2. Update user row in database
+      // 3. Update user row in database
       const updateData: { name: string; email?: string; avatar_url?: string | null } = {
         name: trimmedName,
-        avatar_url: avatarUrl ? avatarUrl : null,
+        avatar_url: finalAvatarUrl ? finalAvatarUrl : null,
       };
       if (trimmedEmail) {
         updateData.email = trimmedEmail;
@@ -305,33 +321,35 @@ export function PortalProfileSettingsModal({
         throw new Error(dbError.message || "Failed to update profile in database.");
       }
 
-      // 3. Save or remove from persistent avatar store (IndexedDB + localStorage)
-      if (!avatarUrl && currentUser) {
+      // 4. Save or remove from persistent avatar store (IndexedDB + memoryCache)
+      if (!finalAvatarUrl && currentUser) {
         await removeStoredAvatar({
           userId: currentUser.user_id,
           username: currentUser.username,
           email: currentUser.email || undefined,
         });
-      } else if (avatarUrl && currentUser) {
+      } else if (finalAvatarUrl && currentUser) {
         await saveStoredAvatar(
           {
             userId: currentUser.user_id,
             username: currentUser.username,
             email: currentUser.email || undefined,
           },
-          avatarUrl
+          finalAvatarUrl
         );
       }
 
-      // 4. Update auth context with new profile info and avatar
+      // 5. Update auth context with new profile info and avatar
       const updatedUser = {
         ...currentUser,
         name: trimmedName,
         email: trimmedEmail || currentUser.email,
-        avatar_url: avatarUrl || undefined,
+        avatar_url: finalAvatarUrl || undefined,
       };
 
       setCurrentUser(updatedUser);
+      setPendingAvatarFile(null);
+      setAvatarUrl(finalAvatarUrl);
 
       // 4. Audit log
       await logAuditEvent({

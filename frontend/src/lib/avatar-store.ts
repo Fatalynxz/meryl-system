@@ -8,6 +8,8 @@
  * on initial page load to prevent UI flicker.
  */
 
+import { supabase } from "./supabase";
+
 export interface AvatarIdentifiers {
   userId?: string | number | null;
   username?: string | null;
@@ -318,5 +320,53 @@ export function purgeLocalStorageSensitiveData(): void {
 
 // Purge immediately on script load
 purgeLocalStorageSensitiveData();
+
+/**
+ * Upload an avatar file or image blob directly to Supabase Cloud Storage ('user-avatars' bucket)
+ * and return the public CDN URL.
+ */
+export async function uploadAvatarToSupabaseStorage(
+  userId: string,
+  fileOrBlob: File | Blob,
+  extension: string = "webp"
+): Promise<string | null> {
+  if (!userId || !fileOrBlob) return null;
+
+  try {
+    const cleanUid = normalize(userId).replace(/[^a-z0-9_-]/g, "") || "user";
+    const fileName = `${cleanUid}_${Date.now()}.${extension}`;
+    const filePath = `${cleanUid}/${fileName}`;
+
+    const contentType = (fileOrBlob as File).type || `image/${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("user-avatars")
+      .upload(filePath, fileOrBlob, {
+        upsert: true,
+        contentType,
+      });
+
+    if (uploadError) {
+      console.warn("Supabase storage avatar upload warning:", uploadError.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from("user-avatars").getPublicUrl(filePath);
+    const publicUrl = data?.publicUrl;
+
+    if (publicUrl) {
+      // Update memory cache
+      memoryCache.set(`uid:${cleanUid}`, publicUrl);
+      memoryCache.set("latest", publicUrl);
+      return publicUrl;
+    }
+
+    return null;
+  } catch (err) {
+    console.warn("Avatar upload to cloud storage failed:", err);
+    return null;
+  }
+}
+
 
 
