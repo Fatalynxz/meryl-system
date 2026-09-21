@@ -31,25 +31,23 @@ export type AuditLogEntry = {
 };
 
 const LOCAL_AUDIT_LOG_KEY = "meryl_local_audit_log";
+const memoryAuditLogs: AuditLogEntry[] = [];
+
+// Clean up any legacy localStorage entry immediately
+if (typeof window !== "undefined") {
+  try {
+    localStorage.removeItem(LOCAL_AUDIT_LOG_KEY);
+  } catch {}
+}
 
 function getLocalAuditLogs(): AuditLogEntry[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_AUDIT_LOG_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  return [...memoryAuditLogs];
 }
 
 function saveLocalAuditLog(entry: AuditLogEntry) {
-  try {
-    const logs = getLocalAuditLogs();
-    logs.unshift(entry);
-    // Keep last 200 logs locally
-    if (logs.length > 200) logs.pop();
-    localStorage.setItem(LOCAL_AUDIT_LOG_KEY, JSON.stringify(logs));
-  } catch {
-    // Ignore storage quota errors
+  memoryAuditLogs.unshift(entry);
+  if (memoryAuditLogs.length > 200) {
+    memoryAuditLogs.pop();
   }
 }
 

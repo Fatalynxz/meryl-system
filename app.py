@@ -2463,7 +2463,7 @@ def api_auth_login():
             "email": user_info["email"],
             "status": user_info["status"],
             "avatar_url": user_info["avatar_url"],
-        }, expires_in_seconds=7 * 24 * 3600)
+        }, expires_in_seconds=24 * 3600)
 
         response = Response(
             json.dumps({"ok": True, "token": token, "user": user_info}),
@@ -2472,21 +2472,19 @@ def api_auth_login():
         )
 
         is_secure = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
-        # 1. Secure HTTP-only cookie for robust cross-tab and refresh session persistence
+        # 1. Secure HTTP-only session cookie (expires on browser close)
         response.set_cookie(
             "meryl_session",
             token,
-            max_age=7 * 24 * 3600,
             httponly=True,
             secure=is_secure,
             samesite="Lax",
             path="/",
         )
-        # 2. Companion cookie visible in browser inspection
+        # 2. Companion session cookie (expires on browser close)
         response.set_cookie(
             "meryl_token",
             token,
-            max_age=7 * 24 * 3600,
             httponly=False,
             secure=is_secure,
             samesite="Lax",

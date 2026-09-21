@@ -13,6 +13,7 @@ import {
   getStoredAvatarSync,
   getStoredAvatarAsync,
   saveStoredAvatar,
+  purgeLocalStorageSensitiveData,
 } from "./avatar-store";
 
 export const MERYL_USER_STORAGE_KEY = "meryl_user";
@@ -112,9 +113,8 @@ export function checkLockoutStatus(username: string): { isLocked: boolean; remai
 
 function readStoredUser(): AuthUser | null {
   try {
-    const raw =
-      (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(MERYL_USER_STORAGE_KEY) : null) ||
-      (typeof localStorage !== "undefined" ? localStorage.getItem(MERYL_USER_STORAGE_KEY) : null);
+    if (typeof sessionStorage === "undefined") return null;
+    const raw = sessionStorage.getItem(MERYL_USER_STORAGE_KEY);
     if (!raw) return null;
     const user = JSON.parse(raw) as AuthUser;
     if (user && typeof window !== "undefined") {
@@ -157,9 +157,8 @@ function writeStoredUser(authUser: AuthUser) {
     }
     try {
       sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
-    } catch {}
-    try {
-      localStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(authUser));
+      // Purge any legacy entry from localStorage so it never appears in DevTools
+      localStorage.removeItem(MERYL_USER_STORAGE_KEY);
     } catch {}
   }
 }
@@ -357,141 +356,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     async function bootstrapAuth() {
-      // 1. Check server-side session cookie via /api/auth/me (enables multi-tabbing & refresh seamlessly)
-      let sessionUserFromCookie: AuthUser | null = null;
+      // 1. Clean any sensitive avatar, receipt, or user keys from localStorage
+      purgeLocalStorageSensitiveData();
+
+      // 2. Check tab-scoped sessionStorage
+      const storedUser = readStoredUser();
+
+      // If this tab does not have an active session (e.g. freshly opened tab or new browser session):
+      // NEVER auto-login from cookies or other tabs! Present the Login portal.
+      if (!storedUser || !isAuthorizedAppUser(storedUser)) {
+        sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+        try {
+          localStorage.removeItem(MERYL_USER_STORAGE_KEY);
+        } catch {}
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // If this tab already has a valid session (e.g. user refreshed F5 in this active tab):
+      // Immediately set user to avoid screen flash
+      if (mounted) {
+        setUser(storedUser);
+      }
+
+      // Asynchronously fetch avatar from IndexedDB (safe local storage)
+      getStoredAvatarAsync({
+        userId: storedUser.user_id,
+        username: storedUser.username,
+        email: storedUser.email,
+      }).then((asyncAvatar) => {
+        if (asyncAvatar && mounted) {
+          setUser((prev) => (prev ? { ...prev, avatar_url: asyncAvatar } : prev));
+        }
+      });
+
+      // Verify active session with backend /api/auth/me to ensure it wasn't revoked
       try {
         const meRes = await fetch("/api/auth/me", {
           method: "GET",
-          credentials: "include", // Transmit cookie across all tabs
+          credentials: "include",
         });
         if (meRes.ok) {
           const meData = await meRes.json();
           if (meData?.ok && meData?.user) {
-            sessionUserFromCookie = {
-              user_id: meData.user.user_id,
-              name: meData.user.name || meData.user.username,
-              username: meData.user.username,
-              role_id: meData.user.role_id || "",
-              role_name: meData.user.role_name || "Administrator",
-              status: meData.user.status || "Active",
-              email: meData.user.email || null,
-              avatar_url: meData.user.avatar_url || undefined,
+            const updatedUser: AuthUser = {
+              ...storedUser,
+              name: meData.user.name || storedUser.name,
+              role_name: meData.user.role_name || storedUser.role_name,
+              status: meData.user.status || storedUser.status,
+              avatar_url: meData.user.avatar_url || storedUser.avatar_url,
             };
+            writeStoredUser(updatedUser);
+            if (mounted) setUser(updatedUser);
           }
+        } else if (meRes.status === 401 || meRes.status === 403) {
+          // Cookie expired or invalidated
+          sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+          if (mounted) setUser(null);
         }
       } catch {
-        // Network / offline fallback
-      }
-
-      if (sessionUserFromCookie && mounted) {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionUserFromCookie.user_id);
-        if (!isUuid && sessionUserFromCookie.username) {
-          try {
-            const { data: userRow } = await supabase
-              .from("user")
-              .select("user_id")
-              .ilike("username", sessionUserFromCookie.username)
-              .limit(1);
-            if (userRow && userRow[0]?.user_id) {
-              sessionUserFromCookie = { ...sessionUserFromCookie, user_id: userRow[0].user_id };
-            }
-          } catch {}
-        }
-        writeStoredUser(sessionUserFromCookie);
-        setUser(sessionUserFromCookie);
-        if (mounted) setLoading(false);
-        return;
-      }
-
-      // 2. Fallback to stored user in localStorage / sessionStorage if server endpoint was unreachable
-      let storedUser = readStoredUser();
-      if (storedUser && !isAuthorizedAppUser(storedUser)) {
-        sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-        localStorage.removeItem(MERYL_USER_STORAGE_KEY);
-        clearGoogleOtpVerifiedEmail();
-      } else if (storedUser && mounted) {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storedUser.user_id);
-        if (!isUuid && storedUser.username) {
-          try {
-            const { data: userRow } = await supabase
-              .from("user")
-              .select("user_id")
-              .ilike("username", storedUser.username)
-              .limit(1);
-            if (userRow && userRow[0]?.user_id) {
-              storedUser = { ...storedUser, user_id: userRow[0].user_id };
-              writeStoredUser(storedUser);
-            }
-          } catch {}
-        }
-        setUser(storedUser);
-        getStoredAvatarAsync({
-          userId: storedUser.user_id,
-          username: storedUser.username,
-          email: storedUser.email,
-        }).then((asyncAvatar) => {
-          if (asyncAvatar && mounted) {
-            setUser((prev) => (prev ? { ...prev, avatar_url: asyncAvatar } : prev));
-          }
-        });
-
-        // Sync fresh avatar from Supabase user table across devices
-        if (storedUser.user_id) {
-          supabase
-            .from("user")
-            .select("avatar_url")
-            .eq("user_id", storedUser.user_id)
-            .limit(1)
-            .then(({ data }) => {
-              const remoteAvatar = (data?.[0] as any)?.avatar_url;
-              if (remoteAvatar && mounted) {
-                saveStoredAvatar(
-                  { userId: storedUser.user_id, username: storedUser.username, email: storedUser.email },
-                  remoteAvatar
-                );
-                setUser((prev) => (prev ? { ...prev, avatar_url: remoteAvatar } : prev));
-              }
-            })
-            .catch(() => null);
-        }
-      }
-
-      try {
-        if (!storedUser || !isAuthorizedAppUser(storedUser)) {
-          await completeExternalAuth();
-        }
-      } catch {
-        await supabase.auth.signOut();
+        // Offline resilience: keep in-tab session active
       } finally {
         if (mounted) setLoading(false);
       }
     }
 
     bootstrapAuth();
-
-    // Cross-tab login/logout synchronization (preserves independent tab sessions)
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === MERYL_USER_STORAGE_KEY) {
-        // If this tab already has its own active session in sessionStorage, keep it isolated
-        // so Cashier in Tab 1 and Admin in Tab 2 run simultaneously without collisions.
-        const currentTabUserRaw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(MERYL_USER_STORAGE_KEY) : null;
-        if (currentTabUserRaw) {
-          return;
-        }
-
-        if (!event.newValue) {
-          setUser(null);
-        } else {
-          try {
-            const parsed = JSON.parse(event.newValue);
-            if (isAuthorizedAppUser(parsed)) {
-              setUser(parsed);
-            }
-          } catch {}
-        }
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
 
     const {
       data: { subscription },
@@ -507,7 +440,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
-      window.removeEventListener("storage", handleStorageChange);
       subscription.unsubscribe();
     };
   }, [completeExternalAuth]);
@@ -538,7 +470,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
           try {
             sessionStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(nextUser));
-            localStorage.setItem(MERYL_USER_STORAGE_KEY, JSON.stringify(nextUser));
+            localStorage.removeItem(MERYL_USER_STORAGE_KEY);
           } catch {}
           return nextUser;
         }

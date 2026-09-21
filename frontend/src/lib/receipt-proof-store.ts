@@ -61,16 +61,7 @@ export async function saveReceiptProof(proof: StoredReceiptProof): Promise<void>
     memoryCache.set(`sale_${proof.salesId}`, proof);
   }
 
-  // 2. Save to localStorage (fallback & instant sync)
-  try {
-    const serialized = JSON.stringify(proof);
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}${proof.returnId}`, serialized);
-    if (proof.salesId) {
-      localStorage.setItem(`${LOCAL_STORAGE_PREFIX}sale_${proof.salesId}`, serialized);
-    }
-  } catch {
-    // If localStorage quota exceeded with large base64, proceed to IndexedDB
-  }
+
 
   // 3. Save to IndexedDB (handles large images easily)
   try {

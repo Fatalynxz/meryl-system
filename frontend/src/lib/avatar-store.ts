@@ -80,42 +80,16 @@ function openDb(): Promise<IDBDatabase | null> {
 }
 
 /**
- * Synchronous avatar retrieval from memory cache or localStorage.
- * Call this during component rendering or initial state bootstrap.
+ * Synchronous avatar retrieval from memory cache.
+ * Returns cached avatar immediately during component render without touching localStorage.
  */
 export function getStoredAvatarSync(identifiers: AvatarIdentifiers): string | undefined {
   if (typeof window === "undefined") return undefined;
 
-  const uid = normalize(identifiers.userId);
-  const uname = normalize(identifiers.username);
-  const email = normalize(identifiers.email);
-
-  // 1. Check in-memory cache
+  // Check in-memory cache
   for (const k of getCacheKeys(identifiers)) {
     const cached = memoryCache.get(k);
     if (cached) return cached;
-  }
-
-  // 2. Check localStorage with fallback patterns
-  const candidateKeys: string[] = [];
-  if (uid) candidateKeys.push(`meryl_avatar_${uid}`, `meryl_avatar_uid_${uid}`);
-  if (uname) candidateKeys.push(`meryl_avatar_${uname}`, `meryl_avatar_uname_${uname}`);
-  if (email) candidateKeys.push(`meryl_avatar_${email}`, `meryl_avatar_email_${email}`);
-  candidateKeys.push("meryl_avatar_latest");
-
-  for (const key of candidateKeys) {
-    try {
-      const val = localStorage.getItem(key);
-      if (val && val.length > 10) {
-        // Cache in memory for subsequent calls
-        for (const k of getCacheKeys(identifiers)) {
-          memoryCache.set(k, val);
-        }
-        return val;
-      }
-    } catch {
-      // LocalStorage access may be restricted in some environments
-    }
   }
 
   return undefined;
@@ -169,15 +143,6 @@ export async function getStoredAvatarAsync(identifiers: AvatarIdentifiers): Prom
               memoryCache.set(k, result);
             }
 
-            // Mirror to localStorage if size allows
-            try {
-              if (uid) localStorage.setItem(`meryl_avatar_${uid}`, result);
-              if (uname) localStorage.setItem(`meryl_avatar_${uname}`, result);
-              localStorage.setItem("meryl_avatar_latest", result);
-            } catch {
-              // Ignore localStorage quota exceeded
-            }
-
             resolve(result);
           }
           remaining--;
@@ -200,8 +165,9 @@ export async function getStoredAvatarAsync(identifiers: AvatarIdentifiers): Prom
 }
 
 /**
- * Permanently save avatar to memory, localStorage, and IndexedDB.
+ * Permanently save avatar to memory and IndexedDB.
  * Emits window event "meryl-avatar-updated" for live multi-component updates.
+ * Never pollutes localStorage with large base64 strings.
  */
 export async function saveStoredAvatar(identifiers: AvatarIdentifiers, avatarDataUrl: string): Promise<void> {
   if (!avatarDataUrl) return;
@@ -216,19 +182,7 @@ export async function saveStoredAvatar(identifiers: AvatarIdentifiers, avatarDat
   }
   memoryCache.set("latest", avatarDataUrl);
 
-  // 2. localStorage
-  if (typeof window !== "undefined") {
-    try {
-      if (uid) localStorage.setItem(`meryl_avatar_${uid}`, avatarDataUrl);
-      if (uname) localStorage.setItem(`meryl_avatar_${uname}`, avatarDataUrl);
-      if (email) localStorage.setItem(`meryl_avatar_${email}`, avatarDataUrl);
-      localStorage.setItem("meryl_avatar_latest", avatarDataUrl);
-    } catch (e) {
-      console.warn("localStorage quota exceeded or blocked; relying on IndexedDB for avatar:", e);
-    }
-  }
-
-  // 3. IndexedDB
+  // 2. IndexedDB
   const db = await openDb();
   if (db) {
     try {
@@ -253,7 +207,7 @@ export async function saveStoredAvatar(identifiers: AvatarIdentifiers, avatarDat
     }
   }
 
-  // 4. Dispatch custom event for real-time reactivity
+  // 3. Dispatch custom event for real-time reactivity
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent("meryl-avatar-updated", {
@@ -319,7 +273,7 @@ export async function removeStoredAvatar(identifiers: AvatarIdentifiers): Promis
     }
   }
 
-  // 4. Dispatch custom event
+  // 3. Dispatch custom event
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent("meryl-avatar-updated", {
@@ -333,4 +287,36 @@ export async function removeStoredAvatar(identifiers: AvatarIdentifiers): Promis
     );
   }
 }
+
+/**
+ * Purge any sensitive avatar strings or user data from localStorage
+ * so that browser inspection (DevTools) stays completely clean.
+ */
+export function purgeLocalStorageSensitiveData(): void {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (
+        k &&
+        (k.startsWith("meryl_avatar_") ||
+          k.startsWith("meryl_receipt_proof_") ||
+          k === "meryl_user" ||
+          k === "meryl_local_audit_log")
+      ) {
+        keysToRemove.push(k);
+      }
+    }
+    for (const k of keysToRemove) {
+      localStorage.removeItem(k);
+    }
+  } catch {
+    // Ignore storage restrictions
+  }
+}
+
+// Purge immediately on script load
+purgeLocalStorageSensitiveData();
+
 
