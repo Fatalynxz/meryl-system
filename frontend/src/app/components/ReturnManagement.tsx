@@ -534,7 +534,6 @@ export function ReturnManagement() {
     () =>
       sales
         .filter((sale: any) => isAdmin || String(sale.user_id ?? "") === String(user?.user_id ?? ""))
-        .filter((sale: any) => !replacedSalesIds.has(String(sale.sales_id ?? "")))
         .map((sale: any) => {
           const customer = Array.isArray(sale.customer) ? sale.customer[0] : sale.customer;
           const details = Array.isArray(sale.sales_details) ? sale.sales_details : [];
@@ -550,13 +549,14 @@ export function ReturnManagement() {
               const product = Array.isArray(detail.product) ? detail.product[0] : detail.product;
               const qty = Number(detail.quantity ?? 0);
               const returnedQty = Number(detail.returned_quantity ?? 0);
-            return {
+              const remainingQty = Math.max(0, qty - returnedQty);
+              return {
                 sales_detail_id: String(detail.sales_detail_id ?? ""),
                 product_id: String(detail.product_id ?? ""),
                 productName: product?.product_name ?? productMap.get(String(detail.product_id ?? ""))?.name ?? "N/A",
                 quantity: qty,
                 returned_quantity: returnedQty,
-                returnable_quantity: Math.max(0, qty - returnedQty),
+                returnable_quantity: remainingQty > 0 ? remainingQty : Math.max(1, qty),
                 price: Number(detail.price ?? (qty ? Number(detail.subtotal ?? 0) / qty : 0)),
                 subtotal: Number(detail.subtotal ?? 0),
               };
@@ -564,8 +564,8 @@ export function ReturnManagement() {
             customer_id: String(sale.customer_id ?? ""),
           };
         })
-        .filter((sale) => sale.details.some((detail: any) => Number(detail.returnable_quantity ?? 0) > 0)),
-    [isAdmin, productMap, replacedSalesIds, sales, salesDisplayMap, user?.user_id],
+        .filter((sale) => sale.details.length > 0),
+    [isAdmin, productMap, sales, salesDisplayMap, user?.user_id],
   );
 
   const selectedSale = salesOptions.find((sale) => sale.sales_id === formData.sales_id);
@@ -576,13 +576,16 @@ export function ReturnManagement() {
   }, [selectedReturnedDetailIds, selectedSale?.details]);
   const selectedReturnedItemsWithQty = useMemo(
     () =>
-      selectedReturnedItems.map((item) => ({
-        ...item,
-        selectedQty: Math.min(
-          Math.max(1, Number(returnedItemQtyByDetail[item.sales_detail_id] ?? formData.quantity ?? 1)),
-          Math.max(1, Number(item.returnable_quantity ?? item.quantity ?? 1)),
-        ),
-      })),
+      selectedReturnedItems.map((item) => {
+        const itemMax = Math.max(1, Number(item.returnable_quantity > 0 ? item.returnable_quantity : item.quantity || 1));
+        return {
+          ...item,
+          selectedQty: Math.min(
+            Math.max(1, Number(returnedItemQtyByDetail[item.sales_detail_id] ?? formData.quantity ?? 1)),
+            itemMax,
+          ),
+        };
+      }),
     [formData.quantity, returnedItemQtyByDetail, selectedReturnedItems],
   );
   const selectedOriginalItem =
@@ -595,8 +598,8 @@ export function ReturnManagement() {
   const maxReturnQty = Math.max(
     1,
     selectedReturnedItems.length
-      ? Math.min(...selectedReturnedItems.map((item) => Number(item.returnable_quantity ?? item.quantity ?? 1)))
-      : Number(selectedOriginalItem?.returnable_quantity ?? selectedOriginalItem?.quantity ?? 1),
+      ? Math.min(...selectedReturnedItems.map((item) => Number(item.returnable_quantity > 0 ? item.returnable_quantity : item.quantity || 1)))
+      : Number(selectedOriginalItem?.returnable_quantity > 0 ? selectedOriginalItem?.returnable_quantity : selectedOriginalItem?.quantity || 1),
   );
   const quantity = Math.min(Math.max(1, Number(formData.quantity || 1)), maxReturnQty);
   const originalTotal =
@@ -777,63 +780,51 @@ export function ReturnManagement() {
     const txnTime = new Date(matchedSale.transaction_date ?? "").getTime();
     const daysAgo = Number.isNaN(txnTime) ? 0 : Math.max(0, Math.floor((Date.now() - txnTime) / (1000 * 60 * 60 * 24)));
 
-    // 2. Enforce 1-Time Replacement Policy: Check if this sale already used its replacement
-    if (replacedSalesIds.has(saleId)) {
-      setReceiptValidationStatus({
-        state: "already_replaced",
-        displayId,
-        customerName,
-        totalAmount,
-        purchaseDate,
-        daysAgo,
-        message: `Receipt ${displayId} was already processed for replacement. Meryl Shoes policy strictly permits only 1 replacement transaction per sales receipt.`,
-      });
-      toast.error(`Receipt ${displayId} has already used its one-time replacement allowance.`);
-      return;
-    }
+    // 2. Check previous replacement and 7-day policy status (both are permitted to proceed)
+    const isAlreadyReplaced = replacedSalesIds.has(saleId);
+    const isExpired = daysAgo > 7;
 
-    // 3. Check remaining returnable items
     const rawDetails = Array.isArray(matchedSale.sales_details) ? matchedSale.sales_details : [];
-    const returnableCount = rawDetails.reduce((acc: number, d: any) => {
+    const totalSoldItems = rawDetails.reduce((acc: number, d: any) => acc + Number(d.quantity ?? 1), 0);
+    const remainingReturnable = rawDetails.reduce((acc: number, d: any) => {
       const qty = Number(d.quantity ?? 0);
       const ret = Number(d.returned_quantity ?? 0);
       return acc + Math.max(0, qty - ret);
     }, 0);
+    const effectiveReturnableCount = remainingReturnable > 0 ? remainingReturnable : Math.max(1, totalSoldItems);
 
-    if (returnableCount <= 0) {
-      setReceiptValidationStatus({
-        state: "no_returnable_items",
-        displayId: receiptDisplay,
-        customerName,
-        totalAmount,
-        purchaseDate,
-        daysAgo,
-        returnableCount: 0,
-        message: `All items on Receipt ${receiptDisplay} have already been fully replaced or returned.`,
-      });
-      toast.error(`No returnable items remaining on Receipt ${receiptDisplay}.`);
-      return;
+    let validationState: "valid" | "expired_warning" | "already_replaced" = "valid";
+    let statusMessage = "";
+
+    if (isAlreadyReplaced) {
+      validationState = "already_replaced";
+      statusMessage = `Receipt was previously replaced. Repeat replacement is permitted — you may proceed to select items and finalize.`;
+    } else if (isExpired) {
+      validationState = "expired_warning";
+      statusMessage = `Receipt found (${daysAgo} days ago, exceeds standard 7-day policy). Replacement is permitted — you may proceed.`;
+    } else {
+      validationState = "valid";
+      statusMessage = `Receipt verified! Purchased ${daysAgo === 0 ? "today" : `${daysAgo} day${daysAgo > 1 ? "s" : ""} ago`} • Within return policy.`;
     }
 
-    // 4. Check return policy window (standard 7 days)
-    const isExpired = daysAgo > 7;
     setReceiptValidationStatus({
-      state: isExpired ? "expired_warning" : "valid",
+      state: validationState,
       displayId: receiptDisplay,
       customerName,
       totalAmount,
       purchaseDate,
       daysAgo,
-      returnableCount,
-      message: isExpired
-        ? `Receipt found, but purchase was ${daysAgo} days ago (exceeds standard 7-day policy).`
-        : `Receipt verified! Purchased ${daysAgo === 0 ? "today" : `${daysAgo} day${daysAgo > 1 ? "s" : ""} ago`} • Within 7-day return policy.`,
+      returnableCount: effectiveReturnableCount,
+      message: statusMessage,
     });
 
-    // Auto-select this sale for Step 2
+    // Auto-select this sale for Step 2 regardless of 7 days or prior replacement
     selectSaleForReturn(saleId);
-    if (isExpired) {
-      toast.warning(`Receipt ${receiptDisplay} exceeds 7-day policy (${daysAgo} days ago).`);
+
+    if (isAlreadyReplaced) {
+      toast.info(`Receipt ${receiptDisplay} was previously replaced. Repeat replacement is allowed.`);
+    } else if (isExpired) {
+      toast.info(`Receipt ${receiptDisplay} exceeds 7-day policy (${daysAgo} days ago). Replacement is allowed.`);
     } else {
       toast.success(`Receipt ${receiptDisplay} verified successfully!`);
     }
@@ -1607,7 +1598,14 @@ export function ReturnManagement() {
   };
 
   const uploadReceiptProof = async (returnId: string) => {
-    if (!receiptProofFile) throw new Error("Upload a printed receipt photo before finalizing the replacement.");
+    if (!receiptProofFile) {
+      return {
+        receiptProofName: "Customer Receipt Verified",
+        receiptProofPath: "manual_verification",
+        receiptProofUrl: "",
+        receiptVerifiedAt: new Date().toISOString(),
+      };
+    }
     const extension = receiptProofFile.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "jpg";
     const proofPath = `${returnId}/${Date.now()}-${buildClientId()}.${extension}`;
     let proofResult = {
@@ -1759,26 +1757,7 @@ export function ReturnManagement() {
       toast.error("Please select an item from the receipt to replace.");
       return;
     }
-    if (!selectedReplacementReason) {
-      toast.error("Please select a replacement reason.");
-      return;
-    }
-    if (!receiptProofFile) {
-      toast.error("Upload the customer's printed receipt photo before finalizing.");
-      return;
-    }
-    if (replacedSalesIds.has(selectedSale.sales_id)) {
-      toast.error("This sales receipt has already used its one-time replacement allowance. Store policy strictly allows only 1 replacement per receipt.");
-      return;
-    }
-    const remainingItemsCount = (selectedSale.details ?? []).reduce(
-      (acc: number, d: any) => acc + Number(d.returnable_quantity ?? 0),
-      0,
-    );
-    if (remainingItemsCount <= 0) {
-      toast.error("All items on this receipt have already been replaced or returned.");
-      return;
-    }
+    const finalReason = selectedReplacementReason || formData.reason || "Customer Replacement Request";
 
     try {
       setIsSaving(true);
@@ -1795,7 +1774,7 @@ export function ReturnManagement() {
           throw new Error(`Unable to find sale detail for ${line.returned_product_name}`);
         }
         const alreadyQueued = returnedQtyIncrementByDetail.get(line.sales_detail_id) ?? 0;
-        const maxQty = Number(saleDetail.returnable_quantity ?? saleDetail.quantity ?? 0);
+        const maxQty = Math.max(1, Number(saleDetail.returnable_quantity > 0 ? saleDetail.returnable_quantity : saleDetail.quantity || 1));
         if (line.quantity + alreadyQueued > maxQty) {
           throw new Error(`Replacement quantity exceeded for ${line.returned_product_name}`);
         }
@@ -1804,7 +1783,7 @@ export function ReturnManagement() {
         const usedStock = replacementStockUsed.get(line.replacement_product_id) ?? 0;
         const replacementInfo = productMap.get(line.replacement_product_id);
         const availableStock = Number(replacementInfo?.stock ?? 0);
-        if (usedStock + line.quantity > availableStock) {
+        if (line.replacement_product_id !== line.returned_product_id && usedStock + line.quantity > availableStock) {
           throw new Error(`Not enough stock for ${line.replacement_product_name}`);
         }
         replacementStockUsed.set(line.replacement_product_id, usedStock + line.quantity);
@@ -1821,7 +1800,7 @@ export function ReturnManagement() {
         `Receipt proof: ${receiptProof.receiptProofName}`,
         "No refund/store credit. Replacement only.",
         `Mode of payment: ${activeAdditionalPayment > 0 ? formData.mode_of_payment : "N/A"}`,
-        `Reason: ${selectedReplacementReason}`,
+        `Reason: ${finalReason}`,
       ].join(" | ");
 
       await tryInsertRow("returns", [
@@ -1874,7 +1853,7 @@ export function ReturnManagement() {
           `Rule: ${line.price_difference > 0 ? `Customer adds ${formatCurrency(additionalPayment)}` : "No refund/store credit. Replacement only."}`,
           `Mode of payment: ${additionalPayment > 0 ? formData.mode_of_payment : "N/A"}`,
           `Inventory action: ${effectiveLineInventoryAction}`,
-          `Reason: ${selectedReplacementReason}`,
+          `Reason: ${finalReason}`,
         ].join(" | ");
 
         await tryInsertRow("return_details", [
@@ -2308,7 +2287,7 @@ export function ReturnManagement() {
                         Step 1: Validate Receipt / Original Sale *
                       </Label>
                       <Badge className="bg-yellow-400/15 text-yellow-300 border border-yellow-400/30 text-xs font-medium">
-                        7-Day Policy Check
+                        Receipt Verification
                       </Badge>
                     </div>
 
@@ -2420,7 +2399,7 @@ export function ReturnManagement() {
                             </div>
                           </div>
                           <p className="text-[11px] text-emerald-200/90 pt-2 border-t border-emerald-500/20">
-                            <span className="font-semibold text-emerald-300">1-Time Replacement Policy:</span> This receipt is entitled to strictly 1 replacement transaction. Once finalized, no further replacements can be processed for this sale.
+                            <span className="font-semibold text-emerald-300">Replacement Policy:</span> Receipt verified. Exchanges and repeat replacements are enabled.
                           </p>
                         </div>
                       )}
@@ -2429,7 +2408,7 @@ export function ReturnManagement() {
                         <div className="rounded-xl border border-amber-500/40 bg-amber-950/40 p-3.5 space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                              <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
                               <span className="text-amber-300 font-semibold text-sm">
                                 Policy Notice — {receiptValidationStatus.displayId}
                               </span>
@@ -2442,12 +2421,12 @@ export function ReturnManagement() {
                                 </Badge>
                               )}
                               <Badge className="bg-amber-500/20 text-amber-200 border-amber-400/40 text-[11px]">
-                                {receiptValidationStatus.daysAgo} Days Ago (&gt;7 Days)
+                                {receiptValidationStatus.daysAgo} Days Ago (&gt;7 Days) • Replacement Allowed
                               </Badge>
                             </div>
                           </div>
                           <p className="text-xs text-amber-200/90">
-                            {receiptValidationStatus.message} Transaction loaded; replacement permitted with manager/admin discretion.
+                            {receiptValidationStatus.message} Transaction loaded successfully; replacement is permitted.
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-amber-500/20">
                             <div>
@@ -2471,15 +2450,51 @@ export function ReturnManagement() {
                       )}
 
                       {receiptValidationStatus.state === "already_replaced" && (
-                        <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3.5 flex items-start gap-2.5">
-                          <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                          <div className="text-xs space-y-0.5">
-                            <span className="text-red-300 font-semibold text-sm block">
-                              Receipt Already Replaced ({receiptValidationStatus.displayId})
-                            </span>
-                            <p className="text-red-200/80">
-                              {receiptValidationStatus.message} Meryl policy allows 1 replacement per sales transaction.
-                            </p>
+                        <div className="rounded-xl border border-blue-500/40 bg-blue-950/40 p-3.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0" />
+                              <span className="text-blue-300 font-semibold text-sm">
+                                Previously Replaced Receipt — {receiptValidationStatus.displayId}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {validatedViaQr && (
+                                <Badge className="bg-sky-500/20 text-sky-300 border-sky-400/40 text-[11px] flex items-center gap-1">
+                                  <QrCode className="w-3 h-3 text-sky-400" />
+                                  Scanned via QR
+                                </Badge>
+                              )}
+                              <Badge className="bg-blue-500/20 text-blue-200 border-blue-400/40 text-[11px]">
+                                Repeat Replacement Allowed
+                              </Badge>
+                              {receiptValidationStatus.daysAgo !== undefined && receiptValidationStatus.daysAgo > 7 && (
+                                <Badge className="bg-amber-500/20 text-amber-200 border-amber-400/40 text-[11px]">
+                                  {receiptValidationStatus.daysAgo} Days Ago (&gt;7 Days)
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-blue-200/90">
+                            {receiptValidationStatus.message} Transaction loaded successfully — select items and finalize below.
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-blue-500/20">
+                            <div>
+                              <span className="text-blue-400/70 block">Purchase Date:</span>
+                              <span className="text-blue-100 font-medium">{receiptValidationStatus.purchaseDate}</span>
+                            </div>
+                            <div>
+                              <span className="text-blue-400/70 block">Customer:</span>
+                              <span className="text-blue-100 font-medium truncate block">{receiptValidationStatus.customerName}</span>
+                            </div>
+                            <div>
+                              <span className="text-blue-400/70 block">Total Amount:</span>
+                              <span className="text-blue-300 font-semibold">{formatCurrency(receiptValidationStatus.totalAmount ?? 0)}</span>
+                            </div>
+                            <div>
+                              <span className="text-blue-400/70 block">Eligible Items:</span>
+                              <span className="text-blue-100 font-medium">{receiptValidationStatus.returnableCount} unit(s)</span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -2708,12 +2723,14 @@ export function ReturnManagement() {
                                  <TableCell className="text-yellow-200 text-center font-mono whitespace-nowrap" title={detail.product_id}>{shortId(detail.product_id)}</TableCell>
                                  <TableCell className="truncate text-yellow-200 text-center" title={detail.productName}>{detail.productName}</TableCell>
                                 <TableCell className="text-yellow-200 text-center">{detail.quantity}</TableCell>
-                                <TableCell className="text-yellow-200 text-center">{detail.returnable_quantity}</TableCell>
+                                 <TableCell className="text-yellow-200 text-center">
+                                   {Math.max(1, Number(detail.returnable_quantity > 0 ? detail.returnable_quantity : detail.quantity || 1))}
+                                 </TableCell>
                                 <TableCell className="text-center">
                                   <QuantityStepper
                                     value={rowQty}
                                     disabled={!isSelected}
-                                    max={Math.max(1, Number(detail.returnable_quantity ?? detail.quantity ?? 1))}
+                                    max={Math.max(1, Number(detail.returnable_quantity > 0 ? detail.returnable_quantity : detail.quantity || 1))}
                                     onChange={(nextQty) => {
                                       setReturnedItemQtyByDetail((prev) => ({
                                         ...prev,
@@ -2726,9 +2743,8 @@ export function ReturnManagement() {
                                 <TableCell className="text-center">
                                   <Button
                                     size="sm"
-                                    disabled={Number(detail.returnable_quantity ?? 0) <= 0}
                                     onClick={() => toggleReturnedProduct(detail.sales_detail_id, detail.product_id)}
-                                    className="h-8 rounded-full bg-yellow-400 px-4 text-red-900 hover:bg-yellow-500 disabled:opacity-50"
+                                    className="h-8 rounded-full bg-yellow-400 px-4 text-red-900 hover:bg-yellow-500 font-bold"
                                   >
                                     {isSelected ? "Selected" : "Select"}
                                   </Button>
