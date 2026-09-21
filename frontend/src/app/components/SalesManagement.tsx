@@ -554,12 +554,12 @@ export function SalesManagement() {
     <div className="space-y-4">
       {/* DYNAMIC METRIC KEYCARDS: Dynamically recalculated based on active period & filters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Card 1: Revenue */}
+        {/* Card 1: Sales */}
         <Card className="bg-[#15151D] border-[#24242F] rounded-2xl">
           <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Revenue</p>
+                <p className="text-xs uppercase tracking-wider text-zinc-400 font-medium">Sales</p>
                 <p className="text-2xl font-bold text-white tracking-tight mt-1.5">
                   ₱{filteredRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
