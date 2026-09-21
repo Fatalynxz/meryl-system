@@ -1572,6 +1572,8 @@ def verify_credentials_server(identifier, password):
         users = supabase().table("user").select("user_id, name, username, password, role_id, status, email, avatar_url").ilike("username", clean_identifier).limit(1).execute().data or []
         if not users:
             users = supabase().table("user").select("user_id, name, username, password, role_id, status, email, avatar_url").ilike("email", clean_identifier).limit(1).execute().data or []
+        if not users:
+            users = supabase().table("user").select("user_id, name, username, password, role_id, status, email, avatar_url").ilike("name", clean_identifier).limit(1).execute().data or []
         if users:
             row = users[0]
             status = str(row.get("status") or "active").lower()
@@ -1598,6 +1600,10 @@ def verify_credentials_server(identifier, password):
                     if role_rows:
                         role_name = role_rows[0].get("role_name") or "Administrator"
 
+                # Sanitize avatar_url to ensure large base64 or invalid strings never get returned or placed in JWT
+                raw_avatar = str(row.get("avatar_url") or "").strip()
+                safe_avatar = raw_avatar if (raw_avatar.startswith("http://") or raw_avatar.startswith("https://")) and len(raw_avatar) < 512 and not raw_avatar.startswith("data:") else ""
+
                 return {
                     "user_id": str(row.get("user_id")),
                     "name": row.get("name") or "User",
@@ -1606,7 +1612,7 @@ def verify_credentials_server(identifier, password):
                     "role_id": str(role_id or ""),
                     "status": row.get("status") or "active",
                     "email": row.get("email") or "",
-                    "avatar_url": row.get("avatar_url") or "",
+                    "avatar_url": safe_avatar,
                 }
     except Exception as exc:
         if "inactive" in str(exc).lower():
@@ -2454,6 +2460,9 @@ def api_auth_login():
         if not user_info:
             return {"ok": False, "error": "Invalid username or password."}, 401
 
+        raw_avatar = str(user_info.get("avatar_url") or "").strip()
+        jwt_avatar = raw_avatar if (raw_avatar.startswith("http://") or raw_avatar.startswith("https://")) and len(raw_avatar) < 512 and not raw_avatar.startswith("data:") else ""
+
         token = create_jwt_token({
             "user_id": user_info["user_id"],
             "username": user_info["username"],
@@ -2462,7 +2471,7 @@ def api_auth_login():
             "role_id": user_info["role_id"],
             "email": user_info["email"],
             "status": user_info["status"],
-            "avatar_url": user_info["avatar_url"],
+            "avatar_url": jwt_avatar,
         }, expires_in_seconds=24 * 3600)
 
         response = Response(

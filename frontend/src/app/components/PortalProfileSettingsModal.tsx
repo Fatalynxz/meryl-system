@@ -294,9 +294,17 @@ export function PortalProfileSettingsModal({
       }
 
       // 3. Update user row in database
+      // Ensure we NEVER store raw base64 data URIs in the database table
+      const isCloudUrl = Boolean(
+        finalAvatarUrl &&
+        (finalAvatarUrl.startsWith("http://") || finalAvatarUrl.startsWith("https://")) &&
+        !finalAvatarUrl.startsWith("data:")
+      );
+      const dbAvatarUrl = isCloudUrl ? finalAvatarUrl : null;
+
       const updateData: { name: string; email?: string; avatar_url?: string | null } = {
         name: trimmedName,
-        avatar_url: finalAvatarUrl ? finalAvatarUrl : null,
+        avatar_url: dbAvatarUrl,
       };
       if (trimmedEmail) {
         updateData.email = trimmedEmail;

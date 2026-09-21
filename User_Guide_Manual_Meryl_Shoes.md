@@ -29,7 +29,7 @@ The Authentication Gateway is the unified, secure entry point for all store pers
    - **Administrators** &rarr; `/admin`
    - **Sales Staff / Cashiers** &rarr; `/sales`
    - **Inventory Custodians** &rarr; `/inventory`
-6. **Multi-Tab & Refresh Protection ("Key in Every Door")**: Your authenticated session is securely bound to an HTTP-only cookie. Opening new browser tabs, refreshing the page, or opening links automatically restores your verified session across all doors without requiring re-login. Automatic cross-tab storage events immediately synchronize sign-in and sign-out states across every open window.
+6. **Multi-Tab Security & Encrypted Session Protection**: To ensure strict workstation compliance and prevent unauthorized walk-up access, user sessions are protected using cryptographic XOR-salt payload encryption (`_sec_session_state`) stored in tab-scoped session memory with zero plaintext credentials or sensitive keys retained in browser storage. Freshly launched browser tabs require explicit authentication, while the active working tab seamlessly maintains its verified state across page refreshes (F5). Once authenticated, the system leverages HTML5 `BroadcastChannel` (`meryl_cross_tab_sync`) and Supabase Realtime WebSockets to synchronize stock deductions, sales orders, and promotional updates instantaneously across all open windows.
 
 ---
 
@@ -68,8 +68,8 @@ To protect store data against brute-force attacks and unauthorized credential st
 
 #### STEPS
 1. If an incorrect password is entered, the system alerts the user: *"Invalid credentials. You have X attempts remaining."*
-2. Upon the 5th consecutive failed attempt, the system automatically locks the username for a security cooldown window of 60 seconds.
-3. The interface renders a prominent red alert displaying a live countdown timer.
+2. Upon the 5th consecutive failed attempt, the system automatically locks the username for a security cooldown window of 5 minutes (300 seconds).
+3. The interface renders a prominent red alert displaying a live countdown timer ticking down the remaining seconds.
 4. Wait until the timer reaches zero before attempting to sign in again, or contact the System Administrator to request an immediate manual lockout unlock via the User Management module.
 
 ---
@@ -596,54 +596,116 @@ Opens by clicking the History icon on any customer record in the CRM table. Prov
 
 ---
 
-### Section 2.22: Replacement & Warranty Claim Management Ledger
+### Section 2.22: Replacement Management – Master Exchange Ledger & KPI Overview
 #### Screen Description
-The Replacement Management module allows administrators to inspect defective footwear returns submitted by cashiers, verify official receipts against the store's 7-day warranty policy, and approve or reject replacements.
+The Replacement Management module (`/admin/returns` or `/replacement`) provides a centralized, real-time command center for tracking customer footwear exchanges, 1:1 size swaps, and manufacturer defect replacements. It features high-level situational KPI metric cards, an omni-channel search bar, multi-attribute staff and status dropdown filters, timeframe preset pills, custom date range pickers, and a chronological exchange register with one-click audit inspection.
 
 #### Screenshot Callout Labels
-* **Box 1 [Pending Claims Table]**: "Lists incoming customer replacement tickets with Claim ID, Customer Name, Model, Defect Reason, and Submission Date."
-* **Box 2 [Warranty Receipt Verification Indicator]**: "System badge verifying whether the purchase date falls within the valid 7-day return period."
-* **Box 3 [Defect Assessment Notes]**: "Details the physical condition of the returned shoe (sole detachment, upper tear, factory defect)."
-* **Box 4 [Process Replacement Button]**: "Opens the structured 5-step return intake wizard."
-* **Box 5 [Review Claim Action Button]**: "Opens the inspection modal to view uploaded receipt proof and defect photos for managerial decision."
-* **Box 6 [Claim Status Filter Dropdown]**: "Filter replacement requests by status: 'All Status', 'Completed', or 'Pending'."
-* **Box 7 [Table Pagination Bar]**: "Interactive pagination controls (10, 15, 25, 50 tickets/page) with active record counts and page jump pills."
+* **Box 1 [Module Header & Exchange Icon]**: "Displays golden circular arrows icon with title 'Replacement Management', alongside total count pill (e.g., 'Total: 31 replacements')."
+* **Box 2 [Executive Exchange KPI Summary Cards]**: "Four real-time metrics tracking store warranty volume:
+  - **COMPLETED EXCHANGES**: Total finalized exchange records (e.g., `31 Processed exchange records`).
+  - **ITEMS REPLACED**: Gross footwear units replaced across all transactions (e.g., `32 Total shoe units exchanged`).
+  - **SIZE SWAPS**: Fit adjustments executed under 1:1 even exchange (e.g., `11 1:1 size or fit exchanges`).
+  - **DEFECTIVE / DAMAGED**: Defective or damaged footwear claims isolated from inventory (e.g., `29 Defect or damage replacements`)."
+* **Box 3 [+ Process Replacement Action Button]**: "Prominent golden action button triggering the multi-step 1:1 item exchange intake modal."
+* **Box 4 [Omni-Search Bar]**: "Real-time search field accepting Replacement IDs (e.g., `EXC-031`), Receipt numbers (`RCP-059`), Customer names, or Shoe model keywords."
+* **Box 5 [Staff & Status Filter Dropdowns]**: "Dropdown selectors to filter records by handling personnel ('All Staff', Administrators, Cashiers) and ticket lifecycle ('All Status', Completed, Pending)."
+* **Box 6 [Timeframe Preset Filter Pills]**: "One-click temporal filters ('All', 'Daily', 'Weekly', 'Monthly', 'Quarterly', 'Annually') to instantly isolate specific operational reporting cycles."
+* **Box 7 [Custom Date Range Calendar Pickers]**: "Dual date input fields ('From mm/dd/yyyy' and 'To mm/dd/yyyy') with calendar pickers for arbitrary historic date auditing."
+* **Box 8 [Live Counter Badge]**: "Displays active record matches relative to total records (e.g., 'Showing 31 of 31 replacements')."
+* **Box 9 [Replacement Master Data Table]**: "Comprehensive exchange ledger displaying: Replacement ID (`EXC-XXX`), Original Receipt # (`RCP-XXX`), Customer Name, Staff Badge Code (`ADM-001`, `CSH-001`), Handling Employee (`Administrator`, `Sales Staff`), Status Badge (`Completed`), Replacement Date, and Action controls."
+* **Box 10 [Row Action Control (Golden Eye Icon)]**: "Golden eye button on each row opening the itemized replacement audit dossier."
 
 #### STEPS
-1. Click **Replacement** in the navigation sidebar.
-2. Review the list of tickets in the claims table.
-3. Use the **Status Filter (Box 6)** to isolate pending claims awaiting managerial review.
-4. Navigate through replacement history using the **Table Pagination Bar (Box 7)**. Changing filters or search terms automatically returns the view to Page 1.
-5. Click **Review Claim (Box 5)** on any ticket to evaluate evidence and decide on disposition.
-6. To initiate a walk-in replacement directly at the administrative desk, click **Process Replacement (Box 4)**.
+1. In the left navigation sidebar, click **Replacement** (highlighted in red).
+2. Review the top KPI cards **(Box 2)** to monitor completed exchanges, total items replaced, size swaps, and defect write-offs.
+3. In the **Search Bar (Box 4)**, type a customer name, Replacement ID (e.g., `EXC-031`), or original Receipt number (e.g., `RCP-059`) for instant lookup.
+4. Filter records using the **Staff** or **Status** dropdowns **(Box 5)**, or click a timeframe pill **(Box 6)** (e.g., *Daily* or *Monthly*).
+5. To audit a specific historical period, specify the **From** and **To** dates in the calendar inputs **(Box 7)**.
+6. In the **Replacement Table (Box 9)**, verify the customer, staff handler, and green **Completed** status badge.
+7. Click the golden **Eye icon (Box 10)** in the Actions column to inspect the original receipt, replaced variant, replacement unit, and reason notes.
+8. To initiate a walk-in customer return or size swap, click the golden **+ Process Replacement (Box 3)** button.
 
 ---
 
-### Section 2.23: Process Item Replacement Modal (1:1 Same-Product Exchange)
+### Section 2.23: Process Item Replacement Modal (5-Step 1:1 Even Exchange Flow)
 #### Screen Description
-Opens when clicking the golden **Process Replacement** button in the Replacement module. Provides a structured 1:1 same-product exchange workflow adhering strictly to Meryl Shoes' store warranty policy (even exchange for sizing or defective replacement with ₱0.00 price difference, no refunds or store credit).
+Opens when clicking the "+ Process Replacement" button. Provides a structured 5-step workflow adhering strictly to Meryl Shoes' store warranty policy (1:1 even exchange for sizing or defective pairs at ₱0.00 price difference, no cash refunds or store credit). It integrates receipt validation, hardware camera QR scanning, receipt proof upload with Supabase Cloud Storage archiving, warehouse routing, replacement shoe/size selection, and replacement queue management.
 
 #### Screenshot Callout Labels
-* **Box 1 [Current Selection Summary Bar]**: "Three-column status card itemizing: 1. Sale / Receipt #, 2. Replaced Item (with original size), and 3. Replacement Variant (with new size/color)."
-* **Box 2 [Step 1: Receipt Number Validation & 7-Day Window]**: "Input to scan or type the receipt # (e.g. SALES-001 or RCP-xxx); displays green 'Within 7-Day Window' badge or policy notice if purchase exceeds 7 days."
-* **Box 3 [Receipt Proof Photo Upload]**: "Camera capture or image upload field attaching a photo of the customer's physical receipt for buyer verification."
-* **Box 4 [Replaced Item Inventory Action]**: "Selects warehouse disposition for the returned shoe: 'Defective / Not Sellable' or 'Back to Stock (Restock)'."
-* **Box 5 [Step 2: Select Replaced Product Table]**: "Lists shoes from the validated receipt; allows selecting item and setting returnable quantity via stepper."
-* **Box 6 [Step 3: Same Product Replacement & Variant Picker]**: "Displays chosen replacement unit with stock badge. Clicking 'Choose Size / Variant' opens available sizes and colors of the same shoe model."
-* **Box 7 [Step 4: Quantity Stepper (1:1 Even Exchange)]**: "Centered [- 1 +] stepper specifying quantity of pairs to exchange under 1:1 even exchange policy."
-* **Box 8 [Replacement Reason Dropdown]**: "Selects reason for exchange: 'Wrong size', 'Damaged item', 'Defective item', 'Wrong item received', or 'Others'."
-* **Box 9 [Finalize Replacement Action Button]**: "Commits the 1:1 exchange, updates warehouse stock, creates audit logs, and closes intake."
+* **Box 1 [Modal Header & Dismiss Control]**: "Modal title 'Process Item Replacement' with opposing exchange arrows icon and close button (X)."
+* **Box 2 [Current Selection Summary Status Bar]**: "Three-column status card with '0 line(s) added' pill detailing active workflow progress:
+  - **1. Sale / Receipt**: Displays selected receipt number and transaction date (or 'Not selected').
+  - **2. Replaced Item**: Displays customer's returned shoe model and original size (or 'Not selected').
+  - **3. Replacement Variant**: Displays chosen replacement unit, new size, and color (or 'Not selected')."
+* **Box 3 [Step 1: Validate Receipt / Original Sale Banner & 7-Day Policy Badge]**: "Receipt validation section featuring a golden '7-Day Policy Check' compliance pill."
+* **Box 4 [Receipt Scanner Input Bar & Action Buttons]**: "Input field accepting receipt numbers (e.g., `RCP-20260918-XXXX` or `SALES-001`) with three action buttons:
+  - **Scan Camera**: Launches the live webcam viewfinder modal to scan receipt QR codes.
+  - **Upload QR Photo**: File picker to upload a pre-captured QR code image.
+  - **Verify**: Commits receipt lookup and verifies that purchase date is within the 7-day warranty window."
+* **Box 5 [Browse All Sales Accordion Trigger]**: "'▼ Or Browse All Sales Instead' collapsible drawer allowing manual lookup from recent sales registers."
+* **Box 6 [Receipt Proof Dropzone & Cloud Upload Button]**: "Dropzone canvas with 'Upload Receipt' button to capture or attach a photo of the printed receipt, uploaded to the encrypted Supabase Cloud Storage `return-receipts` bucket."
+* **Box 7 [Replaced Item Inventory Action Dropdown]**: "Governs warehouse routing for the returned pair: 'Defective / Not Sellable' (routes to scrap/factory return) or 'Back to Stock (Restock)' (for unworn sizing swaps)."
+* **Box 8 [Step 2: Select Replaced Product Table]**: "Displays purchased items from the validated sale with columns: SKU, Product, Sold count, Replaceable quantity, Replace Qty stepper, Price, and Action selector."
+* **Box 9 [Step 3: Same Product Replacement & Size Picker]**: "Panel enforcing store policy (exchanges must be for the same shoe model). Displays the chosen replacement shoe with 'Choose Size / Variant' button to select new in-stock EU sizes (36–46)."
+* **Box 10 [Replacement Queue Table]**: "Queue register displaying items prepared for exchange: Original Item, Replacement Item / Size, Qty, Policy ('1:1 Even Exchange'), and Action delete trash icon."
+* **Box 11 [Step 4: Quantity Stepper (1:1 Even Exchange)]**: "Centered `[- 1 +]` stepper enforcing strict 1:1 replacement limit alongside '1 unit (1:1 Even Exchange)' badge."
+* **Box 12 [Replacement Reason Dropdown]**: "Mandatory reason classification: 'Wrong size', 'Damaged item', 'Defective item', 'Wrong item received', or 'Others'."
+* **Box 13 [Step 5: Add Selected Item & Finalize Replacement Action Buttons]**: "Two-tier submission controls:
+  - **Add Selected Item**: Queues the configured exchange into the replacement register.
+  - **Finalize Replacement (X items)**: Prominent golden button committing stock deductions, logging warehouse movements, and completing the transaction."
 
 #### STEPS
-1. In the Replacement module, click **Process Replacement**.
-2. **Step 1**: Enter the receipt number (e.g., `SALES-001`) and click **Verify Receipt**. The system validates the transaction within the 7-day warranty window.
-3. Click **Upload Receipt** to take or attach a photo of the printed customer receipt.
-4. Set the **Replaced Item Inventory Action** (`Defective / Not Sellable` for damaged shoes or `Back to Stock` for unworn size returns).
-5. **Step 2**: Click **Select** on the purchased shoe row being returned.
-6. **Step 3**: The system automatically selects an identical replacement pair. To exchange for a different size (e.g., EU 40 &rarr; EU 41) or colorway of the same shoe model, click **Choose Size / Variant** and select the desired in-stock option.
-7. **Step 4**: Adjust the exchange quantity using the centered **Quantity Stepper** (1:1 even exchange at ₱0.00 difference).
-8. Select the **Reason** for replacement (e.g., *Wrong size* or *Defective item*).
-9. Click **Finalize Replacement** to record the exchange and automatically update inventory stock.
+1. In the Replacement Management dashboard, click **+ Process Replacement**.
+2. **Step 1 — Validate Receipt**:
+   - In the receipt input field, scan the receipt barcode, click **Scan Camera** to scan the QR code via webcam, or type the receipt number (e.g., `RCP-059`) and click **Verify**.
+   - The system checks the transaction timestamp against the store's 7-day return policy and loads the order items.
+3. **Capture Receipt Proof**:
+   - Click **Upload Receipt** to snap a photo with the counter camera or upload an image file. The receipt image is stored in encrypted Supabase Cloud Storage.
+4. **Set Warehouse Routing**:
+   - In **Replaced Item Inventory Action**, select **Defective / Not Sellable** (for broken soles or tears) or **Back to Stock (Restock)** (for unworn size exchanges).
+5. **Step 2 — Select Replaced Product**:
+   - In the purchased products table, locate the returned shoe and click **Select**.
+6. **Step 3 — Choose Replacement Variant**:
+   - Click **Choose Size / Variant** to open available sizes and colors of the same shoe model. Select an available in-stock EU size (e.g., Size 42).
+7. **Step 4 — Quantity & Reason**:
+   - Ensure the quantity is set using the **Quantity Stepper** (`1 unit`).
+   - Open the **Reason \*** dropdown and select the reason for return (e.g., *Wrong size* or *Defective item*).
+8. **Step 5 — Queue & Finalize**:
+   - Click **Add Selected Item** to add the line to the **Replacement Queue**.
+   - Review the **Current Selection** cards at the top of the modal to ensure all details match.
+   - Click the golden **Finalize Replacement** button.
+   - The system executes the atomic inventory swap (deducting the replacement shoe and routing the returned unit), updates sales records, and confirms: *"Replacement processed successfully!"*
+
+---
+
+### Section 2.23.1: Live Camera Receipt QR Code Scanner Modal
+#### Screen Description
+Triggered by clicking the "Scan Camera" button in Step 1 of the Process Item Replacement modal. Opens a full-featured camera viewfinder modal with automated hardware camera stream initialization, targeting corner reticles, an animated laser scanning beam, focus distance tips, optical digital zoom toggles (1x, 1.5x, 2x), and a manual receipt number verification fallback.
+
+#### Screenshot Callout Labels
+* **Box 1 [Scanner Modal Header]**: "Modal title 'Scan Receipt QR Code' with yellow QR icon, subtitle instructions, and dismiss button (X)."
+* **Box 2 [Webcam Focus Tip Guidance Banner]**: "Amber callout banner: 'Hold receipt 20–30 cm (8–12 inches) away so it stays in sharp focus. If the QR code looks small, use the 1.5x / 2x Zoom buttons below.'"
+* **Box 3 [Live Camera Viewfinder Frame]**: "High-framerate video stream container with glowing yellow targeting corner reticles framing the scanning zone."
+* **Box 4 [Animated Laser Scanning Beam]**: "Horizontal yellow animated scanning line tracking across the viewfinder to guide receipt QR code alignment."
+* **Box 5 [Digital Zoom Control Toolbar]**: "Three magnification buttons ('ZOOM: 1x, 1.5x, 2x') allowing cashiers to zoom in on smaller printed thermal QR codes without moving the receipt closer."
+* **Box 6 [Manual Receipt Number Verification Fallback]**: "Text field ('e.g. RCP-20260918-9374 or 9374') and golden 'Verify' button to type the receipt number directly if the QR code is smudged or creased."
+* **Box 7 [Upload Receipt Photo Instead Button]**: "Alternative button to select a pre-captured photo of the receipt from the local workstation."
+* **Box 8 [Cancel Dismiss Button]**: "Closes the camera scanner modal and returns to the Process Item Replacement dialog."
+
+#### STEPS
+1. In Step 1 of the Process Item Replacement modal, click **Scan Camera**.
+2. When prompted by your web browser, allow camera access (pre-configured via system Permissions-Policy `camera=(self)`).
+3. The live webcam feed activates inside the targeting reticle **(Box 3)** with the animated laser scanning line **(Box 4)**.
+4. Hold the customer's printed thermal receipt approximately **20–30 cm (8–12 inches)** in front of the lens.
+5. If the QR code appears too small or blurry on screen:
+   - Click the **1.5x** or **2x** button in the **ZOOM** toolbar **(Box 5)** to enlarge the image digitally.
+6. Center the QR code within the yellow corner brackets. The scanner automatically detects and decodes the QR token in real time.
+7. Upon successful scan, an audio confirmation chime sounds, the modal closes automatically, and the receipt number is instantly populated and validated in Step 1.
+8. *Fallback Options*:
+   - If the receipt QR code is torn, stained, or unreadable, type the numeric receipt digits into the **Manual Input** field **(Box 6)** and click **Verify**.
+   - Or click **Upload Receipt Photo Instead (Box 7)** to upload an image from disk.
+   - Click **Cancel (Box 8)** at any time to return to the previous screen.
 
 ---
 
@@ -862,7 +924,7 @@ Opens when clicking Reset Password on a staff account. Allows administrators to 
 
 ### Section 2.34: System Security & Activity Audit Trail Inspector
 #### Screen Description
-The Security & Audit Log module provides a tamper-evident, chronological trail of all critical system actions, failed logins, manager overrides, inventory adjustments, and price modifications.
+The Security & Audit Log module provides a tamper-evident, chronological trail of all critical system actions, failed logins, manager overrides, inventory adjustments, and price modifications. Backed by PostgreSQL Row-Level Security (RLS) policies and pgcrypto AES-256 field-level encryption for sensitive customer and transaction data, the audit trail ensures compliance with enterprise data privacy standards.
 
 #### Screenshot Callout Labels
 * **Box 1 [Security Event Filter Bar]**: "Filter logs by Event Type (Logins, Failed Attempts, Price Overrides, Order Voids), User, or Date."
@@ -881,23 +943,23 @@ The Security & Audit Log module provides a tamper-evident, chronological trail o
 
 ### Section 2.35: User Profile Customization & Avatar Upload Modal
 #### Screen Description
-Accessible across all portals by clicking your avatar or Profile & Settings in the bottom-left sidebar or top-right user menu. Allows users to upload profile pictures, update display names, and change passwords using email OTP verification.
+Accessible across all portals by clicking your avatar or Profile & Settings in the bottom-left sidebar or top-right user menu. Allows users to upload profile pictures, update display names, and change passwords using email OTP verification. Profile images are uploaded directly to the Supabase Cloud Storage `user-avatars` bucket with public CDN delivery, client-side auto-downscaling to 512×512, IndexedDB persistence, and zero plaintext data in localStorage.
 
 #### Screenshot Callout Labels
 * **Box 1 [Settings Tabs (My Profile / Security & Credentials)]**: "Switch between personal profile details and password security."
 * **Box 2 [Current Avatar Preview & Initial Fallback]**: "Displays active profile photo; falls back to a sleek colored circle with the user's initial if no photo is set."
-* **Box 3 [Upload Photo Button & Auto-Downscaler]**: "Upload image from computer (PNG, JPG, WEBP); automatically resizes and compresses up to 512×512 JPEG for rapid loading."
+* **Box 3 [Upload Photo Button & Auto-Downscaler]**: "Upload image from computer (PNG, JPG, WEBP); automatically resizes and compresses to 512×512 WebP/JPEG, streaming directly to Supabase Cloud Storage."
 * **Box 4 [Remove Photo Button]**: "Clears uploaded picture and restores the default initial badge."
 * **Box 5 [Display Name & Email Fields]**: "Update your profile full name and registered contact email address."
-* **Box 6 [Save Changes Button (Persistent Sync)]**: "Commits updates to Supabase, IndexedDB, and localStorage so your profile picture persists permanently even after closing browser tabs."
+* **Box 6 [Save Changes Button (Cloud Storage Sync)]**: "Commits updates to Supabase Cloud Storage, database `avatar_url`, and IndexedDB with zero plaintext in `localStorage`, guaranteeing avatar persistence across all devices and sessions."
 * **Box 7 [Security Tab: Request OTP & Reset Password]**: "Request a 6 to 8-digit OTP sent to your email to authorize self-service password updates with live countdown and 60s cooldown."
 
 #### STEPS
 1. Click your user avatar or **Profile & Settings** in the sidebar.
 2. In the **My Profile** tab:
-   - Click **Upload Photo** and select an image from your computer. The system automatically optimizes and downscales the photo to 512×512.
+   - Click **Upload Photo** and select an image from your computer. The system automatically optimizes and downscales the photo to 512×512 and uploads it to Supabase Cloud Storage.
    - Edit your **Full Name** or **Email Address** if needed.
-   - Click **Save Changes**. Your new profile picture appears instantly across top bars, sidebars, and persists across browser tab closes and re-logins.
+   - Click **Save Changes**. Your new profile picture appears instantly across top bars, sidebars, and persists across browser tab closes, refreshes, and multi-device sessions.
 3. In the **Security & Credentials** tab:
    - Click **Send Verification Code** to dispatch an OTP to your email.
    - Enter the 6 to 8-digit code received.
@@ -1002,7 +1064,7 @@ The Replacement Intake module enables cashiers to record defective shoe returns 
 * **Box 1 [Process Replacement Button]**: "Opens the structured 5-step return intake modal."
 * **Box 2 [Receipt Number & 7-Day Policy Check]**: "Input to validate purchase date against 7-day warranty period."
 * **Box 3 [Defect Reason Dropdown & Notes]**: "Select defect: Sole Detachment, Broken Stitching, Upper Material Tear, or Sizing Exchange."
-* **Box 4 [Defect Photo & Receipt Image Upload]**: "Upload image proof taken with the counter camera or smartphone."
+* **Box 4 [Defect Photo & Receipt Camera Capture / Cloud Upload]**: "Snap live proof directly with the counter camera (enabled via Permissions-Policy) or upload an image file, stored in encrypted Supabase Storage."
 * **Box 5 [Replacement Footwear Selection]**: "Choose the requested replacement style and size."
 * **Box 6 [Submit Claim & Print Voucher Button]**: "Submits claim to the Admin approval queue and prints an intake voucher for the customer."
 
@@ -1010,7 +1072,7 @@ The Replacement Intake module enables cashiers to record defective shoe returns 
 1. Click **Replacement** in the sidebar menu and click **Process Replacement**.
 2. Input the **Original Receipt Number** provided by the customer and verify that the 7-day warranty badge is green.
 3. Select the returned shoe from the receipt items.
-4. Choose the **Defect Category**, record notes, and upload photo evidence.
+4. Choose the **Defect Category**, record notes, and capture defect and receipt photo proof using the counter camera.
 5. Select the replacement shoe and size.
 6. Click **Submit Replacement Claim**. Hand the printed voucher slip to the customer and inform them that the supervisor will finalize the approval.
 

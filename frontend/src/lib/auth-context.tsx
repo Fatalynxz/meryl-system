@@ -840,9 +840,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (response.status === 401) {
           return null;
         }
+        if (response.status >= 500) {
+          throw new Error(errJson?.error || "Authentication server error. Please try again in a moment.");
+        }
       }
     } catch (apiErr: any) {
       if (apiErr?.message && apiErr.message.toLowerCase().includes("inactive")) {
+        throw apiErr;
+      }
+      if (apiErr?.message && (apiErr.message.includes("server error") || apiErr.message.includes("try again"))) {
         throw apiErr;
       }
       // If backend server was temporarily unreachable, fall through to Supabase RPC login_user
