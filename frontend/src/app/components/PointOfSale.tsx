@@ -78,6 +78,23 @@ function productVariantLabel(product: Pick<ProductVariant, "color" | "gender" | 
     .join(" / ") || "Default";
 }
 
+function getColorSwatch(colorName?: string): string {
+  if (!colorName) return "#6b7280";
+  const c = colorName.toLowerCase().trim();
+  if (c.includes("black")) return "#18181b";
+  if (c.includes("white")) return "#f4f4f5";
+  if (c.includes("red") || c.includes("crimson") || c.includes("scarlet")) return "#ef4444";
+  if (c.includes("green") || c.includes("olive") || c.includes("lime") || c.includes("grinch")) return "#22c55e";
+  if (c.includes("blue") || c.includes("navy") || c.includes("royal")) return "#3b82f6";
+  if (c.includes("yellow") || c.includes("gold")) return "#eab308";
+  if (c.includes("orange")) return "#f97316";
+  if (c.includes("purple") || c.includes("violet")) return "#a855f7";
+  if (c.includes("pink") || c.includes("rose")) return "#ec4899";
+  if (c.includes("gray") || c.includes("grey") || c.includes("silver")) return "#9ca3af";
+  if (c.includes("brown") || c.includes("tan") || c.includes("beige")) return "#92400e";
+  return c;
+}
+
 function isExpiredInventoryDate(value?: string | null) {
   const date = String(value ?? "").slice(0, 10);
   if (!date) return false;
@@ -398,12 +415,12 @@ export function PointOfSale() {
   type SearchShoeModel = {
     key: string;
     product_name: string;
+    color: string;
     brand: string;
     category: string;
     image_url?: string;
     price: number;
     total_stock: number;
-    colors: string[];
     sizes: string[];
     variants: ProductVariant[];
   };
@@ -411,33 +428,46 @@ export function PointOfSale() {
   const sellableShoeModels = useMemo<SearchShoeModel[]>(() => {
     const map = new Map<string, SearchShoeModel>();
     for (const v of sellableProductInventory) {
-      const key = v.product_name;
+      const colorVal = (v.color && v.color !== "N/A" && v.color !== "Default") ? v.color.trim() : "Standard";
+      // Separate each color variant into its own row so sizes stay within that colorway
+      const key = `${v.product_name}:::${colorVal}`;
       if (!map.has(key)) {
         map.set(key, {
           key,
           product_name: v.product_name,
+          color: colorVal,
           brand: v.brand,
           category: v.category,
           image_url: v.image_url,
           price: v.price,
           total_stock: 0,
-          colors: [],
           sizes: [],
           variants: [],
         });
       }
       const item = map.get(key)!;
       item.total_stock += Number(v.stock_quantity || 0);
-      if (v.image_url && !item.image_url) item.image_url = v.image_url;
-      if (v.price && (!item.price || item.price <= 0)) item.price = v.price;
-      if (v.color && v.color !== "N/A" && v.color !== "Default" && !item.colors.includes(v.color)) {
-        item.colors.push(v.color);
+      // Prefer variant image if available
+      if (v.image_url && (!item.image_url || item.image_url === "")) {
+        item.image_url = v.image_url;
       }
+      if (v.price && (!item.price || item.price <= 0)) item.price = v.price;
       if (v.size && v.size !== "N/A" && v.size !== "Default" && !item.sizes.includes(v.size)) {
         item.sizes.push(v.size);
       }
       item.variants.push(v);
     }
+
+    // Sort sizes naturally / numerically within each colorway
+    for (const item of map.values()) {
+      item.sizes.sort((a, b) => {
+        const numA = parseFloat(a);
+        const numB = parseFloat(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localeCompare(b);
+      });
+    }
+
     return Array.from(map.values());
   }, [sellableProductInventory]);
 
@@ -452,9 +482,9 @@ export function PointOfSale() {
     return source.filter((m) =>
       [
         m.product_name,
+        m.color !== "Standard" ? m.color : "",
         m.brand,
         m.category,
-        m.colors.join(" "),
         m.sizes.join(" "),
         String(m.price),
       ]
@@ -844,13 +874,14 @@ export function PointOfSale() {
 
   const selectShoeModel = (model: SearchShoeModel) => {
     setSelectedProductKey(model.product_name);
-    const firstColor = model.colors[0] || (model.variants[0]?.color ?? "");
-    setSelectedColor(firstColor);
+    const colorToSet = model.color !== "Standard" ? model.color : (model.variants[0]?.color ?? "");
+    setSelectedColor(colorToSet);
     setSelectedSize("");
     setQuantity("1");
     setIsProductGridOpen(false);
     setProductSearch("");
-    toast.success(`Selected "${model.product_name}". Please pick size on the main POS screen.`);
+    const label = model.color !== "Standard" ? `"${model.product_name} (${model.color})"` : `"${model.product_name}"`;
+    toast.success(`Selected ${label}. Pick size on the main POS screen.`);
   };
 
   const fillProductSelection = (variant: ProductVariant) => {
@@ -1386,6 +1417,7 @@ function formatReceiptNumber(salesId?: string) {
                           <TableBody>
                             {filteredShoeModels.length > 0 ? (
                               filteredShoeModels.map((model) => {
+                                const isStandardColor = !model.color || model.color === "Standard";
                                 return (
                                   <TableRow
                                     key={model.key}
@@ -1394,12 +1426,28 @@ function formatReceiptNumber(salesId?: string) {
                                   >
                                     <TableCell className="py-3 text-center">
                                       <div className="flex justify-center">
-                                        <ProductPhotoPlaceholder productName={model.product_name} imageUrl={model.image_url} />
+                                        <ProductPhotoPlaceholder
+                                          productName={`${model.product_name}${!isStandardColor ? ` ${model.color}` : ""}`}
+                                          imageUrl={model.image_url}
+                                        />
                                       </div>
                                     </TableCell>
-                                    <TableCell className="py-3 text-left pl-6 font-semibold text-white truncate group-hover:text-yellow-300" title={model.product_name}>
-                                      <p className="font-bold text-sm text-white group-hover:text-yellow-300">{model.product_name}</p>
-                                      <span className="text-[11px] text-emerald-400 font-medium">{model.total_stock} pairs available</span>
+                                    <TableCell className="py-3 text-left pl-6 font-semibold text-white group-hover:text-yellow-300">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="font-bold text-sm text-white group-hover:text-yellow-300">{model.product_name}</p>
+                                        {!isStandardColor && (
+                                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold text-yellow-300 bg-yellow-400/10 border border-yellow-400/30">
+                                            <span
+                                              className="w-2 h-2 rounded-full border border-white/20 shrink-0"
+                                              style={{ backgroundColor: getColorSwatch(model.color) }}
+                                            />
+                                            {model.color}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[11px] text-emerald-400 font-medium">
+                                        {model.total_stock} pair{model.total_stock === 1 ? "" : "s"} available
+                                      </span>
                                     </TableCell>
                                     <TableCell className="py-3 text-center text-yellow-100/90 truncate" title={model.brand}>
                                       {model.brand}
@@ -1408,35 +1456,36 @@ function formatReceiptNumber(salesId?: string) {
                                       {model.category}
                                     </TableCell>
                                     <TableCell className="py-3 text-center">
-                                      <div className="flex flex-col items-center gap-1">
-                                        {model.colors.length > 0 && (
-                                          <div className="flex items-center justify-center gap-1 flex-wrap">
-                                            {model.colors.slice(0, 3).map((c) => (
-                                              <span key={c} className="text-[10px] font-medium text-white px-1.5 py-0.5 rounded bg-[#202030] border border-[#2e2e42]">
-                                                {c}
-                                              </span>
-                                            ))}
-                                            {model.colors.length > 3 && (
-                                              <span className="text-[10px] text-yellow-200/60 font-medium">+{model.colors.length - 3}</span>
-                                            )}
-                                          </div>
-                                        )}
-                                        {model.sizes.length > 0 && (
-                                          <span className="text-[10px] text-yellow-300 font-medium">
-                                            Sizes: {model.sizes.slice(0, 4).join(", ")}{model.sizes.length > 4 ? ` (+${model.sizes.length - 4})` : ""}
+                                      <div className="flex flex-col items-center gap-1.5">
+                                        {!isStandardColor ? (
+                                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium text-white bg-[#1e1e2d] border border-[#33334c] shadow-sm">
+                                            <span
+                                              className="w-2 h-2 rounded-full border border-white/20 shrink-0"
+                                              style={{ backgroundColor: getColorSwatch(model.color) }}
+                                            />
+                                            {model.color}
                                           </span>
+                                        ) : (
+                                          <span className="text-[10px] text-zinc-400 italic">Standard</span>
+                                        )}
+                                        {model.sizes.length > 0 ? (
+                                          <span className="text-xs text-yellow-300 font-medium">
+                                            Sizes: {model.sizes.join(", ")}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-red-400">Out of stock</span>
                                         )}
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-3 text-right pr-6 font-bold text-yellow-300 truncate" title={`PHP ${model.price}`}>
-                                      PHP {model.price.toLocaleString()}
+                                      PHP {model.price.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
                                     </TableCell>
                                     <TableCell className="py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                       <Button
                                         size="sm"
                                         onClick={() => selectShoeModel(model)}
                                         className="h-8 rounded-lg bg-yellow-400 px-4 font-bold text-xs text-red-950 hover:bg-yellow-500 shadow"
-                                        title="Select this shoe model to pick size on the main POS screen"
+                                        title={`Select ${model.product_name} (${model.color}) to pick size on main POS screen`}
                                       >
                                         Select
                                       </Button>
@@ -1448,7 +1497,7 @@ function formatReceiptNumber(salesId?: string) {
                               <TableRow>
                                 <TableCell colSpan={7} className="py-12 text-center text-sm text-yellow-200/60 space-y-2">
                                   <div className="text-zinc-400 font-semibold text-base">No shoe models found matching &ldquo;{productSearch}&rdquo;</div>
-                                  <div className="text-xs text-yellow-200/40">Check your spelling or try searching by brand (Nike, Adidas, Rocco) or model name.</div>
+                                  <div className="text-xs text-yellow-200/40">Check your spelling or try searching by brand (Nike, Adidas, Rocco), colorway, or model name.</div>
                                 </TableCell>
                               </TableRow>
                             )}
