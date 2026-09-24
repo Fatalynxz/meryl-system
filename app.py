@@ -12,6 +12,7 @@ import traceback
 from email.message import EmailMessage
 from pathlib import Path
 import re
+import urllib.request
 
 from dotenv import load_dotenv
 from flask import Flask, Response, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for, g
@@ -1594,32 +1595,43 @@ def verify_credentials_server(identifier, password):
     if not clean_identifier or not clean_password:
         return None
 
-    # 1. Try Supabase login_user RPC
+    # 1. Try Supabase login_user RPC via direct HTTP to bypass SDK pydantic parsing differences
+    sb_url = os.getenv("SUPABASE_URL", "https://vylmcqmxpxqkldosowrs.supabase.co").rstrip("/")
+    sb_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+    if not sb_key or sb_key.startswith("sb_publishable_"):
+        sb_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5bG1jcW14cHhxa2xkb3Nvd3JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjI0MTAsImV4cCI6MjA5MzAzODQxMH0.NxMMQZ3nFQmpYua-zsd5RNgdaA6zgBIm0XR3NDlds2c"
+
     try:
-        rpc_res = supabase().rpc("login_user", {
-            "p_username": clean_identifier,
-            "p_password": clean_password,
-        }).execute()
-        if rpc_res and rpc_res.data:
-            data = rpc_res.data
-            if isinstance(data, dict):
-                if data.get("error") == "inactive" or str(data.get("status", "")).lower() == "inactive":
-                    raise ValueError("This account is inactive. Please contact the administrator.")
-                if data.get("user_id"):
-                    return {
-                        "user_id": str(data.get("user_id")),
-                        "name": data.get("name") or "User",
-                        "username": data.get("username") or clean_identifier,
-                        "role_name": data.get("role_name") or "Administrator",
-                        "role_id": str(data.get("role_id") or ""),
-                        "status": data.get("status") or "active",
-                        "email": data.get("email") or "",
-                        "avatar_url": data.get("avatar_url") or "",
-                    }
+        rpc_url = f"{sb_url}/rest/v1/rpc/login_user"
+        rpc_headers = {
+            "apikey": sb_key,
+            "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json",
+        }
+        rpc_body = json.dumps({"p_username": clean_identifier, "p_password": clean_password}).encode("utf-8")
+        req = urllib.request.Request(rpc_url, data=rpc_body, headers=rpc_headers, method="POST")
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            if resp.status == 200:
+                raw_payload = resp.read().decode("utf-8")
+                data = json.loads(raw_payload)
+                if isinstance(data, dict):
+                    if data.get("error") == "inactive" or str(data.get("status", "")).lower() == "inactive":
+                        raise ValueError("This account is inactive. Please contact the administrator.")
+                    if data.get("user_id"):
+                        return {
+                            "user_id": str(data.get("user_id")),
+                            "name": data.get("name") or "User",
+                            "username": data.get("username") or clean_identifier,
+                            "role_name": data.get("role_name") or "Administrator",
+                            "role_id": str(data.get("role_id") or ""),
+                            "status": data.get("status") or "active",
+                            "email": data.get("email") or "",
+                            "avatar_url": data.get("avatar_url") or "",
+                        }
     except Exception as exc:
         if "inactive" in str(exc).lower():
             raise
-        logger.warning(f"login_user RPC check error: {exc}")
+        logger.warning(f"login_user direct RPC check error: {exc}")
 
     # 2. Query user table directly with bcrypt / sha256
     try:

@@ -835,12 +835,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (errJson?.error && String(errJson.error).toLowerCase().includes("inactive")) {
           throw new Error("This account is inactive. Please contact the administrator.");
         }
-        if (response.status === 401) {
-          return null;
-        }
-        if (response.status >= 500) {
-          throw new Error(errJson?.error || "Authentication server error. Please try again in a moment.");
-        }
+        // If backend returned non-OK, fall through to Supabase RPC fallback
       }
     } catch (apiErr: any) {
       if (apiErr?.message && apiErr.message.toLowerCase().includes("inactive")) {
