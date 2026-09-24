@@ -2591,6 +2591,91 @@ def api_auth_login():
         return {"ok": False, "error": "Authentication server error. Please try again."}, 500
 
 
+@app.route("/api/auth/sync-session", methods=["POST"])
+def api_auth_sync_session():
+    payload = request.get_json(silent=True) or {}
+    email = str(payload.get("email") or "").strip().lower()
+    user_id = str(payload.get("user_id") or "").strip()
+
+    if not email and not user_id:
+        return {"ok": False, "error": "Email or user ID required"}, 400
+
+    try:
+        users = []
+        if email:
+            users = supabase().table("user").select("user_id, name, username, role_id, status, email, avatar_url").ilike("email", email).limit(1).execute().data or []
+        if not users and user_id:
+            users = supabase().table("user").select("user_id, name, username, role_id, status, email, avatar_url").eq("user_id", user_id).limit(1).execute().data or []
+
+        if not users:
+            return {"ok": False, "error": "User account not found"}, 404
+
+        user_row = users[0]
+        if str(user_row.get("status") or "active").lower() in ("inactive", "disabled"):
+            return {"ok": False, "error": "Account is inactive"}, 403
+
+        role_name = "Administrator"
+        role_id = user_row.get("role_id")
+        if role_id:
+            role_data = supabase().table("role").select("role_name").eq("role_id", role_id).limit(1).execute().data or []
+            if role_data and role_data[0].get("role_name"):
+                role_name = role_data[0]["role_name"]
+
+        raw_avatar = str(user_row.get("avatar_url") or "").strip()
+        jwt_avatar = raw_avatar if (raw_avatar.startswith("http://") or raw_avatar.startswith("https://")) and len(raw_avatar) < 512 and not raw_avatar.startswith("data:") else ""
+
+        user_info = {
+            "user_id": str(user_row.get("user_id")),
+            "username": str(user_row.get("username") or ""),
+            "name": str(user_row.get("name") or "User"),
+            "role_name": role_name,
+            "role_id": str(role_id or ""),
+            "email": str(user_row.get("email") or email),
+            "status": str(user_row.get("status") or "active"),
+            "avatar_url": jwt_avatar,
+        }
+
+        token = create_jwt_token(user_info, expires_in_seconds=24 * 3600)
+
+        response = Response(
+            json.dumps({"ok": True, "token": token, "user": user_info}),
+            status=200,
+            mimetype="application/json",
+        )
+
+        is_secure = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+        cookie_samesite = "None" if is_secure else "Lax"
+        response.set_cookie(
+            "meryl_session",
+            token,
+            httponly=True,
+            secure=is_secure,
+            samesite=cookie_samesite,
+            path="/",
+        )
+        response.set_cookie(
+            "meryl_token",
+            token,
+            httponly=False,
+            secure=is_secure,
+            samesite=cookie_samesite,
+            path="/",
+        )
+
+        session["current_user"] = {
+            "user_id": user_info["user_id"],
+            "username": user_info["username"],
+            "name": user_info["name"],
+            "role": user_info["role_name"],
+            "email": user_info["email"],
+        }
+
+        return response
+    except Exception as exc:
+        logger.exception("Session sync error")
+        return {"ok": False, "error": str(exc)}, 500
+
+
 @app.route("/api/auth/me", methods=["GET"])
 def api_auth_me():
     token = request.cookies.get("meryl_session") or request.cookies.get("meryl_token")

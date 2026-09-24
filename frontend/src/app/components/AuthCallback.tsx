@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AlertTriangle, ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
@@ -39,6 +39,7 @@ export function AuthCallback() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpChallenge, setOtpChallenge] = useState<OtpChallenge | null>(null);
   const [now, setNow] = useState(Date.now());
+  const initialCheckDoneRef = useRef(false);
 
   useEffect(() => {
     if (!otpMode) return undefined;
@@ -56,6 +57,8 @@ export function AuthCallback() {
     let mounted = true;
 
     async function finishSignIn() {
+      if (initialCheckDoneRef.current) return;
+      initialCheckDoneRef.current = true;
       try {
         const {
           data: { session },
@@ -139,23 +142,30 @@ export function AuthCallback() {
       setVerifyingOtp(true);
       setError("");
       setOtpNotice("");
+
+      // Mark Google OTP as verified BEFORE verifyOtp so onAuthStateChange doesn't trigger OTP gate
+      markGoogleOtpVerified(otpEmail);
+
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email: otpEmail,
         token: otpCode.trim(),
         type: "email",
       });
 
-      if (verifyError) throw verifyError;
+      if (verifyError) {
+        sessionStorage.removeItem("meryl_google_otp_verified_email");
+        throw verifyError;
+      }
 
-      markGoogleOtpVerified(otpEmail);
       setOtpChallenge(null);
-      const appUser = await completeExternalAuth({ persist: true });
+      const appUser = await completeExternalAuth({ persist: true, bypassOtpGate: true });
       if (!appUser) {
         throw new Error("Could not complete sign-in after OTP verification.");
       }
 
       navigate(getPostLoginPath(appUser), { replace: true });
     } catch (otpError) {
+      sessionStorage.removeItem("meryl_google_otp_verified_email");
       const nextChallenge = {
         ...otpChallenge,
         attempts: otpChallenge.attempts + 1,

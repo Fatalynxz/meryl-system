@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -217,6 +218,16 @@ function writeStoredUser(authUser: AuthUser) {
   }
 }
 
+export function clearStoredUser() {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(ENCRYPTED_SESSION_KEY);
+    sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+  }
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(MERYL_USER_STORAGE_KEY);
+  }
+}
+
 function getVerifiedGoogleOtpEmail() {
   return sessionStorage.getItem(GOOGLE_OTP_VERIFIED_EMAIL_KEY)?.trim().toLowerCase() ?? "";
 }
@@ -365,6 +376,10 @@ function getSupabaseErrorMessage(error: unknown) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const userRef = useRef<AuthUser | null>(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -394,7 +409,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (googleNeedsOtp && !bypassOtpGate) {
-      sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
+      clearStoredUser();
       setUser(null);
       return null;
     }
@@ -402,6 +417,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (persist) {
       writeStoredUser(authUser);
       setUser(authUser);
+
+      // Asynchronously synchronize session cookie with Python backend (Render)
+      try {
+        fetch(`${BACKEND_BASE}/api/auth/sync-session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            email: authUser.email,
+            user_id: authUser.user_id,
+          }),
+        }).catch(() => null);
+      } catch {}
     }
     return authUser;
   }, []);
@@ -419,10 +447,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If this tab does not have an active session (e.g. freshly opened tab or new browser session):
       // NEVER auto-login from cookies or other tabs! Present the Login portal.
       if (!storedUser || !isAuthorizedAppUser(storedUser)) {
-        sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-        try {
-          localStorage.removeItem(MERYL_USER_STORAGE_KEY);
-        } catch {}
+        clearStoredUser();
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -467,9 +492,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (mounted) setUser(updatedUser);
           }
         } else if (meRes.status === 401 || meRes.status === 403) {
-          // Cookie expired or invalidated
-          sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-          if (mounted) setUser(null);
+          // Check if user is authenticated via Supabase (e.g. Google OAuth or Supabase session)
+          const { data: sbData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+          if (!sbData?.session) {
+            clearStoredUser();
+            if (mounted) setUser(null);
+          } else {
+            // Re-sync session cookie with Render
+            try {
+              fetch(`${BACKEND_BASE}/api/auth/sync-session`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  email: storedUser.email,
+                  user_id: storedUser.user_id,
+                }),
+              }).catch(() => null);
+            } catch {}
+          }
         }
       } catch {
         // Offline resilience: keep in-tab session active
@@ -484,11 +525,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user?.email) {
-        completeExternalAuth().catch(() => {
-          sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-          localStorage.removeItem(MERYL_USER_STORAGE_KEY);
-          setUser(null);
-        });
+        // Skip calling completeExternalAuth when on /auth/callback to avoid race conditions with the OTP gate
+        const isAuthCallbackPath =
+          typeof window !== "undefined" && window.location.pathname.startsWith("/auth/callback");
+        if (!isAuthCallbackPath) {
+          completeExternalAuth().catch(() => {
+            clearStoredUser();
+            setUser(null);
+          });
+        }
       }
     });
 
@@ -1003,12 +1048,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [validateCredentials, setCurrentUser]);
 
   const logout = useCallback(() => {
-    if (user) {
+    const currentUser = userRef.current;
+    if (currentUser) {
       logAuditEvent({
         action_type: "AUTH_LOGOUT",
         entity_type: "USER",
-        entity_id: user.user_id,
-        metadata: { username: user.username, role: user.role_name },
+        entity_id: currentUser.user_id,
+        metadata: { username: currentUser.username, role: currentUser.role_name },
       });
     }
 
@@ -1025,16 +1071,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.cookie = "meryl_token=; Max-Age=0; path=/;";
     }
 
-    sessionStorage.removeItem(ENCRYPTED_SESSION_KEY);
-    sessionStorage.removeItem(MERYL_USER_STORAGE_KEY);
-    localStorage.removeItem(MERYL_USER_STORAGE_KEY);
+    clearStoredUser();
     sessionStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);
-    localStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(MERYL_TERMINAL_LOCKED_KEY);
+    }
     setIsLocked(false);
     clearGoogleOtpVerifiedEmail();
-    supabase.auth.signOut();
+    supabase.auth.signOut().catch(() => null);
     setUser(null);
-  }, [user]);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
