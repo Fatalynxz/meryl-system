@@ -507,7 +507,15 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
       return "Product name should include the model/style, not only the brand.";
     }
     if (!productForm.category_id) return "Category is required.";
-    if (Number(productForm.unit_price) < 0) return "Unit price must be greater than or equal to 0.";
+    if (!productForm.size || !productForm.size.trim()) {
+      return "Size is required.";
+    }
+    if (!productForm.unit_price || Number(productForm.unit_price) <= 0) {
+      return "Unit price is required and must be greater than 0.";
+    }
+    if (isNaN(Number(productForm.unit_price))) {
+      return "Unit price must be a valid number.";
+    }
     return "";
   };
 
@@ -841,7 +849,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
                 <DialogHeader>
                   <DialogTitle className="text-yellow-300">{editingProduct ? "Edit Product" : "Add Product"}</DialogTitle>
                 </DialogHeader>
-                <ProductMasterForm formData={productForm} setFormData={setProductForm} categories={categories} />
+                <ProductMasterForm formData={productForm} setFormData={setProductForm} categories={categories} products={products} />
                 {editingProduct && (
                   <VariantUpdateScope
                     editScope={editScope}
@@ -910,7 +918,7 @@ export function ProductManagement({ view, onViewChange }: ProductManagementProps
                       <DialogHeader>
                         <DialogTitle className="text-yellow-300">{editingProduct ? "Edit Product" : "Add Product"}</DialogTitle>
                       </DialogHeader>
-                      <ProductMasterForm formData={productForm} setFormData={setProductForm} categories={categories} />
+                      <ProductMasterForm formData={productForm} setFormData={setProductForm} categories={categories} products={products} />
                       {editingProduct && (
                         <VariantUpdateScope
                           editScope={editScope}
@@ -2068,9 +2076,118 @@ function ProductSettingsPage({
   );
 }
 
-function ProductMasterForm({ formData, setFormData, categories }: { formData: ProductFormData; setFormData: (data: ProductFormData) => void; categories: any[] }) {
+const PREDEFINED_BRANDS = [
+  "Nike",
+  "Adidas",
+  "Jordan",
+  "Puma",
+  "Converse",
+  "Vans",
+  "New Balance",
+  "Under Armour",
+  "Asics",
+  "Reebok",
+  "Flamingos",
+  "Rocco",
+  "Venus",
+  "MStyle",
+  "LA Bucks",
+  "Shoelyns",
+  "Alex",
+  "Shoefit",
+  "C-Speed",
+  "Ultra Lite",
+];
+
+const STANDARD_COLORS = [
+  { label: "Black", value: "Black", bg: "#09090b", border: "#3f3f46" },
+  { label: "White", value: "White", bg: "#ffffff", border: "#d4d4d8" },
+  { label: "Black/White", value: "Black/White", bg: "linear-gradient(135deg, #09090b 50%, #ffffff 50%)", border: "#3f3f46" },
+  { label: "Red", value: "Red", bg: "#ef4444" },
+  { label: "Blue", value: "Blue", bg: "#3b82f6" },
+  { label: "Navy", value: "Navy", bg: "#1e3a8a" },
+  { label: "Green", value: "Green", bg: "#10b981" },
+  { label: "Yellow", value: "Yellow", bg: "#eab308" },
+  { label: "Orange", value: "Orange", bg: "#f97316" },
+  { label: "Purple", value: "Purple", bg: "#a855f7" },
+  { label: "Pink", value: "Pink", bg: "#ec4899" },
+  { label: "Grey", value: "Grey", bg: "#6b7280" },
+  { label: "Brown", value: "Brown", bg: "#78350f" },
+  { label: "Beige", value: "Beige", bg: "#d4b996" },
+  { label: "Multi-Color", value: "Multi-Color", bg: "linear-gradient(135deg, #ef4444, #eab308, #10b981, #3b82f6)" },
+  { label: "Default", value: "Default", bg: "#52525b" },
+];
+
+const STANDARD_SIZES = [
+  { value: "35", label: "EU 35 (US Men 3.5 / Women 5)" },
+  { value: "36", label: "EU 36 (US Men 4.5 / Women 6)" },
+  { value: "37", label: "EU 37 (US Men 5 / Women 6.5)" },
+  { value: "38", label: "EU 38 (US Men 5.5 / Women 7)" },
+  { value: "39", label: "EU 39 (US Men 6.5 / Women 8)" },
+  { value: "40", label: "EU 40 (US Men 7 / Women 8.5)" },
+  { value: "41", label: "EU 41 (US Men 8 / Women 9.5)" },
+  { value: "42", label: "EU 42 (US Men 8.5 / Women 10)" },
+  { value: "43", label: "EU 43 (US Men 9.5 / Women 11)" },
+  { value: "44", label: "EU 44 (US Men 10 / Women 11.5)" },
+  { value: "45", label: "EU 45 (US Men 11 / Women 12.5)" },
+  { value: "46", label: "EU 46 (US Men 12 / Women 13.5)" },
+  { value: "47", label: "EU 47 (US Men 13 / Women 14.5)" },
+  { value: "48", label: "EU 48 (US Men 14)" },
+  { value: "XS", label: "XS (Apparel)" },
+  { value: "S", label: "S (Apparel)" },
+  { value: "M", label: "M (Apparel)" },
+  { value: "L", label: "L (Apparel)" },
+  { value: "XL", label: "XL (Apparel)" },
+  { value: "XXL", label: "XXL (Apparel)" },
+];
+
+function ProductMasterForm({
+  formData,
+  setFormData,
+  categories,
+  products = [],
+}: {
+  formData: ProductFormData;
+  setFormData: (data: ProductFormData) => void;
+  categories: any[];
+  products?: UiProduct[];
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [isCustomBrand, setIsCustomBrand] = useState(false);
+  const [isCustomSize, setIsCustomSize] = useState(false);
+  const [isCustomColor, setIsCustomColor] = useState(false);
+
+  const availableBrands = useMemo(() => {
+    const set = new Set<string>();
+    PREDEFINED_BRANDS.forEach((b) => set.add(b));
+    products.forEach((p) => {
+      const b = (p.brand || "").trim();
+      if (b && b !== "N/A" && b.length > 1) {
+        set.add(b);
+      }
+    });
+    if (formData.brand && formData.brand.trim() && !isCustomBrand) {
+      set.add(formData.brand.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [products, formData.brand, isCustomBrand]);
+
+  const availableSizes = useMemo(() => {
+    const list = [...STANDARD_SIZES];
+    if (formData.size && !isCustomSize && !list.some((s) => s.value === formData.size)) {
+      list.unshift({ value: formData.size, label: `${formData.size} (Current)` });
+    }
+    return list;
+  }, [formData.size, isCustomSize]);
+
+  const availableColors = useMemo(() => {
+    const list = [...STANDARD_COLORS];
+    if (formData.color && !isCustomColor && !list.some((c) => c.value.toLowerCase() === formData.color.toLowerCase())) {
+      list.unshift({ label: formData.color, value: formData.color, bg: "#64748b" });
+    }
+    return list;
+  }, [formData.color, isCustomColor]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2129,33 +2246,240 @@ function ProductMasterForm({ formData, setFormData, categories }: { formData: Pr
 
   return (
     <div className="grid gap-4 py-4">
+      {/* ROW 1: Product Name & Brand */}
       <div className="grid gap-4 md:grid-cols-2">
-        <TextField label="Product Name *" value={formData.name} onChange={(value) => setFormData({ ...formData, name: value })} />
-        <TextField label="Brand *" value={formData.brand} onChange={(value) => setFormData({ ...formData, brand: value })} />
+        <TextField
+          label="Product Name *"
+          value={formData.name}
+          onChange={(value) => setFormData({ ...formData, name: value })}
+        />
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-yellow-300">Brand *</Label>
+            {isCustomBrand ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomBrand(false);
+                  setFormData({ ...formData, brand: availableBrands[0] || "" });
+                }}
+                className="text-[11px] text-yellow-400 hover:text-yellow-300 underline"
+              >
+                Choose from list
+              </button>
+            ) : null}
+          </div>
+          {isCustomBrand ? (
+            <Input
+              autoFocus
+              placeholder="Type new brand name..."
+              value={formData.brand}
+              onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+              className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100"
+            />
+          ) : (
+            <Select
+              value={formData.brand || ""}
+              onValueChange={(value) => {
+                if (value === "__custom_brand__") {
+                  setIsCustomBrand(true);
+                  setFormData({ ...formData, brand: "" });
+                } else {
+                  setFormData({ ...formData, brand: value });
+                }
+              }}
+            >
+              <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100">
+                <SelectValue placeholder="Select Brand *" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#181824] border-[#2d2d3a] text-yellow-100 max-h-64">
+                {availableBrands.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b}
+                  </SelectItem>
+                ))}
+                <SelectItem value="__custom_brand__" className="text-yellow-400 font-semibold border-t border-[#2d2d3a] mt-1 pt-1.5">
+                  + Add Custom Brand...
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
+
+      {/* ROW 2: Category & Size */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label className="text-yellow-300">Category *</Label>
-          <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
-            <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100"><SelectValue placeholder="Select category" /></SelectTrigger>
+          <Select
+            value={formData.category_id}
+            onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+          >
+            <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100">
+              <SelectValue placeholder="Select category *" />
+            </SelectTrigger>
             <SelectContent className="bg-[#181824] border-[#2d2d3a] text-yellow-100">
-              {categories.map((category: any) => <SelectItem key={category.category_id} value={category.category_id}>{category.category_name}</SelectItem>)}
+              {categories.map((category: any) => (
+                <SelectItem key={category.category_id} value={category.category_id}>
+                  {category.category_name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <TextField label="Size" value={formData.size} onChange={(value) => setFormData({ ...formData, size: value })} />
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-yellow-300">Size *</Label>
+            {isCustomSize ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomSize(false);
+                  setFormData({ ...formData, size: "42" });
+                }}
+                className="text-[11px] text-yellow-400 hover:text-yellow-300 underline"
+              >
+                Choose from standard sizes
+              </button>
+            ) : null}
+          </div>
+          {isCustomSize ? (
+            <Input
+              autoFocus
+              placeholder="e.g. EU 42.5 or 9.5"
+              value={formData.size}
+              onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+              className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100"
+            />
+          ) : (
+            <Select
+              value={formData.size || ""}
+              onValueChange={(value) => {
+                if (value === "__custom_size__") {
+                  setIsCustomSize(true);
+                  setFormData({ ...formData, size: "" });
+                } else {
+                  setFormData({ ...formData, size: value });
+                }
+              }}
+            >
+              <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100">
+                <SelectValue placeholder="Select size *" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#181824] border-[#2d2d3a] text-yellow-100 max-h-64">
+                {availableSizes.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+                <SelectItem value="__custom_size__" className="text-yellow-400 font-semibold border-t border-[#2d2d3a] mt-1 pt-1.5">
+                  + Custom Size...
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
+
+      {/* ROW 3: Color, Department & Unit Price */}
       <div className="grid gap-4 md:grid-cols-3">
-        <TextField label="Color" value={formData.color} onChange={(value) => setFormData({ ...formData, color: value })} />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-yellow-300">Color</Label>
+            {isCustomColor ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomColor(false);
+                  setFormData({ ...formData, color: "Black" });
+                }}
+                className="text-[11px] text-yellow-400 hover:text-yellow-300 underline"
+              >
+                Choose from palette
+              </button>
+            ) : null}
+          </div>
+          {isCustomColor ? (
+            <Input
+              autoFocus
+              placeholder="e.g. Bred / Royal Blue"
+              value={formData.color}
+              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100"
+            />
+          ) : (
+            <Select
+              value={formData.color || ""}
+              onValueChange={(value) => {
+                if (value === "__custom_color__") {
+                  setIsCustomColor(true);
+                  setFormData({ ...formData, color: "" });
+                } else {
+                  setFormData({ ...formData, color: value });
+                }
+              }}
+            >
+              <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100">
+                <SelectValue placeholder="Select color" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#181824] border-[#2d2d3a] text-yellow-100 max-h-64">
+                {availableColors.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3 h-3 rounded-full border shrink-0"
+                        style={{ background: c.bg, borderColor: c.border || "transparent" }}
+                      />
+                      <span>{c.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <SelectItem value="__custom_color__" className="text-yellow-400 font-semibold border-t border-[#2d2d3a] mt-1 pt-1.5">
+                  + Custom Color...
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
         <div className="space-y-2">
           <Label className="text-yellow-300">Department</Label>
-          <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
-            <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100"><SelectValue placeholder="Select department" /></SelectTrigger>
-            <SelectContent className="bg-[#181824] border-[#2d2d3a] text-yellow-100"><SelectItem value="Men">Men</SelectItem><SelectItem value="Women">Women</SelectItem><SelectItem value="Kids">Kids</SelectItem><SelectItem value="Unisex">Unisex</SelectItem></SelectContent>
+          <Select
+            value={formData.gender || "Unisex"}
+            onValueChange={(value) => setFormData({ ...formData, gender: value })}
+          >
+            <SelectTrigger className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100">
+              <SelectValue placeholder="Select department" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#181824] border-[#2d2d3a] text-yellow-100">
+              <SelectItem value="Men">Men</SelectItem>
+              <SelectItem value="Women">Women</SelectItem>
+              <SelectItem value="Kids">Kids</SelectItem>
+              <SelectItem value="Unisex">Unisex</SelectItem>
+            </SelectContent>
           </Select>
         </div>
-        <NumberField label="Unit Price" value={formData.unit_price} onChange={(value) => setFormData({ ...formData, unit_price: value })} />
+
+        <div className="space-y-2">
+          <Label className="text-yellow-300">Unit Price (SRP) *</Label>
+          <Input
+            type="number"
+            min="0.01"
+            step="0.01"
+            placeholder="0.00"
+            value={formData.unit_price === 0 ? "" : formData.unit_price}
+            onChange={(e) => {
+              const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
+              setFormData({ ...formData, unit_price: isNaN(val) ? 0 : val });
+            }}
+            className="bg-[#1d1d27] border-[#2d2d3a] text-yellow-100 font-semibold"
+          />
+        </div>
       </div>
+
+      {/* ROW 4: Image Upload */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-yellow-300">Product Image (Optional)</Label>
