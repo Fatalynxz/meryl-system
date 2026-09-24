@@ -3290,15 +3290,15 @@ export function ReturnManagement() {
                             </div>
 
                             <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                              <p className="mb-3 text-xs uppercase tracking-wide text-zinc-400">Financials</p>
+                              <p className="mb-3 text-xs uppercase tracking-wide text-zinc-400">Policy & Status</p>
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                  <p className="text-sm text-zinc-400">Additional Pay</p>
-                                  <p className="text-zinc-100">{formatCurrency(returnItem.additional_payment)}</p>
+                                  <p className="text-sm text-zinc-400">Exchange Rule</p>
+                                  <p className="text-emerald-400 font-medium">1:1 Even Exchange (Same Model)</p>
                                 </div>
                                 <div>
                                   <p className="text-sm text-zinc-400">Replacement Status</p>
-                                  <p className="text-zinc-100">{returnItem.return_status}</p>
+                                  <p className="text-zinc-100">{returnItem.return_status || "Completed"}</p>
                                 </div>
                               </div>
                             </div>
@@ -3411,7 +3411,7 @@ export function ReturnManagement() {
                                       </div>
                                     </div>
                                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-300">
-                                      <Badge className="bg-zinc-800 text-zinc-200">Difference: {formatCurrency(detail.price_difference)}</Badge>
+                                      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30">1:1 Even Exchange</Badge>
                                       <Badge className="bg-zinc-800 text-zinc-200">Inventory: {detail.inventory_action}</Badge>
                                     </div>
                                   </div>
@@ -3517,16 +3517,16 @@ export function ReturnManagement() {
                 ))}
               </div>
 
-              {/* ── FINANCIAL SUMMARY ── */}
+              {/* ── EXCHANGE SUMMARY ── */}
               <p className="text-center text-[10px] tracking-widest my-1">- - - - - - - - - - - - - - - - - -</p>
               <div className="space-y-0.5 text-[11px]">
                 <div className="flex justify-between">
-                  <span>Additional Payment:</span>
-                  <span className="tabular-nums font-bold">{printExchangeSlip.additional_payment.toFixed(2)}</span>
+                  <span>Exchange Policy:</span>
+                  <span className="font-semibold text-right">1:1 Even Exchange</span>
                 </div>
-                <div className="flex justify-between font-black text-[13px] pt-0.5">
-                  <span>NET COLLECTED</span>
-                  <span className="tabular-nums">{printExchangeSlip.additional_payment.toFixed(2)}</span>
+                <div className="flex justify-between font-bold text-[12px] pt-0.5">
+                  <span>AMOUNT DUE:</span>
+                  <span className="tabular-nums">PHP 0.00</span>
                 </div>
               </div>
 
