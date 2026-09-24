@@ -1,0 +1,73 @@
+# ==============================================================================
+# MERYL SHOES SYSTEM - HOSTINGER APACHE / LITESPEED PRODUCTION CONFIGURATION
+# Location: public_html/.htaccess
+# ==============================================================================
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Force HTTPS
+  RewriteCond %{HTTPS} !=on
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # 2. Never rewrite physical files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 3. Single Page Application (SPA) Fallback
+  # Direct all deep links (e.g. /dashboard, /pos, /inventory) to index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# ==============================================================================
+# SECURITY HEADERS (CWE-693, CWE-1021 Hardening)
+# ==============================================================================
+<IfModule mod_headers.c>
+  # Clickjacking Defense
+  Header set X-Frame-Options "SAMEORIGIN"
+
+  # MIME Sniffing Prevention
+  Header set X-Content-Type-Options "nosniff"
+
+  # Referrer Policy
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Strict Transport Security (HSTS)
+  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+  # Content Security Policy (CSP) tailored for Meryl System on Hostinger
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://meryl-system.onrender.com https://api.brevo.com; frame-ancestors 'self';"
+
+  # Permissions Policy
+  Header set Permissions-Policy "geolocation=(), microphone=(), camera=(self)"
+
+  # Prevent caching of index.html so updates deploy instantly
+  <Files "index.html">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </Files>
+</IfModule>
+
+# ==============================================================================
+# COMPRESSION (Gzip / Deflate)
+# ==============================================================================
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml
+</IfModule>
+
+# ==============================================================================
+# STATIC ASSETS CACHING
+# ==============================================================================
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+</IfModule>

@@ -23,6 +23,14 @@ export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes lockout
 export const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes terminal inactivity
 const GOOGLE_OTP_VERIFIED_EMAIL_KEY = "meryl_google_otp_verified_email";
+export const BACKEND_BASE = (
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" &&
+  (window.location.hostname.includes("merylshoesbacolod.shop") ||
+   window.location.hostname.includes("hostinger"))
+    ? "https://meryl-system.onrender.com"
+    : "")
+).replace(/\/$/, "");
 
 export type AuthUser = {
   user_id: string;
@@ -441,7 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Verify active session with backend /api/auth/me to ensure it wasn't revoked
       try {
-        const meRes = await fetch("/api/auth/me", {
+        const meRes = await fetch(`${BACKEND_BASE}/api/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -575,7 +583,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
       try {
-        const response = await fetch("/api/auth/password-reset/request", {
+        const response = await fetch(`${BACKEND_BASE}/api/auth/password-reset/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: normalizedEmail }),
@@ -657,7 +665,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Sync to Python backend if available
     try {
-      await fetch("/api/auth/password-reset/verify", {
+      await fetch(`${BACKEND_BASE}/api/auth/password-reset/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -727,7 +735,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Also sync to backend if running
       try {
-        await fetch("/api/auth/password-reset/verify", {
+        await fetch(`${BACKEND_BASE}/api/auth/password-reset/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -752,7 +760,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 2. Fallback to Python backend OTP verification if Supabase Auth OTP wasn't matched
     let backendResponse: Response | null = null;
     try {
-      backendResponse = await fetch("/api/auth/password-reset/verify", {
+      backendResponse = await fetch(`${BACKEND_BASE}/api/auth/password-reset/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -796,7 +804,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 1. Primary: Authenticate securely via Server-Side API endpoint
     // The server validates credentials against database hashes, sets secure HTTP-only cookies, and returns signed JWT
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(`${BACKEND_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include", // Transmit and store cookies across all tabs
@@ -1011,7 +1019,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Invalidate server-side cookies
     try {
-      fetch("/api/auth/logout", {
+      fetch(`${BACKEND_BASE}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       }).catch(() => null);

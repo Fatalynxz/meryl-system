@@ -178,20 +178,34 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "meryl-secure-production-jwt-key-2026-secret"
+is_prod = os.getenv("FLASK_ENV") == "production" or not os.getenv("FLASK_DEBUG")
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production" or not os.getenv("FLASK_DEBUG"),
+    SESSION_COOKIE_SAMESITE="None" if is_prod else "Lax",
+    SESSION_COOKIE_SECURE=is_prod,
 )
 
 
 ALLOWED_ORIGINS = {
+    "https://merylshoesbacolod.shop",
+    "https://www.merylshoesbacolod.shop",
+    "http://merylshoesbacolod.shop",
+    "http://www.merylshoesbacolod.shop",
     "https://meryl-system.onrender.com",
     "http://localhost:5173",
     "http://localhost:5000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5000",
 }
+
+# Dynamically support additional origins from environment variables
+for env_var in ("ALLOWED_ORIGINS", "FRONTEND_URL"):
+    val = os.getenv(env_var, "")
+    if val:
+        for item in val.split(","):
+            cleaned = item.strip().rstrip("/")
+            if cleaned:
+                ALLOWED_ORIGINS.add(cleaned)
 
 
 @app.before_request
@@ -234,7 +248,7 @@ def add_security_headers(response):
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob: https:; "
         "media-src 'self' blob: data:; "
-        f"connect-src 'self' {supabase_origin} {supabase_ws} https://api.brevo.com; "
+        f"connect-src 'self' {supabase_origin} {supabase_ws} https://api.brevo.com https://merylshoesbacolod.shop https://www.merylshoesbacolod.shop; "
         "frame-ancestors 'self';"
     )
     response.headers["Content-Security-Policy"] = csp
@@ -2529,13 +2543,14 @@ def api_auth_login():
         )
 
         is_secure = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+        cookie_samesite = "None" if is_secure else "Lax"
         # 1. Secure HTTP-only session cookie (expires on browser close)
         response.set_cookie(
             "meryl_session",
             token,
             httponly=True,
             secure=is_secure,
-            samesite="Lax",
+            samesite=cookie_samesite,
             path="/",
         )
         # 2. Companion session cookie (expires on browser close)
@@ -2544,7 +2559,7 @@ def api_auth_login():
             token,
             httponly=False,
             secure=is_secure,
-            samesite="Lax",
+            samesite=cookie_samesite,
             path="/",
         )
 
@@ -2601,8 +2616,10 @@ def api_auth_logout():
         status=200,
         mimetype="application/json",
     )
-    response.delete_cookie("meryl_session", path="/")
-    response.delete_cookie("meryl_token", path="/")
+    is_secure = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+    cookie_samesite = "None" if is_secure else "Lax"
+    response.delete_cookie("meryl_session", path="/", secure=is_secure, samesite=cookie_samesite)
+    response.delete_cookie("meryl_token", path="/", secure=is_secure, samesite=cookie_samesite)
     session.clear()
     return response
 
