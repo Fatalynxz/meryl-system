@@ -95,6 +95,38 @@ function getColorSwatch(colorName?: string): string {
   return c;
 }
 
+const SHOE_SIZE_CONVERSIONS: Record<string, { usMen: string; usWomen: string }> = {
+  "35": { usMen: "3.5", usWomen: "5" },
+  "36": { usMen: "4.5", usWomen: "6" },
+  "37": { usMen: "5", usWomen: "6.5" },
+  "38": { usMen: "5.5", usWomen: "7" },
+  "39": { usMen: "6.5", usWomen: "8" },
+  "40": { usMen: "7", usWomen: "8.5" },
+  "41": { usMen: "8", usWomen: "9.5" },
+  "42": { usMen: "8.5", usWomen: "10" },
+  "43": { usMen: "9.5", usWomen: "11" },
+  "44": { usMen: "10", usWomen: "11.5" },
+  "45": { usMen: "11", usWomen: "12.5" },
+  "46": { usMen: "12", usWomen: "13.5" },
+  "47": { usMen: "13", usWomen: "14.5" },
+  "48": { usMen: "14", usWomen: "15.5" },
+};
+
+function getShoeSizeConversion(euSize: string, gender?: string): string {
+  const cleanSize = String(euSize ?? "").replace(/^EU\s*/i, "").trim();
+  const conversion = SHOE_SIZE_CONVERSIONS[cleanSize];
+  if (!conversion) return "";
+
+  const g = (gender || "").trim().toLowerCase();
+  if (g === "men" || g === "mens" || g === "man") {
+    return `US M ${conversion.usMen}`;
+  }
+  if (g === "women" || g === "womens" || g === "woman") {
+    return `US W ${conversion.usWomen}`;
+  }
+  return `M ${conversion.usMen} / W ${conversion.usWomen}`;
+}
+
 function isExpiredInventoryDate(value?: string | null) {
   const date = String(value ?? "").slice(0, 10);
   if (!date) return false;
@@ -418,6 +450,7 @@ export function PointOfSale() {
     color: string;
     brand: string;
     category: string;
+    gender: string;
     image_url?: string;
     price: number;
     total_stock: number;
@@ -429,6 +462,7 @@ export function PointOfSale() {
     const map = new Map<string, SearchShoeModel>();
     for (const v of sellableProductInventory) {
       const colorVal = (v.color && v.color !== "N/A" && v.color !== "Default") ? v.color.trim() : "Standard";
+      const genderVal = (v.gender && v.gender !== "N/A" && v.gender !== "Default") ? v.gender.trim() : "";
       // Separate each color variant into its own row so sizes stay within that colorway
       const key = `${v.product_name}:::${colorVal}`;
       if (!map.has(key)) {
@@ -438,6 +472,7 @@ export function PointOfSale() {
           color: colorVal,
           brand: v.brand,
           category: v.category,
+          gender: genderVal,
           image_url: v.image_url,
           price: v.price,
           total_stock: 0,
@@ -446,6 +481,9 @@ export function PointOfSale() {
         });
       }
       const item = map.get(key)!;
+      if (!item.gender && genderVal) {
+        item.gender = genderVal;
+      }
       item.total_stock += Number(v.stock_quantity || 0);
       // Prefer variant image if available
       if (v.image_url && (!item.image_url || item.image_url === "")) {
@@ -479,19 +517,22 @@ export function PointOfSale() {
     }
     if (!term && modalCategoryFilter === "All") return [];
     if (!term) return source;
-    return source.filter((m) =>
-      [
+    return source.filter((m) => {
+      const usSizes = m.sizes.map((s) => getShoeSizeConversion(s, m.gender)).join(" ");
+      return [
         m.product_name,
         m.color !== "Standard" ? m.color : "",
         m.brand,
         m.category,
+        m.gender,
         m.sizes.join(" "),
+        usSizes,
         String(m.price),
       ]
         .join(" ")
         .toLowerCase()
-        .includes(term),
-    );
+        .includes(term);
+    });
   }, [sellableShoeModels, productSearch, modalCategoryFilter]);
 
   const filteredProductInventory = useMemo(() => {
@@ -1433,21 +1474,20 @@ function formatReceiptNumber(salesId?: string) {
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-3 text-left pl-6 font-semibold text-white group-hover:text-yellow-300">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="font-bold text-sm text-white group-hover:text-yellow-300">{model.product_name}</p>
-                                        {!isStandardColor && (
-                                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold text-yellow-300 bg-yellow-400/10 border border-yellow-400/30">
-                                            <span
-                                              className="w-2 h-2 rounded-full border border-white/20 shrink-0"
-                                              style={{ backgroundColor: getColorSwatch(model.color) }}
-                                            />
-                                            {model.color}
-                                          </span>
+                                      <p className="font-bold text-sm text-white group-hover:text-yellow-300">{model.product_name}</p>
+                                      <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className="text-[11px] text-emerald-400 font-medium">
+                                          {model.total_stock} pair{model.total_stock === 1 ? "" : "s"} available
+                                        </span>
+                                        {model.gender && (
+                                          <>
+                                            <span className="text-zinc-600 text-[10px]">•</span>
+                                            <span className="text-[11px] text-yellow-300/80 font-medium">
+                                              {model.gender}
+                                            </span>
+                                          </>
                                         )}
                                       </div>
-                                      <span className="text-[11px] text-emerald-400 font-medium">
-                                        {model.total_stock} pair{model.total_stock === 1 ? "" : "s"} available
-                                      </span>
                                     </TableCell>
                                     <TableCell className="py-3 text-center text-yellow-100/90 truncate" title={model.brand}>
                                       {model.brand}
@@ -1623,6 +1663,15 @@ function formatReceiptNumber(salesId?: string) {
                             <span className={`text-sm font-bold ${isSelected ? "text-red-950" : "text-white"}`}>
                               Size {variant.size}
                             </span>
+                            {getShoeSizeConversion(variant.size, variant.gender) && (
+                              <span
+                                className={`text-[10px] font-semibold mt-0.5 leading-tight ${
+                                  isSelected ? "text-red-950 font-bold" : "text-yellow-400/90"
+                                }`}
+                              >
+                                {getShoeSizeConversion(variant.size, variant.gender)}
+                              </span>
+                            )}
                             <span className={`text-xs font-semibold mt-0.5 ${isSelected ? "text-red-900" : "text-yellow-300"}`}>
                               ₱{variant.price.toLocaleString()}
                             </span>

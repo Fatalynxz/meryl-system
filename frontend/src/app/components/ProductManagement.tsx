@@ -2133,12 +2133,6 @@ const STANDARD_SIZES = [
   { value: "46", label: "EU 46 (US Men 12 / Women 13.5)" },
   { value: "47", label: "EU 47 (US Men 13 / Women 14.5)" },
   { value: "48", label: "EU 48 (US Men 14)" },
-  { value: "XS", label: "XS (Apparel)" },
-  { value: "S", label: "S (Apparel)" },
-  { value: "M", label: "M (Apparel)" },
-  { value: "L", label: "L (Apparel)" },
-  { value: "XL", label: "XL (Apparel)" },
-  { value: "XXL", label: "XXL (Apparel)" },
 ];
 
 function ProductMasterForm({
