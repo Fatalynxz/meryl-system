@@ -30,34 +30,23 @@ SET
 ALTER TABLE public.returns
   ADD COLUMN IF NOT EXISTS return_type VARCHAR(40) DEFAULT 'Replacement',
   ADD COLUMN IF NOT EXISTS return_status VARCHAR(30) DEFAULT 'Completed',
-  ADD COLUMN IF NOT EXISTS additional_payment DECIMAL(12, 2) DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS adjustment_amount DECIMAL(12, 2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS remarks TEXT;
 
 UPDATE public.returns
 SET
   return_type = COALESCE(return_type, 'Replacement'),
-  return_status = COALESCE(return_status, 'Completed'),
-  additional_payment = COALESCE(additional_payment, 0),
-  adjustment_amount = COALESCE(adjustment_amount, 0);
+  return_status = COALESCE(return_status, 'Completed');
 
 -- Store item-level replacement/refund/inventory handling details.
 ALTER TABLE public.return_details
   ADD COLUMN IF NOT EXISTS replacement_product_id UUID REFERENCES public.product(product_id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS replacement_quantity INT DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS price_difference DECIMAL(12, 2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS inventory_action VARCHAR(40) DEFAULT 'Defective / Not Sellable';
 
 UPDATE public.return_details
 SET
   replacement_quantity = COALESCE(replacement_quantity, 0),
-  price_difference = COALESCE(price_difference, 0),
   inventory_action = COALESCE(inventory_action, 'Defective / Not Sellable');
-
--- Allow payment adjustment rows if the business later wants separate payment records.
--- Existing app code can also update the existing payment amount when only one row exists.
-ALTER TABLE public.payment
-  DROP CONSTRAINT IF EXISTS payment_sales_id_key;
 
 CREATE INDEX IF NOT EXISTS idx_sales_transaction_sales_status ON public.sales_transaction(sales_status);
 CREATE INDEX IF NOT EXISTS idx_sales_transaction_return_status ON public.sales_transaction(return_status);

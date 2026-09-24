@@ -52,8 +52,6 @@ type ReturnRow = {
   total_refund: number;
   return_type: string;
   return_status: string;
-  additional_payment: number;
-  adjustment_amount: number;
   processedBy: string;
   staffCode: string;
   salesStatus: string;
@@ -70,7 +68,6 @@ type ExchangeForm = {
   replacement_product_id: string;
   quantity: number;
   reason: string;
-  mode_of_payment: "gcash" | "cash";
   return_action: "Replacement" | "Partial Return" | "Full Return" | "Adjustment";
   inventory_action: "Defective / Not Sellable" | "Return to Stock";
 };
@@ -95,7 +92,6 @@ const defaultForm: ExchangeForm = {
   replacement_product_id: "",
   quantity: 1,
   reason: "",
-  mode_of_payment: "cash",
   return_action: "Replacement",
   inventory_action: "Defective / Not Sellable",
 };
@@ -614,9 +610,7 @@ export function ReturnManagement() {
           return sum + Number(repItem?.price ?? item.price ?? 0) * Number(item.selectedQty ?? 1);
         }, 0)
       : Number(replacementProduct?.price ?? 0) * quantity;
-  const priceDifference = replacementTotal - originalTotal;
-  const customerPays = Math.max(0, priceDifference);
-  const totalAdditionalPayment = replacementLines.reduce((sum, line) => sum + Math.max(0, line.price_difference), 0);
+
   const hasSaleSelected = Boolean(selectedSale);
   const hasReturnedSelected = selectedReturnedItems.length > 0;
   const hasReplacementSelected =
@@ -1386,29 +1380,6 @@ export function ReturnManagement() {
       const customer = Array.isArray(sale?.customer) ? sale.customer[0] : sale?.customer;
       const processedUser = Array.isArray(row.user) ? row.user[0] : row.user;
       const details = Array.isArray(row.return_details) ? row.return_details : [];
-      const paymentFromDetails = details.reduce((sum: number, detail: any) => {
-        const product = Array.isArray(detail.product) ? detail.product[0] : detail.product;
-        const replacementJoin = Array.isArray(detail.replacement_product) ? detail.replacement_product[0] : detail.replacement_product;
-        const newProductJoin = Array.isArray(detail.new_product) ? detail.new_product[0] : detail.new_product;
-        const replacementNameFromNote = extractReplacementName(String(detail.reason ?? ""));
-        const returnedFallback = productMap.get(String(detail.returned_product_id ?? detail.product_id ?? ""));
-        const replacementFallback =
-          productMap.get(String(detail.replacement_product_id ?? detail.new_product_id ?? "")) ??
-          [...productMap.values()].find((item) => normalizeProductName(item.name) === normalizeProductName(replacementNameFromNote));
-        const replacement = replacementJoin ?? newProductJoin;
-        const returnedInventory = Array.isArray(product?.inventory) ? product.inventory[0] : product?.inventory;
-        const replacementInventory = Array.isArray(replacement?.inventory) ? replacement.inventory[0] : replacement?.inventory;
-        const returnedPrice = Number(detail.returned_price_unit ?? returnedInventory?.srp ?? product?.price ?? product?.cost_price ?? returnedFallback?.price ?? 0);
-        const replacementPrice = Number(detail.new_price_unit ?? replacementInventory?.srp ?? replacement?.price ?? replacement?.cost_price ?? replacementFallback?.price ?? 0);
-        const returnedQty = Number(detail.returned_quantity ?? detail.quantity_returned ?? 0);
-        const replacementQty = Number(detail.new_quantity ?? detail.replacement_quantity ?? detail.quantity_returned ?? 0);
-        const storedDifference = Number(detail.net_difference ?? detail.price_difference ?? 0);
-        const computedDifference = (replacementPrice * replacementQty) - (returnedPrice * returnedQty);
-        const byDiff = Math.max(0, storedDifference !== 0 ? storedDifference : computedDifference);
-        if (byDiff > 0) return sum + byDiff;
-        return sum + extractPesoAmount(String(detail?.reason ?? ""));
-      }, 0);
-      const rowAdditionalPayment = Number(row.additional_payment ?? row.total_replacement_payments ?? 0);
       const localProof =
         storedReceiptsMap.get(String(row.return_id ?? "")) ||
         storedReceiptsMap.get(`sale_${String(row.sales_id ?? "")}`) ||
@@ -1427,8 +1398,6 @@ export function ReturnManagement() {
         total_refund: Number(row.total_refund ?? 0),
         return_type: String(row.return_type ?? "Replacement"),
         return_status: String(row.return_status ?? "Completed"),
-        additional_payment: paymentFromDetails > 0 ? paymentFromDetails : rowAdditionalPayment,
-        adjustment_amount: Number(row.adjustment_amount ?? 0),
         processedBy: processedUser?.name ?? processedUser?.username ?? "Staff",
         staffCode: String(processedUser?.staff_code ?? processedUser?.staffCode ?? "N/A"),
         salesStatus: normalizeSaleStatus(sale?.sales_status ?? sale?.status),
@@ -1521,43 +1490,6 @@ export function ReturnManagement() {
         transaction_type: dbTransactionType,
         reference_id: referenceId,
         date_updated: new Date().toISOString(),
-      },
-    ]);
-  };
-
-  const recordAdditionalPayment = async (salesId: string, amount: number) => {
-    if (amount <= 0) return;
-
-    const { data: existingPayment } = await supabase
-      .from("payment")
-      .select("payment_id, amount_paid")
-      .eq("sales_id", salesId)
-      .maybeSingle();
-
-    if (existingPayment?.payment_id) {
-      const nextAmountPaid = Number(existingPayment.amount_paid ?? 0) + amount;
-      const { error } = await supabase
-        .from("payment")
-        .update({
-          amount_paid: nextAmountPaid,
-          payment_status: "completed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("payment_id", existingPayment.payment_id);
-      if (error) throw error;
-      return;
-    }
-
-    await tryInsertRow("payment", [
-      {
-        payment_id: buildClientId(),
-        sales_id: salesId,
-        payment_method: "cash",
-        amount_paid: amount,
-        change_amount: 0,
-        payment_status: "completed",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       },
     ]);
   };
@@ -1789,17 +1721,13 @@ export function ReturnManagement() {
         replacementStockUsed.set(line.replacement_product_id, usedStock + line.quantity);
       }
 
-      const activeAdditionalPayment = lines.reduce((sum, line) => sum + Math.max(0, line.price_difference), 0);
       const returnId = buildClientId();
       const receiptProof = await uploadReceiptProof(returnId);
-      const adjustedTotal = Math.max(0, Number(selectedSale.total_amount ?? 0) + activeAdditionalPayment);
       const replacementSummary = [
         "Replacement",
         `Lines: ${lines.length}`,
-        `Additional payment: ${formatCurrency(activeAdditionalPayment)}`,
         `Receipt proof: ${receiptProof.receiptProofName}`,
         "No refund/store credit. Replacement only.",
-        `Mode of payment: ${activeAdditionalPayment > 0 ? formData.mode_of_payment : "N/A"}`,
         `Reason: ${finalReason}`,
       ].join(" | ");
 
@@ -1813,15 +1741,8 @@ export function ReturnManagement() {
           return_type: "Replacement",
           return_status: "Completed",
           total_refund: 0,
-          additional_payment: activeAdditionalPayment,
-          adjustment_amount: activeAdditionalPayment,
-          mode_of_payment: activeAdditionalPayment > 0 ? formData.mode_of_payment : null,
-          payment_date: activeAdditionalPayment > 0 ? new Date().toISOString() : null,
           fulfilled_date: new Date().toISOString(),
           replacement_count: lines.length,
-          total_replacement_payments: activeAdditionalPayment,
-          total_credits_issued: 0,
-          net_amount: adjustedTotal,
           last_activity_date: new Date().toISOString(),
           receipt_proof_name: receiptProof.receiptProofName,
           receipt_proof_path: receiptProof.receiptProofPath,
@@ -1845,13 +1766,11 @@ export function ReturnManagement() {
           ? "Defective / Not Sellable"
           : line.inventory_action;
 
-        const additionalPayment = Math.max(0, line.price_difference);
         const replacementNote = [
           "Replacement",
           `Replaced: ${line.returned_product_name}`,
           `Replacement: ${line.replacement_product_name}`,
-          `Rule: ${line.price_difference > 0 ? `Customer adds ${formatCurrency(additionalPayment)}` : "No refund/store credit. Replacement only."}`,
-          `Mode of payment: ${additionalPayment > 0 ? formData.mode_of_payment : "N/A"}`,
+          "Rule: Even exchange",
           `Inventory action: ${effectiveLineInventoryAction}`,
           `Reason: ${finalReason}`,
         ].join(" | ");
@@ -1866,14 +1785,12 @@ export function ReturnManagement() {
             refund_amount: 0,
             replacement_product_id: line.replacement_product_id,
             replacement_quantity: line.quantity,
-            price_difference: line.price_difference,
             returned_product_id: line.returned_product_id,
             returned_quantity: line.quantity,
             returned_price_unit: line.returned_price_unit,
             new_product_id: line.replacement_product_id,
             new_quantity: line.quantity,
             new_price_unit: line.replacement_price_unit,
-            net_difference: line.price_difference,
             inventory_action: effectiveLineInventoryAction,
           },
           {
@@ -1918,19 +1835,17 @@ export function ReturnManagement() {
       await tryUpdateById("sales_transaction", "sales_id", selectedSale.sales_id, [
         {
           original_total_amount: Number(selectedSale.total_amount ?? 0),
-          adjusted_total_amount: Math.max(0, Number(selectedSale.total_amount ?? 0) + activeAdditionalPayment),
-          total_amount: Math.max(0, Number(selectedSale.total_amount ?? 0) + activeAdditionalPayment),
+          adjusted_total_amount: Number(selectedSale.total_amount ?? 0),
+          total_amount: Number(selectedSale.total_amount ?? 0),
           sales_status: "Adjusted",
           return_status: "Completed",
           updated_at: new Date().toISOString(),
         },
         {
-          total_amount: Math.max(0, Number(selectedSale.total_amount ?? 0) + activeAdditionalPayment),
+          total_amount: Number(selectedSale.total_amount ?? 0),
           updated_at: new Date().toISOString(),
         },
       ]);
-
-      await recordAdditionalPayment(selectedSale.sales_id, activeAdditionalPayment);
 
       // Policy: Replacement only. No store credit issuance and no cash refund.
 
