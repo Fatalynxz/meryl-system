@@ -1,0 +1,588 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2820" height="1620" viewBox="0 0 2820 1620">
+  <defs>
+    <style>
+      .font-main { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; }
+      .crit-line { stroke: #D32F2F; stroke-width: 3.8; fill: none; }
+      .noncrit-line { stroke: #000000; stroke-width: 2.4; stroke-dasharray: 9,5; fill: none; }
+    </style>
+    <marker id="arrow-crit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#D32F2F" />
+    </marker>
+    <marker id="arrow-noncrit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#000000" />
+    </marker>
+  </defs>
+
+  <!-- Clean Canvas -->
+  <rect width="2820" height="1620" fill="#FFFFFF" />
+
+  <!-- Header (All Black) -->
+  <text x="70" y="48" class="font-main" font-size="24" font-weight="900" fill="#000000">CARLOS HILADO MEMORIAL STATE UNIVERSITY — COLLEGE OF COMPUTER STUDIES</text>
+  <text x="70" y="76" class="font-main" font-size="20" font-weight="800" fill="#000000">PROGRAM EVALUATION AND REVIEW TECHNIQUE (PERT) NETWORK DIAGRAM</text>
+  <text x="70" y="102" class="font-main" font-size="16" font-style="italic" font-weight="600" fill="#000000">Integrated POS-Driven Inventory System with Data Analytics | Total Critical Duration: 159 Calendar Days (May 5 – Oct 10, 2026)</text>
+
+  <!-- Connectors -->
+  <line x1="230" y1="250" x2="355" y2="250" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="625" y1="250" x2="685" y2="250" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="955" y1="250" x2="1015" y2="250" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="1285" y1="250" x2="1345" y2="250" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1615 250 L 1650 250 L 1650 150 L 1685 150" class="noncrit-line" marker-end="url(#arrow-noncrit)" />
+  <path d="M 1615 250 L 1650 250 L 1650 355 L 1685 355" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="1955" y1="355" x2="2035" y2="355" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="2305" y1="355" x2="2385" y2="355" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 2655 355 L 2710 355 L 2710 670 L 2655 670" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1955 150 L 2710 150 L 2710 355" class="noncrit-line" />
+  <path d="M 2385 670 L 2345 670 L 2345 555 L 2305 555" class="noncrit-line" marker-end="url(#arrow-noncrit)" />
+  <path d="M 2385 670 L 2345 670 L 2345 785 L 2305 785" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 2035 555 L 1995 555 L 1995 670 L 1955 670" class="noncrit-line" marker-end="url(#arrow-noncrit)" />
+  <path d="M 2035 785 L 1995 785 L 1995 670 L 1955 670" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1685 670 L 1650 670 L 1650 555 L 1615 555" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1685 670 L 1650 670 L 1650 785 L 1615 785" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 2035 555 L 2010 555 L 2010 430 L 1235 430 L 1235 607" class="noncrit-line" marker-end="url(#arrow-noncrit)" />
+  <path d="M 2035 785 L 2010 785 L 2010 555" class="noncrit-line" />
+  <path d="M 1345 555 L 1315 555 L 1315 505 L 630 505 L 630 1090 L 685 1090" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1345 785 L 1315 785 L 1315 835 L 630 835" class="crit-line" />
+  <path d="M 1015 670 L 630 670" class="noncrit-line" />
+  <path d="M 955 1090 L 985 1090 L 985 975 L 1015 975" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 955 1090 L 985 1090 L 985 1205 L 1015 1205" class="noncrit-line" marker-end="url(#arrow-noncrit)" />
+  <path d="M 1285 975 L 1315 975 L 1315 1090 L 1345 1090" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1285 1205 L 1315 1205 L 1315 1090 L 1345 1090" class="noncrit-line" marker-end="url(#arrow-noncrit)" />
+  <path d="M 1615 1090 L 1650 1090 L 1650 975 L 1685 975" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1615 1090 L 1650 1090 L 1650 1205 L 1685 1205" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1955 975 L 2020 975 L 2020 1420 L 1955 1420" class="crit-line" marker-end="url(#arrow-crit)" />
+  <path d="M 1955 1205 L 2020 1205" class="crit-line" />
+  <line x1="1685" y1="1420" x2="1615" y2="1420" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="1345" y1="1420" x2="1285" y2="1420" class="crit-line" marker-end="url(#arrow-crit)" />
+  <line x1="1015" y1="1420" x2="890" y2="1420" class="crit-line" marker-end="url(#arrow-crit)" />
+
+  <!-- Terminal: Start -->
+  <g>
+    <rect x="90" y="217" width="140" height="66" rx="10" ry="10" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    <text x="160" y="259" class="font-main" font-size="26" font-weight="900" fill="#000000" text-anchor="middle">Start</text>
+  </g>
+  <!-- PERT Node A -->
+  <g>
+    <rect x="355" y="187" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="355" y1="247" x2="625" y2="247" stroke="#000000" stroke-width="2.0" />
+    <line x1="490" y1="247" x2="490" y2="313" stroke="#000000" stroke-width="2.0" />
+    <line x1="355" y1="280" x2="625" y2="280" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="490" y="213" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Requirements Elicitation</text>
+        <text x="490" y="236" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">& Stakeholder Interviews</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="369" y="270" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 0</text>
+    <text x="369" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 14</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="504" y="270" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: A (1.1)</text>
+    <text x="504" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 14</text>
+  </g>
+  <!-- PERT Node B -->
+  <g>
+    <rect x="685" y="187" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="685" y1="247" x2="955" y2="247" stroke="#000000" stroke-width="2.0" />
+    <line x1="820" y1="247" x2="820" y2="313" stroke="#000000" stroke-width="2.0" />
+    <line x1="685" y1="280" x2="955" y2="280" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="820" y="213" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Process Observation &</text>
+        <text x="820" y="236" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Inventory Workflow Audit</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="699" y="270" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 5</text>
+    <text x="699" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 21</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="834" y="270" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: B (1.2)</text>
+    <text x="834" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 16</text>
+  </g>
+  <!-- PERT Node C -->
+  <g>
+    <rect x="1015" y="187" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1015" y1="247" x2="1285" y2="247" stroke="#000000" stroke-width="2.0" />
+    <line x1="1150" y1="247" x2="1150" y2="313" stroke="#000000" stroke-width="2.0" />
+    <line x1="1015" y1="280" x2="1285" y2="280" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1150" y="213" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">UI/UX Wireframing, DFDs</text>
+        <text x="1150" y="236" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">(0-2) & ERD Modeling</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1029" y="270" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 15</text>
+    <text x="1029" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 31</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1164" y="270" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: C (2.1)</text>
+    <text x="1164" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 16</text>
+  </g>
+  <!-- PERT Node D -->
+  <g>
+    <rect x="1345" y="187" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1345" y1="247" x2="1615" y2="247" stroke="#000000" stroke-width="2.0" />
+    <line x1="1480" y1="247" x2="1480" y2="313" stroke="#000000" stroke-width="2.0" />
+    <line x1="1345" y1="280" x2="1615" y2="280" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1480" y="213" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">System Architecture &</text>
+        <text x="1480" y="236" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Security Design (JWT/Crypt)</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1359" y="270" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 21</text>
+    <text x="1359" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 37</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1494" y="270" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: D (2.2)</text>
+    <text x="1494" y="303" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 16</text>
+  </g>
+  <!-- PERT Node E -->
+  <g>
+    <rect x="1685" y="87" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1685" y1="147" x2="1955" y2="147" stroke="#000000" stroke-width="2.0" />
+    <line x1="1820" y1="147" x2="1820" y2="213" stroke="#000000" stroke-width="2.0" />
+    <line x1="1685" y1="180" x2="1955" y2="180" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1820" y="113" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Analytics Modeling &</text>
+        <text x="1820" y="136" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Promotions Design</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1699" y="170" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 27</text>
+    <text x="1699" y="203" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 45</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1834" y="170" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: E (2.3)</text>
+    <text x="1834" y="203" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 18</text>
+  </g>
+  <!-- PERT Node F -->
+  <g>
+    <rect x="1685" y="292" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1685" y1="352" x2="1955" y2="352" stroke="#000000" stroke-width="2.0" />
+    <line x1="1820" y1="352" x2="1820" y2="418" stroke="#000000" stroke-width="2.0" />
+    <line x1="1685" y1="385" x2="1955" y2="385" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1820" y="318" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Master Catalog & Item</text>
+        <text x="1820" y="341" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Parameters Design</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1699" y="375" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 38</text>
+    <text x="1699" y="408" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 52</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1834" y="375" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: F (3.1)</text>
+    <text x="1834" y="408" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 14</text>
+  </g>
+  <!-- PERT Node G -->
+  <g>
+    <rect x="2035" y="292" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="2035" y1="352" x2="2305" y2="352" stroke="#000000" stroke-width="2.0" />
+    <line x1="2170" y1="352" x2="2170" y2="418" stroke="#000000" stroke-width="2.0" />
+    <line x1="2035" y1="385" x2="2305" y2="385" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="2170" y="318" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">POS Terminal, Multi-Tender</text>
+        <text x="2170" y="341" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">& Receipt Design</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="2049" y="375" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 41</text>
+    <text x="2049" y="408" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 55</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="2184" y="375" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: G (3.2)</text>
+    <text x="2184" y="408" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 14</text>
+  </g>
+  <!-- PERT Node H -->
+  <g>
+    <rect x="2385" y="292" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="2385" y1="352" x2="2655" y2="352" stroke="#000000" stroke-width="2.0" />
+    <line x1="2520" y1="352" x2="2520" y2="418" stroke="#000000" stroke-width="2.0" />
+    <line x1="2385" y1="385" x2="2655" y2="385" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="2520" y="318" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Replacement Intake &</text>
+        <text x="2520" y="341" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Hardware Camera QR Design</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="2399" y="375" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 44</text>
+    <text x="2399" y="408" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 60</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="2534" y="375" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: H (3.3)</text>
+    <text x="2534" y="408" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 16</text>
+  </g>
+  <!-- PERT Node I -->
+  <g>
+    <rect x="2385" y="607" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="2385" y1="667" x2="2655" y2="667" stroke="#000000" stroke-width="2.0" />
+    <line x1="2520" y1="667" x2="2520" y2="733" stroke="#000000" stroke-width="2.0" />
+    <line x1="2385" y1="700" x2="2655" y2="700" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="2520" y="633" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Database Setup, RLS &</text>
+        <text x="2520" y="656" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Cloud Storage Buckets</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="2399" y="690" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 54</text>
+    <text x="2399" y="723" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 69</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="2534" y="690" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: I (4.1)</text>
+    <text x="2534" y="723" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 15</text>
+  </g>
+  <!-- PERT Node J -->
+  <g>
+    <rect x="2035" y="492" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="2035" y1="552" x2="2305" y2="552" stroke="#000000" stroke-width="2.0" />
+    <line x1="2170" y1="552" x2="2170" y2="618" stroke="#000000" stroke-width="2.0" />
+    <line x1="2035" y1="585" x2="2305" y2="585" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="2170" y="518" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Front-End UI Development</text>
+        <text x="2170" y="541" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">(React, TS, Tailwind)</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="2049" y="575" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 60</text>
+    <text x="2049" y="608" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 84</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="2184" y="575" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: J (4.2)</text>
+    <text x="2184" y="608" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 24</text>
+  </g>
+  <!-- PERT Node K -->
+  <g>
+    <rect x="2035" y="722" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="2035" y1="782" x2="2305" y2="782" stroke="#000000" stroke-width="2.0" />
+    <line x1="2170" y1="782" x2="2170" y2="848" stroke="#000000" stroke-width="2.0" />
+    <line x1="2035" y1="815" x2="2305" y2="815" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="2170" y="748" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Back-End API Services &</text>
+        <text x="2170" y="771" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Session Cryptography</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="2049" y="805" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 64</text>
+    <text x="2049" y="838" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 88</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="2184" y="805" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: K (4.3)</text>
+    <text x="2184" y="838" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 24</text>
+  </g>
+  <!-- PERT Node L -->
+  <g>
+    <rect x="1685" y="607" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1685" y1="667" x2="1955" y2="667" stroke="#000000" stroke-width="2.0" />
+    <line x1="1820" y1="667" x2="1820" y2="733" stroke="#000000" stroke-width="2.0" />
+    <line x1="1685" y1="700" x2="1955" y2="700" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1820" y="633" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Core POS Checkout &</text>
+        <text x="1820" y="656" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Thermal Receipt Engine</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1699" y="690" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 71</text>
+    <text x="1699" y="723" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 93</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1834" y="690" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: L (4.4)</text>
+    <text x="1834" y="723" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 22</text>
+  </g>
+  <!-- PERT Node M -->
+  <g>
+    <rect x="1345" y="492" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1345" y1="552" x2="1615" y2="552" stroke="#000000" stroke-width="2.0" />
+    <line x1="1480" y1="552" x2="1480" y2="618" stroke="#000000" stroke-width="2.0" />
+    <line x1="1345" y1="585" x2="1615" y2="585" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1480" y="518" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Predictive Sales Forecast</text>
+        <text x="1480" y="541" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">& Brevo Marketing Blast</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1359" y="575" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 76</text>
+    <text x="1359" y="608" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 98</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1494" y="575" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: M (4.5)</text>
+    <text x="1494" y="608" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 22</text>
+  </g>
+  <!-- PERT Node N -->
+  <g>
+    <rect x="1345" y="722" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1345" y1="782" x2="1615" y2="782" stroke="#000000" stroke-width="2.0" />
+    <line x1="1480" y1="782" x2="1480" y2="848" stroke="#000000" stroke-width="2.0" />
+    <line x1="1345" y1="815" x2="1615" y2="815" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1480" y="748" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Replacement Intake &</text>
+        <text x="1480" y="771" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Hardware Camera Scanner</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1359" y="805" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 78</text>
+    <text x="1359" y="838" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 98</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1494" y="805" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: N (4.6)</text>
+    <text x="1494" y="838" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 20</text>
+  </g>
+  <!-- PERT Node O -->
+  <g>
+    <rect x="1015" y="607" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1015" y1="667" x2="1285" y2="667" stroke="#000000" stroke-width="2.0" />
+    <line x1="1150" y1="667" x2="1150" y2="733" stroke="#000000" stroke-width="2.0" />
+    <line x1="1015" y1="700" x2="1285" y2="700" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1150" y="633" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Module Unit Testing &</text>
+        <text x="1150" y="656" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">White-Box Test Cases</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1029" y="690" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 84</text>
+    <text x="1029" y="723" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 106</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1164" y="690" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: O (5.1)</text>
+    <text x="1164" y="723" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 22</text>
+  </g>
+  <!-- PERT Node P -->
+  <g>
+    <rect x="685" y="1027" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="685" y1="1087" x2="955" y2="1087" stroke="#000000" stroke-width="2.0" />
+    <line x1="820" y1="1087" x2="820" y2="1153" stroke="#000000" stroke-width="2.0" />
+    <line x1="685" y1="1120" x2="955" y2="1120" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="820" y="1053" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Subsystem & Cross-Tab</text>
+        <text x="820" y="1076" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Integration Testing</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="699" y="1110" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 95</text>
+    <text x="699" y="1143" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 116</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="834" y="1110" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: P (5.2)</text>
+    <text x="834" y="1143" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 21</text>
+  </g>
+  <!-- PERT Node Q -->
+  <g>
+    <rect x="1015" y="912" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1015" y1="972" x2="1285" y2="972" stroke="#000000" stroke-width="2.0" />
+    <line x1="1150" y1="972" x2="1150" y2="1038" stroke="#000000" stroke-width="2.0" />
+    <line x1="1015" y1="1005" x2="1285" y2="1005" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1150" y="938" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Functional Black-Box</text>
+        <text x="1150" y="961" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Alpha Testing (POS/Inv)</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1029" y="995" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 105</text>
+    <text x="1029" y="1028" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 127</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1164" y="995" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: Q (5.3)</text>
+    <text x="1164" y="1028" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 22</text>
+  </g>
+  <!-- PERT Node R -->
+  <g>
+    <rect x="1015" y="1142" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1015" y1="1202" x2="1285" y2="1202" stroke="#000000" stroke-width="2.0" />
+    <line x1="1150" y1="1202" x2="1150" y2="1268" stroke="#000000" stroke-width="2.0" />
+    <line x1="1015" y1="1235" x2="1285" y2="1235" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1150" y="1168" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Security, Pen-Testing &</text>
+        <text x="1150" y="1191" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">RLS Lockout Validation</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1029" y="1225" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 112</text>
+    <text x="1029" y="1258" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 133</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1164" y="1225" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: R (5.4)</text>
+    <text x="1164" y="1258" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 21</text>
+  </g>
+  <!-- PERT Node S -->
+  <g>
+    <rect x="1345" y="1027" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1345" y1="1087" x2="1615" y2="1087" stroke="#000000" stroke-width="2.0" />
+    <line x1="1480" y1="1087" x2="1480" y2="1153" stroke="#000000" stroke-width="2.0" />
+    <line x1="1345" y1="1120" x2="1615" y2="1120" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1480" y="1053" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Full System Stress &</text>
+        <text x="1480" y="1076" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Hardware Concurrency</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1359" y="1110" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 119</text>
+    <text x="1359" y="1143" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 139</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1494" y="1110" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: S (5.5)</text>
+    <text x="1494" y="1143" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 20</text>
+  </g>
+  <!-- PERT Node T -->
+  <g>
+    <rect x="1685" y="912" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1685" y1="972" x2="1955" y2="972" stroke="#000000" stroke-width="2.0" />
+    <line x1="1820" y1="972" x2="1820" y2="1038" stroke="#000000" stroke-width="2.0" />
+    <line x1="1685" y1="1005" x2="1955" y2="1005" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1820" y="938" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Bug Resolution, Retesting</text>
+        <text x="1820" y="961" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">& System Hardening</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1699" y="995" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 128</text>
+    <text x="1699" y="1028" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 147</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1834" y="995" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: T (5.6)</text>
+    <text x="1834" y="1028" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 19</text>
+  </g>
+  <!-- PERT Node U -->
+  <g>
+    <rect x="1685" y="1142" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1685" y1="1202" x2="1955" y2="1202" stroke="#000000" stroke-width="2.0" />
+    <line x1="1820" y1="1202" x2="1820" y2="1268" stroke="#000000" stroke-width="2.0" />
+    <line x1="1685" y1="1235" x2="1955" y2="1235" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1820" y="1168" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">ISO/IEC 25010:2011 Product</text>
+        <text x="1820" y="1191" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Quality Evaluation</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1699" y="1225" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 133</text>
+    <text x="1699" y="1258" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 147</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1834" y="1225" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: U (5.7)</text>
+    <text x="1834" y="1258" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 14</text>
+  </g>
+  <!-- PERT Node V -->
+  <g>
+    <rect x="1685" y="1357" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1685" y1="1417" x2="1955" y2="1417" stroke="#000000" stroke-width="2.0" />
+    <line x1="1820" y1="1417" x2="1820" y2="1483" stroke="#000000" stroke-width="2.0" />
+    <line x1="1685" y1="1450" x2="1955" y2="1450" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1820" y="1383" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Beta Testing & User</text>
+        <text x="1820" y="1406" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Acceptance Testing (UAT)</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1699" y="1440" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 144</text>
+    <text x="1699" y="1473" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 152</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1834" y="1440" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: V (6.1)</text>
+    <text x="1834" y="1473" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 8</text>
+  </g>
+  <!-- PERT Node W -->
+  <g>
+    <rect x="1345" y="1357" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1345" y1="1417" x2="1615" y2="1417" stroke="#000000" stroke-width="2.0" />
+    <line x1="1480" y1="1417" x2="1480" y2="1483" stroke="#000000" stroke-width="2.0" />
+    <line x1="1345" y1="1450" x2="1615" y2="1450" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1480" y="1383" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Client Feedback &</text>
+        <text x="1480" y="1406" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">UI Final Polish</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1359" y="1440" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 149</text>
+    <text x="1359" y="1473" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 155</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1494" y="1440" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: W (6.2)</text>
+    <text x="1494" y="1473" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 6</text>
+  </g>
+  <!-- PERT Node X -->
+  <g>
+    <rect x="1015" y="1357" width="270" height="126" rx="8" ry="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    
+    <!-- Grid Dividers -->
+    <line x1="1015" y1="1417" x2="1285" y2="1417" stroke="#000000" stroke-width="2.0" />
+    <line x1="1150" y1="1417" x2="1150" y2="1483" stroke="#000000" stroke-width="2.0" />
+    <line x1="1015" y1="1450" x2="1285" y2="1450" stroke="#000000" stroke-width="1.6" />
+
+    <!-- Task Name (Bold Black) -->
+    <text x="1150" y="1383" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">Final Documentation &</text>
+        <text x="1150" y="1406" class="font-main" font-size="16.5" font-weight="900" fill="#000000" text-anchor="middle">System Turnover Closeout</text>
+
+    <!-- Bottom Left: Start & Finish (Bold Black) -->
+    <text x="1029" y="1440" class="font-main" font-size="17" font-weight="900" fill="#000000">Start: 152</text>
+    <text x="1029" y="1473" class="font-main" font-size="17" font-weight="900" fill="#000000">Finish: 159</text>
+
+    <!-- Bottom Right: ID & Duration (Bold Black) -->
+    <text x="1164" y="1440" class="font-main" font-size="18" font-weight="900" fill="#000000">ID: X (6.3)</text>
+    <text x="1164" y="1473" class="font-main" font-size="17" font-weight="900" fill="#000000">Duration: 7</text>
+  </g>
+  <!-- Terminal: Finish -->
+  <g>
+    <rect x="750" y="1387" width="140" height="66" rx="10" ry="10" fill="#FFFFFF" stroke="#000000" stroke-width="2.8" />
+    <text x="820" y="1429" class="font-main" font-size="26" font-weight="900" fill="#000000" text-anchor="middle">Finish</text>
+  </g>
+  <!-- Legend -->
+  <g transform="translate(80, 1530)">
+    <rect x="0" y="-18" width="1220" height="54" rx="8" fill="#FFFFFF" stroke="#000000" stroke-width="2.4" />
+    <text x="22" y="16" class="font-main" font-size="18" font-weight="900" fill="#000000">PERT LEGEND:</text>
+    
+    <!-- Red Critical Path -->
+    <line x1="175" y1="10" x2="255" y2="10" stroke="#D32F2F" stroke-width="4.2" />
+    <polygon points="251,6.5 261,10 251,13.5" fill="#D32F2F" />
+    <text x="275" y="16" class="font-main" font-size="16.5" font-weight="900" fill="#D32F2F">Critical Path (Zero Slack / Direct Impact on Closeout)</text>
+    
+    <!-- Black Non-Critical Path -->
+    <line x1="800" y1="10" x2="875" y2="10" stroke="#000000" stroke-width="2.4" stroke-dasharray="9,5" />
+    <polygon points="871,6.5 881,10 871,13.5" fill="#000000" />
+    <text x="895" y="16" class="font-main" font-size="16.5" font-weight="800" fill="#000000">Non-Critical Activity (Flexible Float)</text>
+  </g>
+</svg>

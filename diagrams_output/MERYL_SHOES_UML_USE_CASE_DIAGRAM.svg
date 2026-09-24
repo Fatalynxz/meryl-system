@@ -1,0 +1,543 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 2480" width="2200" height="2480" style="background:#ffffff; font-family: Arial, Helvetica, sans-serif;">
+  <defs>
+    <!-- Arrowhead marker for <<include>> and <<extend>> -->
+    <marker id="open-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <polyline points="0,1 10,5 0,9" fill="none" stroke="#000000" stroke-width="1.8" />
+    </marker>
+    <style>
+      .system-header { font-size: 28px; font-weight: bold; fill: #000000; letter-spacing: 0.5px; }
+      .actor-name { font-size: 28px; font-weight: bold; fill: #000000; }
+      .main-uc-text { font-size: 18.5px; font-weight: bold; fill: #000000; text-anchor: middle; }
+      .sub-uc-text { font-size: 16.5px; font-weight: bold; fill: #000000; text-anchor: middle; }
+      .stereotype { font-size: 14.5px; font-style: italic; font-weight: bold; fill: #000000; text-anchor: middle; }
+      .actor-line { stroke: #000000; stroke-width: 2.8; fill: none; }
+      .solid-line { stroke: #000000; stroke-width: 1.8; fill: none; }
+      .dashed-line { stroke: #000000; stroke-width: 1.7; stroke-dasharray: 6,4; fill: none; marker-end: url(#open-arrow); }
+      .uc-oval { fill: #ffffff; stroke: #000000; stroke-width: 2.2; }
+      .label-bg { fill: #ffffff; stroke: none; }
+    </style>
+  </defs>
+
+  <!-- System Boundary Rectangle -->
+  <rect x="250" y="80" width="1700" height="2340" fill="#ffffff" stroke="#000000" stroke-width="2.8" rx="8" />
+  <text x="1100" y="124" text-anchor="middle" class="system-header">Integrated POS-Driven Inventory System with Data Analytics for Targeting Sales Marketing</text>
+
+  <!-- ========================================================================= -->
+  <!-- 1. TOP CENTER: LOGIN & AUTHENTICATION USE CASE                             -->
+  <!-- ========================================================================= -->
+  <ellipse cx="1100" cy="175" rx="95" ry="34" class="uc-oval" />
+  <text x="1100" y="182" class="main-uc-text">Login</text>
+
+  <ellipse cx="1100" cy="290" rx="145" ry="36" class="uc-oval" />
+  <text x="1100" y="284" class="sub-uc-text">
+    <tspan x="1100" dy="0">Authenticate Credentials</tspan>
+    <tspan x="1100" dy="20">&amp; Resolve Role</tspan>
+  </text>
+
+  <!-- Login -> Authenticate (<<include>>) -->
+  <line x1="1100" y1="209" x2="1100" y2="254" class="dashed-line" />
+  <rect x="1051" y="221" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1100" y="237" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- ========================================================================= -->
+  <!-- 2. ALL SOLID ASSOCIATION LINES (Connecting strictly from Actor Hands)     -->
+  <!-- ========================================================================= -->
+  <g id="actor-associations">
+    <!-- Mandatory Login for ALL Roles -->
+    <line x1="195" y1="530" x2="1005" y2="175" class="solid-line" />
+    <line x1="195" y1="1590" x2="1005" y2="175" class="solid-line" />
+    <line x1="2005" y1="1200" x2="1195" y2="175" class="solid-line" />
+
+    <!-- Cashier Hand (195, 530) to Primary Counter Use Cases -->
+    <line x1="195" y1="530" x2="295" y2="530" class="solid-line" />
+    <line x1="195" y1="530" x2="295" y2="940" class="solid-line" />
+
+    <!-- Inventory Staff Hand (195, 1590) to Primary Warehouse Use Cases -->
+    <line x1="195" y1="1590" x2="295" y2="1350" class="solid-line" />
+    <line x1="195" y1="1590" x2="295" y2="1590" class="solid-line" />
+    <line x1="195" y1="1590" x2="295" y2="1830" class="solid-line" />
+
+    <!-- Administrator Hand (2005, 1200) has ALL: Radiates to ALL Primary Use Cases -->
+    <!-- Admin to Left Counter & Warehouse Use Cases -->
+    <line x1="2005" y1="1200" x2="585" y2="530" class="solid-line" />
+    <line x1="2005" y1="1200" x2="585" y2="940" class="solid-line" />
+    <line x1="2005" y1="1200" x2="585" y2="1350" class="solid-line" />
+    <line x1="2005" y1="1200" x2="585" y2="1590" class="solid-line" />
+    <line x1="2005" y1="1200" x2="585" y2="1830" class="solid-line" />
+
+    <!-- Admin to Right Administrative, Marketing & Analytics Use Cases -->
+    <line x1="2005" y1="1200" x2="1905" y2="470" class="solid-line" />
+    <line x1="2005" y1="1200" x2="1905" y2="810" class="solid-line" />
+    <line x1="2005" y1="1200" x2="1905" y2="1200" class="solid-line" />
+    <line x1="2005" y1="1200" x2="1905" y2="1570" class="solid-line" />
+    <line x1="2005" y1="1200" x2="1905" y2="1990" class="solid-line" />
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- 2.5 ACTORS (Standard UML Stick Figures with Distinct Outstretched Hands)   -->
+  <!-- ========================================================================= -->
+
+  <!-- ACTOR 1: CASHIER (Top Left, hand point at x=195, y=530) -->
+  <g id="actor-cashier">
+    <circle cx="125" cy="475" r="26" class="actor-line" fill="#ffffff" />
+    <line x1="125" y1="501" x2="125" y2="575" class="actor-line" />
+    <line x1="55" y1="530" x2="195" y2="530" class="actor-line" />
+    <circle cx="55" cy="530" r="4" fill="#000000" />
+    <circle cx="195" cy="530" r="5" fill="#000000" />
+    <line x1="125" y1="575" x2="85" y2="650" class="actor-line" />
+    <line x1="125" y1="575" x2="165" y2="650" class="actor-line" />
+    <text x="125" y="688" text-anchor="middle" class="actor-name">Cashier</text>
+  </g>
+
+  <!-- ACTOR 2: INVENTORY STAFF (Bottom Left, hand point at x=195, y=1590) -->
+  <g id="actor-inventory">
+    <circle cx="125" cy="1535" r="26" class="actor-line" fill="#ffffff" />
+    <line x1="125" y1="1561" x2="125" y2="1635" class="actor-line" />
+    <line x1="55" y1="1590" x2="195" y2="1590" class="actor-line" />
+    <circle cx="55" cy="1590" r="4" fill="#000000" />
+    <circle cx="195" cy="1590" r="5" fill="#000000" />
+    <line x1="125" y1="1635" x2="85" y2="1710" class="actor-line" />
+    <line x1="125" y1="1635" x2="165" y2="1710" class="actor-line" />
+    <text x="125" y="1748" text-anchor="middle" class="actor-name">Inventory Staff</text>
+  </g>
+
+  <!-- ACTOR 3: ADMINISTRATOR (Right Side, hand point at x=2005, y=1200) -->
+  <g id="actor-admin">
+    <circle cx="2075" cy="1145" r="26" class="actor-line" fill="#ffffff" />
+    <line x1="2075" y1="1171" x2="2075" y2="1245" class="actor-line" />
+    <line x1="2005" y1="1200" x2="2145" y2="1200" class="actor-line" />
+    <circle cx="2005" cy="1200" r="5" fill="#000000" />
+    <circle cx="2145" cy="1200" r="4" fill="#000000" />
+    <line x1="2075" y1="1245" x2="2035" y2="1320" class="actor-line" />
+    <line x1="2075" y1="1245" x2="2115" y2="1320" class="actor-line" />
+    <text x="2075" y="1358" text-anchor="middle" class="actor-name">Administrator</text>
+  </g>
+
+
+  <!-- ========================================================================= -->
+  <!-- 3. CASHIER USE CASES                                                      -->
+  <!-- ========================================================================= -->
+
+  <!-- PRIMARY 1: Process Sales Transaction (cy=530) -->
+  <ellipse cx="440" cy="530" rx="145" ry="40" class="uc-oval" />
+  <text x="440" y="523" class="main-uc-text">
+    <tspan x="440" dy="0">Process Sales</tspan>
+    <tspan x="440" dy="22">Transaction</tspan>
+  </text>
+
+  <!-- Sub 1.1: Search Footwear & Validate Stock (cy=390) -->
+  <ellipse cx="910" cy="390" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="384" class="sub-uc-text">
+    <tspan x="910" dy="0">Search Footwear &amp;</tspan>
+    <tspan x="910" dy="19">Validate Available Stock</tspan>
+  </text>
+  <line x1="560" y1="505" x2="770" y2="415" class="dashed-line" />
+  <rect x="616" y="448" width="98" height="22" rx="4" class="label-bg" />
+  <text x="665" y="464" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 1.2: Apply Promotional Discount (cy=465) -->
+  <ellipse cx="910" cy="465" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="459" class="sub-uc-text">
+    <tspan x="910" dy="0">Apply Promotional</tspan>
+    <tspan x="910" dy="19">Discount</tspan>
+  </text>
+  <line x1="575" y1="520" x2="770" y2="475" class="dashed-line" />
+  <rect x="623" y="486" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="502" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 1.3: Record Customer Demographic Profile (cy=540) -->
+  <ellipse cx="910" cy="540" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="534" class="sub-uc-text">
+    <tspan x="910" dy="0">Record Customer</tspan>
+    <tspan x="910" dy="19">Demographic Profile</tspan>
+  </text>
+  <line x1="585" y1="532" x2="765" y2="538" class="dashed-line" />
+  <rect x="626" y="524" width="98" height="22" rx="4" class="label-bg" />
+  <text x="675" y="540" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 1.4: Process Multi-Tender Payment & Deduct Stock (cy=615) -->
+  <ellipse cx="910" cy="615" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="609" class="sub-uc-text">
+    <tspan x="910" dy="0">Process Multi-Tender Payment</tspan>
+    <tspan x="910" dy="19">&amp; Deduct Stock</tspan>
+  </text>
+  <line x1="575" y1="545" x2="770" y2="598" class="dashed-line" />
+  <rect x="623" y="561" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="577" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 1.5: Print Thermal Receipt with QR Code (cy=690) -->
+  <ellipse cx="910" cy="690" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="684" class="sub-uc-text">
+    <tspan x="910" dy="0">Print Thermal Receipt</tspan>
+    <tspan x="910" dy="19">with Verification QR Code</tspan>
+  </text>
+  <line x1="560" y1="558" x2="770" y2="665" class="dashed-line" />
+  <rect x="616" y="601" width="98" height="22" rx="4" class="label-bg" />
+  <text x="665" y="617" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 2: Process Return & Replacement (cy=940) -->
+  <ellipse cx="440" cy="940" rx="145" ry="40" class="uc-oval" />
+  <text x="440" y="933" class="main-uc-text">
+    <tspan x="440" dy="0">Process Return &amp;</tspan>
+    <tspan x="440" dy="22">Replacement</tspan>
+  </text>
+
+  <!-- Sub 2.1: Scan Receipt QR Token & 7-Day Check (cy=810) -->
+  <ellipse cx="910" cy="810" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="804" class="sub-uc-text">
+    <tspan x="910" dy="0">Scan Receipt QR Token &amp;</tspan>
+    <tspan x="910" dy="19">Verify 7-Day Warranty</tspan>
+  </text>
+  <line x1="560" y1="915" x2="770" y2="835" class="dashed-line" />
+  <rect x="616" y="864" width="98" height="22" rx="4" class="label-bg" />
+  <text x="665" y="880" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 2.2: Capture Defect Photo Proof (cy=890) -->
+  <ellipse cx="910" cy="890" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="884" class="sub-uc-text">
+    <tspan x="910" dy="0">Capture Defect Category &amp;</tspan>
+    <tspan x="910" dy="19">Camera Photo Proof</tspan>
+  </text>
+  <line x1="575" y1="930" x2="770" y2="900" class="dashed-line" />
+  <rect x="623" y="904" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="920" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 2.3: Record Additional Payment (Upgrade Difference) -> <<extend>> (cy=980) -->
+  <ellipse cx="910" cy="980" rx="145" ry="35" class="uc-oval" />
+  <text x="910" y="974" class="sub-uc-text">
+    <tspan x="910" dy="0">Record Additional Payment</tspan>
+    <tspan x="910" dy="19">(Upgrade Difference)</tspan>
+  </text>
+  <!-- Extension originates at (765,975) pointing back to base (585,945) -->
+  <line x1="765" y1="975" x2="585" y2="945" class="dashed-line" />
+  <rect x="629" y="949" width="92" height="22" rx="4" class="label-bg" />
+  <text x="675" y="965" class="stereotype">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- Sub 2.4: Update Inventory & Print Exchange Slip (cy=1065) -->
+  <ellipse cx="910" cy="1065" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="1059" class="sub-uc-text">
+    <tspan x="910" dy="0">Update Inventory Balances</tspan>
+    <tspan x="910" dy="19">&amp; Print Exchange Slip</tspan>
+  </text>
+  <line x1="565" y1="965" x2="770" y2="1040" class="dashed-line" />
+  <rect x="618" y="991" width="98" height="22" rx="4" class="label-bg" />
+  <text x="667" y="1007" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- ========================================================================= -->
+  <!-- 4. INVENTORY STAFF USE CASES                                              -->
+  <!-- ========================================================================= -->
+
+  <!-- PRIMARY 3: Maintain Product Master Catalog (cy=1350) -->
+  <ellipse cx="440" cy="1350" rx="145" ry="40" class="uc-oval" />
+  <text x="440" y="1343" class="main-uc-text">
+    <tspan x="440" dy="0">Maintain Product</tspan>
+    <tspan x="440" dy="22">Master Catalog</tspan>
+  </text>
+
+  <!-- Sub 3.1: Encode Footwear Specs (cy=1295) -->
+  <ellipse cx="910" cy="1295" rx="145" ry="35" class="uc-oval" />
+  <text x="910" y="1289" class="sub-uc-text">
+    <tspan x="910" dy="0">Encode Footwear Specs</tspan>
+    <tspan x="910" dy="19">(Brand, Size, Color, Cost)</tspan>
+  </text>
+  <line x1="575" y1="1335" x2="770" y2="1308" class="dashed-line" />
+  <rect x="623" y="1310" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="1326" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 3.2: Validate Category & SKU (cy=1380) -->
+  <ellipse cx="910" cy="1380" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="1374" class="sub-uc-text">
+    <tspan x="910" dy="0">Validate Category Integrity</tspan>
+    <tspan x="910" dy="19">&amp; SKU Formatting</tspan>
+  </text>
+  <line x1="575" y1="1360" x2="770" y2="1375" class="dashed-line" />
+  <rect x="623" y="1357" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="1373" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 4: Manage Inventory Stock & Restocking (cy=1590) -->
+  <ellipse cx="440" cy="1590" rx="145" ry="40" class="uc-oval" />
+  <text x="440" y="1583" class="main-uc-text">
+    <tspan x="440" dy="0">Manage Inventory Stock</tspan>
+    <tspan x="440" dy="22">&amp; Restocking</tspan>
+  </text>
+
+  <!-- Sub 4.1: Record Batch Stock-In & SRP (cy=1495) -->
+  <ellipse cx="910" cy="1495" rx="145" ry="35" class="uc-oval" />
+  <text x="910" y="1489" class="sub-uc-text">
+    <tspan x="910" dy="0">Record Batch Stock-In</tspan>
+    <tspan x="910" dy="19">Quantities &amp; Set SRP</tspan>
+  </text>
+  <line x1="560" y1="1568" x2="770" y2="1515" class="dashed-line" />
+  <rect x="616" y="1531" width="98" height="22" rx="4" class="label-bg" />
+  <text x="665" y="1547" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 4.2: Execute Physical Stock Adjustments (cy=1580) -->
+  <ellipse cx="910" cy="1580" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="1574" class="sub-uc-text">
+    <tspan x="910" dy="0">Execute Stock Adjustments</tspan>
+    <tspan x="910" dy="19">&amp; Physical Reconciliation</tspan>
+  </text>
+  <line x1="585" y1="1590" x2="765" y2="1585" class="dashed-line" />
+  <rect x="626" y="1576" width="98" height="22" rx="4" class="label-bg" />
+  <text x="675" y="1592" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 4.3: Append Movement Audit Trail Entry (cy=1665) -->
+  <ellipse cx="910" cy="1665" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="1659" class="sub-uc-text">
+    <tspan x="910" dy="0">Append Inventory Movement</tspan>
+    <tspan x="910" dy="19">Audit Trail Entry</tspan>
+  </text>
+  <line x1="565" y1="1610" x2="770" y2="1648" class="dashed-line" />
+  <rect x="618" y="1618" width="98" height="22" rx="4" class="label-bg" />
+  <text x="667" y="1634" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 5: Monitor Stock Levels & Alerts (cy=1830) -->
+  <ellipse cx="440" cy="1830" rx="145" ry="40" class="uc-oval" />
+  <text x="440" y="1823" class="main-uc-text">
+    <tspan x="440" dy="0">Monitor Stock Levels</tspan>
+    <tspan x="440" dy="22">&amp; Low-Stock Alerts</tspan>
+  </text>
+
+  <!-- Sub 5.1: Tag Damaged / Non-Sellable Footwear (cy=1780) -->
+  <ellipse cx="910" cy="1780" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="1774" class="sub-uc-text">
+    <tspan x="910" dy="0">Tag Damaged / Expired</tspan>
+    <tspan x="910" dy="19">Non-Sellable Footwear</tspan>
+  </text>
+  <line x1="575" y1="1815" x2="770" y2="1790" class="dashed-line" />
+  <rect x="623" y="1791" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="1807" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 5.2: Scan Reorder Thresholds & Low-Stock Alerts (cy=1870) -->
+  <ellipse cx="910" cy="1870" rx="145" ry="34" class="uc-oval" />
+  <text x="910" y="1864" class="sub-uc-text">
+    <tspan x="910" dy="0">Scan Reorder Thresholds &amp;</tspan>
+    <tspan x="910" dy="19">Receive Low-Stock Warnings</tspan>
+  </text>
+  <line x1="575" y1="1842" x2="770" y2="1860" class="dashed-line" />
+  <rect x="623" y="1840" width="98" height="22" rx="4" class="label-bg" />
+  <text x="672" y="1856" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- ========================================================================= -->
+  <!-- 5. ADMINISTRATOR USE CASES                                                 -->
+  <!-- ========================================================================= -->
+
+  <!-- PRIMARY 6: Manage User Accounts & Security Roles (cy=470) -->
+  <ellipse cx="1760" cy="470" rx="145" ry="40" class="uc-oval" />
+  <text x="1760" y="463" class="main-uc-text">
+    <tspan x="1760" dy="0">Manage User Accounts</tspan>
+    <tspan x="1760" dy="22">&amp; Security Roles</tspan>
+  </text>
+
+  <!-- Sub 6.1: Provision Staff Account (cy=390) -->
+  <ellipse cx="1290" cy="390" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="384" class="sub-uc-text">
+    <tspan x="1290" dy="0">Provision Staff Account &amp;</tspan>
+    <tspan x="1290" dy="19">Assign System Role</tspan>
+  </text>
+  <line x1="1630" y1="448" x2="1430" y2="408" class="dashed-line" />
+  <rect x="1481" y="417" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="433" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 6.2: Reset Password via Email OTP -> <<extend>> (cy=470) -->
+  <ellipse cx="1290" cy="470" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="464" class="sub-uc-text">
+    <tspan x="1290" dy="0">Reset Staff Password via</tspan>
+    <tspan x="1290" dy="19">Encrypted Email OTP</tspan>
+  </text>
+  <!-- Extension originates at (1435,470) pointing back to base (1615,470) -->
+  <line x1="1435" y1="470" x2="1615" y2="470" class="dashed-line" />
+  <rect x="1479" y="459" width="92" height="22" rx="4" class="label-bg" />
+  <text x="1525" y="475" class="stereotype">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- Sub 6.3: Update Permissions, Status, & Avatar (cy=550) -->
+  <ellipse cx="1290" cy="550" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="544" class="sub-uc-text">
+    <tspan x="1290" dy="0">Update Permissions, Status,</tspan>
+    <tspan x="1290" dy="19">&amp; Cloud Profile Avatar</tspan>
+  </text>
+  <line x1="1630" y1="492" x2="1430" y2="532" class="dashed-line" />
+  <rect x="1481" y="501" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="517" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 7: Manage Promotions & Marketing Campaigns (cy=810) -->
+  <ellipse cx="1760" cy="810" rx="145" ry="40" class="uc-oval" />
+  <text x="1760" y="803" class="main-uc-text">
+    <tspan x="1760" dy="0">Manage Promotions &amp;</tspan>
+    <tspan x="1760" dy="22">Marketing Campaigns</tspan>
+  </text>
+
+  <!-- Sub 7.1: Formulate Campaign Rules (cy=700) -->
+  <ellipse cx="1290" cy="700" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="694" class="sub-uc-text">
+    <tspan x="1290" dy="0">Formulate Campaign Rules &amp;</tspan>
+    <tspan x="1290" dy="19">Discount Percentages</tspan>
+  </text>
+  <line x1="1630" y1="785" x2="1430" y2="725" class="dashed-line" />
+  <rect x="1481" y="744" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="760" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 7.2: Link Targeted Slow-Moving Footwear (cy=780) -->
+  <ellipse cx="1290" cy="780" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="774" class="sub-uc-text">
+    <tspan x="1290" dy="0">Link Targeted Slow-Moving</tspan>
+    <tspan x="1290" dy="19">Footwear to Promotion</tspan>
+  </text>
+  <line x1="1620" y1="802" x2="1430" y2="788" class="dashed-line" />
+  <rect x="1476" y="784" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1525" y="800" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 7.3: Dispatch Promotional Email Notifications -> <<extend>> (cy=860) -->
+  <ellipse cx="1290" cy="860" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="854" class="sub-uc-text">
+    <tspan x="1290" dy="0">Dispatch Promotional Email</tspan>
+    <tspan x="1290" dy="19">Notifications to Customers</tspan>
+  </text>
+  <!-- Extension originates at (1435,850) pointing back to base (1625,820) -->
+  <line x1="1435" y1="850" x2="1625" y2="820" class="dashed-line" />
+  <rect x="1484" y="824" width="92" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="840" class="stereotype">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- Sub 7.4: Track Campaign Sales Lift (cy=940) -->
+  <ellipse cx="1290" cy="940" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="934" class="sub-uc-text">
+    <tspan x="1290" dy="0">Track Campaign Sales Lift &amp;</tspan>
+    <tspan x="1290" dy="19">Goal Attainment</tspan>
+  </text>
+  <line x1="1630" y1="835" x2="1430" y2="915" class="dashed-line" />
+  <rect x="1481" y="864" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="880" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 8: Analyze Sales Performance (cy=1200) -->
+  <ellipse cx="1760" cy="1200" rx="145" ry="40" class="uc-oval" />
+  <text x="1760" y="1193" class="main-uc-text">
+    <tspan x="1760" dy="0">Analyze Sales</tspan>
+    <tspan x="1760" dy="22">Performance</tspan>
+  </text>
+
+  <!-- Sub 8.1: View Top-Selling Footwear (cy=1115) -->
+  <ellipse cx="1290" cy="1115" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1109" class="sub-uc-text">
+    <tspan x="1290" dy="0">View Top-Selling Footwear</tspan>
+    <tspan x="1290" dy="19">Rankings &amp; Velocity</tspan>
+  </text>
+  <line x1="1630" y1="1178" x2="1430" y2="1135" class="dashed-line" />
+  <rect x="1481" y="1145" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="1161" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 8.2: Classify Fast/Slow Moving Items (cy=1200) -->
+  <ellipse cx="1290" cy="1200" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1194" class="sub-uc-text">
+    <tspan x="1290" dy="0">Classify Fast-Moving &amp;</tspan>
+    <tspan x="1290" dy="19">Slow-Moving Products</tspan>
+  </text>
+  <line x1="1615" y1="1200" x2="1435" y2="1200" class="dashed-line" />
+  <rect x="1476" y="1189" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1525" y="1205" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 8.3: Monitor Trends & Turnover Ratios (cy=1285) -->
+  <ellipse cx="1290" cy="1285" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1279" class="sub-uc-text">
+    <tspan x="1290" dy="0">Monitor Revenue Trends &amp;</tspan>
+    <tspan x="1290" dy="19">Inventory Turnover Ratios</tspan>
+  </text>
+  <line x1="1630" y1="1222" x2="1430" y2="1265" class="dashed-line" />
+  <rect x="1481" y="1233" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="1249" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 9: Generate Predictive Demand Forecasts (cy=1570) -->
+  <ellipse cx="1760" cy="1570" rx="145" ry="40" class="uc-oval" />
+  <text x="1760" y="1563" class="main-uc-text">
+    <tspan x="1760" dy="0">Generate Predictive</tspan>
+    <tspan x="1760" dy="22">Demand Forecasts</tspan>
+  </text>
+
+  <!-- Sub 9.1: Run Ensemble Models (SMA, LR, Exp Smoothing) (cy=1485) -->
+  <ellipse cx="1290" cy="1485" rx="145" ry="35" class="uc-oval" />
+  <text x="1290" y="1479" class="sub-uc-text">
+    <tspan x="1290" dy="0">Run Statistical Models</tspan>
+    <tspan x="1290" dy="19">(SMA, LR, Exp Smoothing)</tspan>
+  </text>
+  <line x1="1630" y1="1548" x2="1430" y2="1508" class="dashed-line" />
+  <rect x="1481" y="1517" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="1533" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 9.2: Evaluate Safety Stock & Stockout Risks (cy=1570) -->
+  <ellipse cx="1290" cy="1570" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1564" class="sub-uc-text">
+    <tspan x="1290" dy="0">Evaluate Safety Stock &amp;</tspan>
+    <tspan x="1290" dy="19">Stockout Probability Risks</tspan>
+  </text>
+  <line x1="1615" y1="1570" x2="1435" y2="1570" class="dashed-line" />
+  <rect x="1476" y="1559" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1525" y="1575" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 9.3: Track Forecast Accuracy Benchmarks (cy=1655) -->
+  <ellipse cx="1290" cy="1655" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1649" class="sub-uc-text">
+    <tspan x="1290" dy="0">Track Historical Model</tspan>
+    <tspan x="1290" dy="19">Accuracy Benchmarks</tspan>
+  </text>
+  <line x1="1630" y1="1592" x2="1430" y2="1632" class="dashed-line" />
+  <rect x="1481" y="1601" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="1617" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- PRIMARY 10: Generate Business Reports (cy=1990) -->
+  <ellipse cx="1760" cy="1990" rx="145" ry="40" class="uc-oval" />
+  <text x="1760" y="1983" class="main-uc-text">
+    <tspan x="1760" dy="0">Generate Operational</tspan>
+    <tspan x="1760" dy="22">Business Reports</tspan>
+  </text>
+
+  <!-- Sub 10.1: Sales & Financial Summaries (cy=1860) -->
+  <ellipse cx="1290" cy="1860" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1854" class="sub-uc-text">
+    <tspan x="1290" dy="0">Compile Sales &amp; Financial</tspan>
+    <tspan x="1290" dy="19">Revenue Summaries</tspan>
+  </text>
+  <line x1="1630" y1="1962" x2="1430" y2="1885" class="dashed-line" />
+  <rect x="1481" y="1913" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1530" y="1929" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 10.2: Inventory Valuation & Movement History (cy=1945) -->
+  <ellipse cx="1290" cy="1945" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="1939" class="sub-uc-text">
+    <tspan x="1290" dy="0">Compile Inventory Valuation</tspan>
+    <tspan x="1290" dy="19">&amp; Movement History Logs</tspan>
+  </text>
+  <line x1="1620" y1="1978" x2="1430" y2="1955" class="dashed-line" />
+  <rect x="1476" y="1955" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1525" y="1971" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 10.3: Replacement & Defect Audit Logs (cy=2030) -->
+  <ellipse cx="1290" cy="2030" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="2024" class="sub-uc-text">
+    <tspan x="1290" dy="0">Compile Replacement &amp;</tspan>
+    <tspan x="1290" dy="19">Defect Audit Logs</tspan>
+  </text>
+  <line x1="1620" y1="2002" x2="1430" y2="2022" class="dashed-line" />
+  <rect x="1476" y="2001" width="98" height="22" rx="4" class="label-bg" />
+  <text x="1525" y="2017" class="stereotype">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- Sub 10.4: Export Formatted PDF/Excel -> <<extend>> (cy=2115) -->
+  <ellipse cx="1290" cy="2115" rx="145" ry="34" class="uc-oval" />
+  <text x="1290" y="2109" class="sub-uc-text">
+    <tspan x="1290" dy="0">Export Formatted Business</tspan>
+    <tspan x="1290" dy="19">Reports (PDF / Excel)</tspan>
+  </text>
+  <!-- Extension originates at (1435,2095) pointing back to base (1630,2015) -->
+  <line x1="1435" y1="2095" x2="1630" y2="2015" class="dashed-line" />
+  <rect x="1486" y="2044" width="92" height="22" rx="4" class="label-bg" />
+  <text x="1532" y="2060" class="stereotype">&lt;&lt;extend&gt;&gt;</text>
+
+</svg>

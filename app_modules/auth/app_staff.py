@@ -38,6 +38,7 @@ def sync_staff_user_record(
     fetch_rows,
     safe_int,
     supabase,
+    hash_password=None,
 ):
     username = str(account.get("username", "")).strip()
     if not username:
@@ -47,10 +48,15 @@ def sync_staff_user_record(
     if role_id <= 0:
         return None
 
+    stored_hash = account.get("password_hash")
+    if not stored_hash and hash_password:
+        raw_pw = account.get("password") or "staff123"
+        stored_hash = hash_password(raw_pw)
+
     payload = {
         "name": account.get("name", "Staff User"),
         "username": username,
-        "password": account.get("password", "") or "staff123",
+        "password": stored_hash or account.get("password", "") or "staff123",
         "role_id": role_id,
         "status": db_user_status(account.get("status", "active")),
     }
@@ -123,7 +129,6 @@ def upsert_staff_account(
         "name": str(name or "").strip(),
         "username": str(username or "").strip(),
         "email": normalized_email,
-        "password": password,
         "password_hash": hash_password(password),
         "role": normalize_staff_role(role),
         "status": normalize_account_status(status),

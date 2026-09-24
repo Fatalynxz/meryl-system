@@ -648,16 +648,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (updateError) throw updateError;
 
-    // Update public user table password
+    // Update password securely via RPC if present
     try {
       await supabase.rpc("reset_user_password_by_email", { p_new_password: clean });
     } catch {
-      // RPC not present or ignored
-    }
-    try {
-      await supabase.from("user").update({ password: clean }).eq("email", authUser.email);
-    } catch {
-      // Direct update fallback ignored
+      // RPC handled securely DB-side
     }
 
     // Sync to Python backend if available
@@ -723,16 +718,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Auth user update ignored if not supported
       }
 
-      // Update public "user" table password
+      // Update password securely via RPC if present
       try {
         await supabase.rpc("reset_user_password_by_email", { p_new_password: cleanPassword });
       } catch {
-        // RPC not present or ignored
-      }
-      try {
-        await supabase.from("user").update({ password: cleanPassword }).eq("email", normalizedEmail);
-      } catch {
-        // Direct table update fallback ignored
+        // RPC handled securely DB-side
       }
 
       // Also sync to backend if running

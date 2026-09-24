@@ -1,0 +1,5 @@
+[run]
+omit =
+    *run_pytest_runner*
+    *whitebox_test_suite*
+

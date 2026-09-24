@@ -185,6 +185,29 @@ app.config.update(
 )
 
 
+ALLOWED_ORIGINS = {
+    "https://meryl-system.onrender.com",
+    "http://localhost:5173",
+    "http://localhost:5000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5000",
+}
+
+
+@app.before_request
+def handle_cors_preflight():
+    if request.method == "OPTIONS":
+        origin = request.headers.get("Origin")
+        if origin and (origin in ALLOWED_ORIGINS or (os.getenv("FLASK_ENV") != "production" and ("localhost" in origin or "127.0.0.1" in origin))):
+            res = Response("", status=204)
+            res.headers["Access-Control-Allow-Origin"] = origin
+            res.headers["Access-Control-Allow-Credentials"] = "true"
+            res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, apikey"
+            res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            return res
+        return Response("Forbidden Origin", status=403)
+
+
 @app.after_request
 def add_security_headers(response):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
@@ -192,14 +215,26 @@ def add_security_headers(response):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(self)"
+
+    # Restrict CORS to trusted origins only (prevent arbitrary-origin reflection)
+    origin = request.headers.get("Origin")
+    if origin and (origin in ALLOWED_ORIGINS or (os.getenv("FLASK_ENV") != "production" and ("localhost" in origin or "127.0.0.1" in origin))):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, apikey"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+
+    # Tightened CSP: no unsafe-eval, no unsafe-inline in script-src, narrowed origins
+    supabase_origin = os.getenv("SUPABASE_URL", "https://vylmcqmxpxqkldosowrs.supabase.co").rstrip("/")
+    supabase_ws = supabase_origin.replace("https://", "wss://").replace("http://", "ws://")
     csp = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co; "
+        f"script-src 'self' {supabase_origin}; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob: https:; "
         "media-src 'self' blob: data:; "
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.brevo.com; "
+        f"connect-src 'self' {supabase_origin} {supabase_ws} https://api.brevo.com; "
         "frame-ancestors 'self';"
     )
     response.headers["Content-Security-Policy"] = csp
@@ -613,6 +648,7 @@ def sync_staff_user_record(account, previous_username=None):
         fetch_rows=fetch_rows,
         safe_int=safe_int,
         supabase=supabase(),
+        hash_password=hash_password,
     )
 
 
@@ -857,11 +893,12 @@ def update_staff_password_by_email(email, new_password):
 
     accounts = load_auth_accounts()
     password_updated = False
+    hashed = hash_password(clean_password)
     for account in accounts:
         if str(account.get("email") or "").strip().lower() != normalized_email:
             continue
-        account["password"] = clean_password
-        account["password_hash"] = hash_password(clean_password)
+        account.pop("password", None)
+        account["password_hash"] = hashed
         account["updated_at"] = datetime.now().isoformat()
         password_updated = True
         sync_staff_user_record(account)
@@ -870,7 +907,7 @@ def update_staff_password_by_email(email, new_password):
         save_auth_accounts(accounts)
 
     user_payload = {
-        "password": clean_password,
+        "password": hashed,
         "updated_at": datetime.now().isoformat(),
     }
     result = (
@@ -905,15 +942,18 @@ def create_user_profile(name, username, role, password=None, status="active"):
         if role_id <= 0:
             return None
 
+        raw_pw = password or (
+            os.getenv("ADMIN_PASSWORD", "admin123") if canonical_app_role_name(role) == "admin" else "staff123"
+        )
+        hashed_pw = raw_pw if str(raw_pw).startswith("$2") else hash_password(raw_pw)
+
         created = (
             supabase().table("user")
             .insert(
                 {
                     "name": name,
                     "username": username,
-                    "password": password or (
-                        os.getenv("ADMIN_PASSWORD", "admin123") if canonical_app_role_name(role) == "admin" else "staff123"
-                    ),
+                    "password": hashed_pw,
                     "role_id": role_id,
                     "status": db_user_status(status),
                 }
@@ -1588,9 +1628,17 @@ def verify_credentials_server(identifier, password):
                     matched = bcrypt.checkpw(clean_password.encode("utf-8"), db_pw.encode("utf-8"))
                 except Exception:
                     pass
-            if not matched:
+            elif db_pw:
                 sha = hashlib.sha256(clean_password.encode("utf-8")).hexdigest()
-                matched = (db_pw == clean_password) or (db_pw == sha)
+                if hmac.compare_digest(db_pw, sha) or db_pw == clean_password:
+                    matched = True
+                    # Auto-upgrade legacy password to bcrypt
+                    try:
+                        upgraded = hash_password(clean_password)
+                        supabase().table("user").update({"password": upgraded}).eq("user_id", row.get("user_id")).execute()
+                        logger.info(f"Auto-upgraded user {clean_identifier} password to bcrypt")
+                    except Exception as up_err:
+                        logger.warning(f"Could not auto-upgrade password for {clean_identifier}: {up_err}")
 
             if matched:
                 role_id = row.get("role_id")

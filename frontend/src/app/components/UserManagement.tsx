@@ -126,7 +126,7 @@ export function UserManagement() {
         staff_code: String(raw.staff_code ?? ''),
         name: String(raw.name ?? 'Unnamed User'),
         username: String(raw.username ?? '').toLowerCase(),
-        password: String(raw.password ?? ''),
+        password: '',
         email: raw.email ?? '',
         role,
         role_id: String(raw.role_id ?? raw.role?.role_id ?? ''),
@@ -172,8 +172,6 @@ export function UserManagement() {
     };
     if (source.password.trim()) {
       payload.password = source.password.trim();
-    } else if (existing?.password) {
-      payload.password = existing.password;
     }
     return payload;
   };

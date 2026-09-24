@@ -103,9 +103,6 @@ async function updateUserFallback(id: string, payload: any) {
   if (payload.avatar_url !== undefined) {
     updatePayload.avatar_url = payload.avatar_url || null;
   }
-  if (String(payload.password ?? "").trim()) {
-    updatePayload.password = payload.password;
-  }
   let { data, error } = await supabase
     .from("user")
     .update(updatePayload)
